@@ -10,8 +10,7 @@ import type { ParsedLine, ParsePreset } from "./types";
 export type Anchor =
   | "free"        // draggable anywhere (seret di preview)
   | "kiri-atas"
-  | "kiri-bawah"
-  | "luar-bawah"; // black extension BELOW the photo — screenshot stays clean
+  | "kiri-bawah";
 
 /** Background behind a block's rows. */
 export type BgMode = "none" | "block" | "mask";
@@ -88,8 +87,6 @@ export interface AppState {
   /** Vertical nudge for BG strips, px (fine-tune around the auto shift). */
   bgOffset: number;
 
-  /** Solid color of the "Luar" area below the photo. */
-  luarColor: string;
 
   /** Font family for all chat text — picked from the installed system fonts. */
   fontFamily: string;
@@ -157,7 +154,6 @@ export const state: AppState = {
   strokeWidth: null,
   lineGap: 122,
   bgOffset: 0,
-  luarColor: "#000000",
   fontFamily: "Arial",
   preset: structuredClone(DEFAULT_PRESET),
   fileNameTemplate: "screenie-{tanggal}-{jam}",

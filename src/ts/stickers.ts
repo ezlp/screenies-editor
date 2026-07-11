@@ -9,6 +9,7 @@
 import { state, notify } from "./state";
 import type { Sticker } from "./state";
 import { clampBlocksToOutput } from "./canvas";
+import { commit } from "./history";
 
 const ACCEPTED = ["image/png", "image/webp"];
 let seq = 0;
@@ -46,11 +47,41 @@ function loadSticker(file: File): void {
       };
       state.stickers.push(st);
       listEl.appendChild(buildCard(st));
+      commit();
       notify();
     };
     img.src = String(reader.result);
   };
   reader.readAsDataURL(file);
+}
+
+/** Undo/redo: rebuild sticker list + state from snapshot data. */
+export async function rebuildStickersFrom(
+  snaps: Array<{ name: string; src: string; base64: string; x: number; y: number; scale: number }>,
+): Promise<void> {
+  listEl.innerHTML = "";
+  state.stickers = [];
+  await Promise.all(
+    snaps.map(
+      (sn) =>
+        new Promise<void>((resolve) => {
+          const img = new Image();
+          img.onload = () => {
+            const st: Sticker = {
+              id: ++seq, name: sn.name, dataBase64: sn.base64, img,
+              x: sn.x, y: sn.y, scale: sn.scale,
+            };
+            state.stickers.push(st);
+            listEl.appendChild(buildCard(st));
+            const slider = listEl.lastElementChild?.querySelector("input[type=range]") as HTMLInputElement | null;
+            if (slider) slider.value = String(st.scale);
+            resolve();
+          };
+          img.onerror = () => resolve();
+          img.src = sn.src;
+        }),
+    ),
+  );
 }
 
 function buildCard(st: Sticker): HTMLElement {
@@ -69,6 +100,7 @@ function buildCard(st: Sticker): HTMLElement {
   remove.addEventListener("click", () => {
     state.stickers = state.stickers.filter((s) => s.id !== st.id);
     card.remove();
+    commit();
     notify();
   });
   head.append(name, remove);
@@ -93,6 +125,7 @@ function buildCard(st: Sticker): HTMLElement {
     clampBlocksToOutput(); // keep it grabbable if it grew off-canvas
     notify();
   });
+  slider.addEventListener("change", commit);
   row.append(label, slider, val);
 
   card.append(head, row);

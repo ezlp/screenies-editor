@@ -13,6 +13,8 @@ import { DEFAULT_TEXT_X, DEFAULT_TEXT_Y, state, notify } from "./state";
 import type { Anchor, BgMode, ChatBlock } from "./state";
 import { fitImage, getBlockBounds } from "./canvas";
 import { onImageLoaded } from "./crop";
+import { commit } from "./history";
+import { t } from "./i18n";
 import { autoTextSize } from "./textstyle";
 
 const DEBOUNCE_MS = 150;
@@ -20,18 +22,21 @@ const ACCEPTED = ["image/png", "image/jpeg", "image/webp", "image/bmp"];
 /** Vertical offset between newly added free blocks so they don't stack. */
 const NEW_BLOCK_STEP = 70;
 
-const ANCHOR_OPTIONS: Array<{ value: Anchor; label: string }> = [
-  { value: "free", label: "Bebas (seret)" },
-  { value: "kiri-atas", label: "Kiri Atas" },
-  { value: "kiri-bawah", label: "Kiri Bawah" },
-  { value: "luar-bawah", label: "Luar (bawah foto)" },
-];
+function anchorOptions(): Array<{ value: Anchor; label: string }> {
+  return [
+    { value: "free", label: t("anchorFree") },
+    { value: "kiri-atas", label: t("anchorTopLeft") },
+    { value: "kiri-bawah", label: t("anchorBottomLeft") },
+  ];
+}
 
-const BG_OPTIONS: Array<{ value: BgMode; label: string }> = [
-  { value: "none", label: "BG: tanpa" },
-  { value: "block", label: "BG: blok" },
-  { value: "mask", label: "BG: mask" },
-];
+function bgOptions(): Array<{ value: BgMode; label: string }> {
+  return [
+    { value: "none", label: t("bgNone") },
+    { value: "block", label: t("bgBlock") },
+    { value: "mask", label: t("bgMask") },
+  ];
+}
 
 let blockSeq = 0;
 let listEl: HTMLElement;
@@ -43,6 +48,56 @@ let activeArea: { blockId: number; textarea: HTMLTextAreaElement } | null = null
 
 export function getActiveChatArea(): HTMLTextAreaElement | null {
   return activeArea?.textarea ?? null;
+}
+
+/** Language switch: retranslate every card's dropdown options in place. */
+function relabelSelects(): void {
+  const container = document.getElementById("chatlog-list");
+  if (!container) return;
+  for (const card of Array.from(container.children)) {
+    const selects = card.querySelectorAll("select");
+    const sets = [anchorOptions(), bgOptions()];
+    selects.forEach((sel, i) => {
+      const opts = sets[i];
+      if (!opts) return;
+      Array.from(sel.options).forEach((o, j) => {
+        if (opts[j]) o.textContent = opts[j].label;
+      });
+    });
+  }
+}
+
+/** Set by initChatlog; lets paste/drop handlers reuse the photo loader. */
+let imageLoader: ((file: File) => void) | null = null;
+
+export function loadPhotoFile(file: File): void {
+  imageLoader?.(file);
+}
+
+/** Undo/redo: rebuild all block cards + state from plain snapshot data. */
+export async function rebuildBlocksFrom(
+  snaps: Array<{ rawText: string; anchor: Anchor; bgMode: BgMode; x: number; y: number }>,
+): Promise<void> {
+  const container = mustGet<HTMLElement>("chatlog-list");
+  container.innerHTML = "";
+  statusById.clear();
+  activeArea = null;
+  state.blocks = [];
+  for (const s of snaps) {
+    const block = addBlock();
+    block.rawText = s.rawText;
+    block.anchor = s.anchor;
+    block.bgMode = s.bgMode;
+    block.x = s.x;
+    block.y = s.y;
+    const card = container.lastElementChild;
+    const ta = card?.querySelector("textarea");
+    if (ta) ta.value = s.rawText;
+    const selects = card?.querySelectorAll("select");
+    if (selects && selects[0]) (selects[0] as HTMLSelectElement).value = s.anchor;
+    if (selects && selects[1]) (selects[1] as HTMLSelectElement).value = s.bgMode;
+  }
+  await reparseAllBlocks();
 }
 
 /* ── image upload (unchanged behavior) ── */
@@ -92,6 +147,7 @@ export function initUpload(): void {
     notify();
   });
 
+  imageLoader = loadImageFile;
   function loadImageFile(file: File): void {
     if (!ACCEPTED.includes(file.type)) {
       console.warn(`[screenies-editor] Ignored non-image file: ${file.name} (${file.type})`);
@@ -121,11 +177,20 @@ export function initUpload(): void {
 export function initChatlog(): void {
   listEl = mustGet<HTMLElement>("chatlog-list");
   const addBtn = mustGet<HTMLButtonElement>("btn-add-chatlog");
-  addBtn.addEventListener("click", () => addBlock());
+  addBtn.textContent = t("addChatlog");
+  window.addEventListener("i18n-changed", () => {
+    addBtn.textContent = t("addChatlog");
+    relabelSelects();
+  });
+
+  addBtn.addEventListener("click", () => {
+    addBlock();
+    commit();
+  });
   if (state.blocks.length === 0) addBlock(); // start with one block
 }
 
-function addBlock(): void {
+function addBlock(): ChatBlock {
   const block: ChatBlock = {
     id: ++blockSeq,
     rawText: "",
@@ -150,6 +215,7 @@ function removeBlock(id: number, card: HTMLElement): void {
   state.blocks = state.blocks.filter((b) => b.id !== id);
   card.remove();
   refreshTitles();
+  commit();
   notify();
 }
 
@@ -167,7 +233,7 @@ function buildCard(block: ChatBlock): HTMLElement {
   const select = document.createElement("select");
   select.className = "select";
   select.title = "Posisi chatlog";
-  for (const opt of ANCHOR_OPTIONS) {
+  for (const opt of anchorOptions()) {
     const o = document.createElement("option");
     o.value = opt.value;
     o.textContent = opt.label;
@@ -183,13 +249,14 @@ function buildCard(block: ChatBlock): HTMLElement {
       block.y = b ? b.y : DEFAULT_TEXT_Y;
     }
     block.anchor = next;
+    commit();
     notify();
   });
 
   const bgSelect = document.createElement("select");
   bgSelect.className = "select select-compact";
   bgSelect.title = "Background di belakang teks";
-  for (const opt of BG_OPTIONS) {
+  for (const opt of bgOptions()) {
     const o = document.createElement("option");
     o.value = opt.value;
     o.textContent = opt.label;
@@ -198,6 +265,7 @@ function buildCard(block: ChatBlock): HTMLElement {
   bgSelect.value = block.bgMode;
   bgSelect.addEventListener("change", () => {
     block.bgMode = bgSelect.value as BgMode;
+    commit();
     notify();
   });
 
@@ -241,7 +309,8 @@ function buildCard(block: ChatBlock): HTMLElement {
         const lines = await parseChatlog(textarea.value, state.preset);
         if (seq !== requestSeq) return; // a newer request finished later
         block.lines = lines;
-        status.textContent = `${lines.length} baris`;
+        status.textContent = `${lines.length} ${t("lines")}`;
+        commit();
         notify();
       } catch (err) {
         status.textContent = "gagal memproses — lihat console";

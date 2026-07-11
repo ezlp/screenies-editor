@@ -8,6 +8,7 @@
  */
 
 import { DEFAULT_FILTERS, state, notify } from "./state";
+import { commit } from "./history";
 import type { Filters } from "./state";
 
 interface FilterDef {
@@ -22,6 +23,17 @@ const DEFS: FilterDef[] = [
   { key: "saturate", max: 200 },
   { key: "contrast", max: 200 },
 ];
+
+/** Undo/redo: point the sliders at the restored state. */
+export function syncFiltersUI(): void {
+  for (const def of DEFS) {
+    const row = document.querySelector<HTMLElement>(`.filter-row[data-filter="${def.key}"]`);
+    const slider = row?.querySelector<HTMLInputElement>("input[type=range]");
+    const value = row?.querySelector<HTMLElement>(".filter-val");
+    if (slider) slider.value = String(state.filters[def.key]);
+    if (value) value.textContent = `${state.filters[def.key]}%`;
+  }
+}
 
 export function initFilters(): void {
   for (const def of DEFS) {
@@ -51,10 +63,12 @@ export function initFilters(): void {
       sync();
       notify();
     });
+    slider.addEventListener("change", commit); // one undo step per release
 
     reset.addEventListener("click", () => {
       state.filters[def.key] = DEFAULT_FILTERS[def.key];
       sync();
+      commit();
       notify();
     });
 

@@ -7,9 +7,10 @@
  */
 
 import { effectiveStroke, state, onChange } from "./state";
-import { buildRenderBlocks, outputDims, photoDims, sourceCrop } from "./canvas";
+import { buildRenderBlocks, outputDims, sourceCrop } from "./canvas";
 import { copyPng, exportPng } from "./tauri-bridge";
 import { scheduleSaveSettings } from "./settings";
+import { t } from "./i18n";
 import type { RenderJobPayload } from "./tauri-bridge";
 
 let saveBtn: HTMLButtonElement;
@@ -19,6 +20,12 @@ let busy = false;
 export function initExport(): void {
   saveBtn = mustGet<HTMLButtonElement>("btn-save");
   copyBtn = mustGet<HTMLButtonElement>("btn-copy");
+  window.addEventListener("i18n-changed", () => {
+    if (!busy) {
+      saveBtn.textContent = t("saveIdle");
+      copyBtn.textContent = t("copyIdle");
+    }
+  });
 
   const template = mustGet<HTMLInputElement>("file-name-template");
   template.value = state.fileNameTemplate;
@@ -46,11 +53,11 @@ async function run(kind: "save" | "copy"): Promise<void> {
   if (!job || busy) return;
 
   const btn = kind === "save" ? saveBtn : copyBtn;
-  const idle = kind === "save" ? "Save Disk (.png)" : "Copy ke Clipboard";
+  const idle = kind === "save" ? t("saveIdle") : t("copyIdle");
   busy = true;
   saveBtn.disabled = true;
   copyBtn.disabled = true;
-  btn.textContent = kind === "save" ? "Merender…" : "Menyalin…";
+  btn.textContent = kind === "save" ? t("saving") : t("copying");
 
   try {
     if (kind === "save") {
@@ -58,12 +65,12 @@ async function run(kind: "save" | "copy"): Promise<void> {
       btn.textContent = idle;
     } else {
       await copyPng(job);
-      btn.textContent = "Disalin ✓";
+      btn.textContent = t("copied");
       window.setTimeout(() => (btn.textContent = idle), 1400);
     }
   } catch (err) {
     console.error(`[screenies-editor] ${kind} failed:`, err);
-    btn.textContent = "Gagal — lihat console";
+    btn.textContent = t("failed");
     window.setTimeout(() => (btn.textContent = idle), 2200);
   } finally {
     busy = false;
@@ -88,15 +95,10 @@ function buildJob(): RenderJobPayload | null {
   const blocks = buildRenderBlocks(out.w)
     .filter((b) => b.rows.length > 0)
     .map((b) => ({ rows: b.rows }));
-  const total = outputDims() ?? out; // build refreshed the Luar strip
-  const photo = photoDims() ?? total;
-
   return {
     imageBase64: img.src.slice(comma + 1),
     crop: { x: crop.x, y: crop.y, w: crop.w, h: crop.h },
-    output: { w: total.w, h: total.h },
-    photo: { w: photo.w, h: photo.h },
-    luarColor: state.luarColor,
+    output: { w: out.w, h: out.h },
     stickers: state.stickers.map((st) => ({
       dataBase64: st.dataBase64,
       x: Math.round(st.x),

@@ -9,6 +9,7 @@
 import { loadSettings, saveSettings } from "./tauri-bridge";
 import { state } from "./state";
 import { currentTheme, setTheme } from "./theme";
+import { getLang, setLang } from "./i18n";
 
 const SAVE_DEBOUNCE_MS = 400;
 let timer: number | undefined;
@@ -21,7 +22,7 @@ export async function applyLoadedSettings(): Promise<void> {
     state.fontFamily = s.fontFamily;
     state.preset = s.preset;
     if (s.fileNameTemplate) state.fileNameTemplate = s.fileNameTemplate;
-    if (s.luarColor) state.luarColor = s.luarColor;
+    setLang(s.lang === "en" ? "en" : "id");
     setTheme(s.theme === "light" ? "light" : "dark");
   } catch (err) {
     console.error("[screenies-editor] load_settings failed:", err);
@@ -41,7 +42,7 @@ async function persist(): Promise<void> {
       fontFamily: state.fontFamily,
       preset: state.preset,
       fileNameTemplate: state.fileNameTemplate,
-      luarColor: state.luarColor,
+      lang: getLang(),
     });
   } catch (err) {
     console.error("[screenies-editor] save_settings failed:", err);

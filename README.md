@@ -22,15 +22,29 @@ Semua offline, tanpa upload ke mana-mana.
 | 🖼️ **Resolusi & crop** | 800×600 · 4:3 · 16:9 · 21:9 · 4K · W×H kustom · Bebas — kotak crop dengan ratio lock |
 | 🎛️ **Filter live** | Brightness (s.d. 300%) / Grayscale / Sepia / Saturate / Contrast — foto saja, teks tetap tajam |
 | ✍️ **Kontrol teks** | Font sistem, ukuran 8–60px, outline 0–10px (auto), jarak baris, palet warna seleksi |
-| 🏷️ **BG & Luar** | BG blok / mask per chatlog + posisi **Luar (bawah foto)**: teks di area warna solid di bawah foto — screenshot bersih |
+| 🏷️ **Background teks** | BG *blok* (per baris) atau *mask* (selebar gambar) per chatlog, dengan slider Geser BG |
 | 🖼️ **Stiker** | Import PNG/WebP, seret di preview, skala 10–300% |
 | 💾 **Export Rust** | Save Disk (.png) & Copy ke Clipboard — render penuh sampai 4K, **persis seperti preview** |
-| ⚙️ **Nyaman** | Dark/light mode, settings tersimpan, template nama file `{tanggal} {jam} {res} {foto}`, folder terakhir diingat |
+| ⚙️ **Nyaman** | Undo/redo (Ctrl+Z/Y), paste foto (Ctrl+V), Bahasa ID/EN, dark/light mode, settings tersimpan, template nama file, folder terakhir diingat |
+
+> **English:** see [README.en.md](README.en.md)
+
+## ⚠️ Catatan Windows: butuh WebView2 (runtime Edge)
+
+Versi saat ini memakai **Microsoft WebView2**. Windows 11 & Windows 10
+terbaru sudah punya bawaan; **laptop lama** mungkin belum — installer akan
+mengunduhnya otomatis saat pemasangan (butuh internet sekali). Kalau
+gagal, pasang manual "WebView2 Runtime (Evergreen)" dari situs Microsoft.
+
+**Kabar baiknya:** kami sedang **migrasi ke teknologi lain** (shell native
+tanpa WebView2 sama sekali) supaya laptop lama tetap bisa jalan — progres
+& rencananya terbuka di [docs/NATIVE-MIGRATION.md](docs/NATIVE-MIGRATION.md).
 
 ## 📥 Download & Install
 
 Ambil dari **[Releases](../../releases)**: Windows `-setup.exe` (64/32-bit) ·
-Linux `.deb` / `.AppImage`. Windows SmartScreen: *More info → Run anyway*
+Linux `.deb` / `.AppImage`. Pakai yang berlabel **Latest**; release berlabel
+*Pre-release* / *nightly* adalah build percobaan untuk penguji. Windows SmartScreen: *More info → Run anyway*
 (installer belum ditandatangani). Panduan lengkap ada di **Wiki**.
 
 ## 🚀 Cara pakai (30 detik)
@@ -55,6 +69,12 @@ Linux `.deb` / `.AppImage`. Windows SmartScreen: *More info → Run anyway*
 
 Arsitektur & panduan kontributor: **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)** ·
 Riwayat rilis: **[docs/CHANGELOG.md](docs/CHANGELOG.md)**
+
+## 🧪 Eksperimen: shell native (egui)
+
+Folder `native/` berisi versi eksperimental **tanpa WebView2** (untuk
+laptop lama) dengan pipeline render yang sama persis — tidak pernah ikut
+release resmi. Rencana lengkap: [docs/NATIVE-MIGRATION.md](docs/NATIVE-MIGRATION.md).
 
 ## 🗺️ Setelah 1.0
 

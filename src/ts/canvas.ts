@@ -21,6 +21,7 @@ import {
   notify,
 } from "./state";
 import { effectiveStroke } from "./state";
+import { commit } from "./history";
 import type { ChatBlock, CropRect, Sticker } from "./state";
 import type { ColorSpan, ParsedLine } from "./types";
 
@@ -55,9 +56,6 @@ interface Bounds {
 
 const boundsById = new Map<number, Bounds>();
 const stickerBoundsById = new Map<number, Bounds>();
-
-/** Height of the "Luar" strip below the photo — set on every layout pass. */
-let lastExtension = 0;
 
 type Corner = "tl" | "tr" | "bl" | "br";
 type DragMode = "none" | "pan" | "text" | "sticker" | "crop-move" | "crop-resize";
@@ -113,30 +111,19 @@ export function sourceCrop(): CropRect | null {
   return state.crop ?? { x: 0, y: 0, w: img.width, h: img.height };
 }
 
-/** The photo's area — the chosen resolution (or the crop's own pixels). */
-export function photoDims(): { w: number; h: number } | null {
+/** FINAL output dimensions — the saved PNG, the text space, the HUD. */
+export function outputDims(): { w: number; h: number } | null {
   const crop = sourceCrop();
   if (!crop) return null;
   if (state.outputSize) return { ...state.outputSize };
   return { w: Math.round(crop.w), h: Math.round(crop.h) };
 }
 
-/**
- * FINAL output dimensions (saved PNG, text space, HUD): the photo area
- * plus the "Luar" strip below it. With Luar text, the PNG is TALLER than
- * the chosen resolution — by design, so the photo itself never shrinks.
- */
-export function outputDims(): { w: number; h: number } | null {
-  const photo = photoDims();
-  if (!photo) return null;
-  return { w: photo.w, h: photo.h + lastExtension };
-}
-
 /** Zoom so the current subject (output or full photo) fits, centered. */
 export function fitImage(): void {
   const subject = state.cropEditing
     ? state.image && { w: state.image.width, h: state.image.height }
-    : (totalDims() ?? outputDims());
+    : (outputDims());
   if (!subject) return;
   const vw = viewport.clientWidth;
   const vh = viewport.clientHeight;
@@ -147,18 +134,13 @@ export function fitImage(): void {
   notify();
 }
 
-/** Alias — output already includes the Luar strip in every mode. */
-export function totalDims(): { w: number; h: number } | null {
-  return outputDims();
-}
-
 export function getBlockBounds(id: number): Bounds | undefined {
   return boundsById.get(id);
 }
 
 /** Keep every free block reachable when the output dimensions change. */
 export function clampBlocksToOutput(): void {
-  const out = totalDims() ?? outputDims();
+  const out = outputDims();
   if (!out) return;
   for (const block of state.blocks) {
     if (block.anchor !== "free") continue;
@@ -261,20 +243,12 @@ function drawResult(img: HTMLImageElement): void {
   const out = outputDims();
   if (!out) return;
 
-  const built = buildRenderBlocks(out.w); // refreshes lastExtension
+  const built = buildRenderBlocks(out.w);
 
   const crop = sourceCrop();
-  const photo = photoDims();
-  if (!crop || !photo) return;
+  if (!crop) return;
 
-  imgCtx.drawImage(img, crop.x, crop.y, crop.w, crop.h, 0, 0, photo.w, photo.h);
-
-  // The Luar strip — on the UI layer, in the chosen solid color, never
-  // touched by the photo filters.
-  if (photo.h < out.h) {
-    ctx.fillStyle = state.luarColor;
-    ctx.fillRect(0, photo.h, out.w, out.h - photo.h);
-  }
+  imgCtx.drawImage(img, crop.x, crop.y, crop.w, crop.h, 0, 0, out.w, out.h);
 
   drawStickers();
   drawBuilt(built);
@@ -371,39 +345,14 @@ export function buildRenderBlocks(
   const advance = size * (state.lineGap / 100);
   const result: Array<{ blockId: number; rows: RenderRow[]; bounds: Bounds | null }> = [];
 
-  // Luar is two-pass: measure Luar block heights first (strip size),
-  // then lay everything out for real. Measured layouts are cached and
-  // reused in pass 2 — each Luar block is laid out exactly once.
-  const luarLayouts = new Map<number, BlockLayout>();
-  let stripNeed = 0;
-  for (const b of state.blocks) {
-    if (b.anchor !== "luar-bawah" || b.lines.length === 0) continue;
-    const lay = layoutLines(b.lines, size, wrapWidthFor(b, outputWidth), advance);
-    luarLayouts.set(b.id, lay);
-    stripNeed += lay.height + MARGIN_Y;
-  }
-  lastExtension = stripNeed > 0 ? Math.round(stripNeed + MARGIN_Y) : 0;
-
-  const photoBottom = photoDims()?.h ?? 0;
-  let luarY = photoBottom + MARGIN_Y;
-
   for (const block of state.blocks) {
     if (block.lines.length === 0) {
       result.push({ blockId: block.id, rows: [], bounds: null });
       continue;
     }
 
-    const layout =
-      luarLayouts.get(block.id) ??
-      layoutLines(block.lines, size, wrapWidthFor(block, outputWidth), advance);
-
-    let origin: { x: number; y: number };
-    if (block.anchor === "luar-bawah") {
-      origin = { x: MARGIN_X, y: luarY };
-      luarY += layout.height + MARGIN_Y;
-    } else {
-      origin = blockOrigin(block, layout);
-    }
+    const layout = layoutLines(block.lines, size, wrapWidthFor(block, outputWidth), advance);
+    const origin = blockOrigin(block, layout);
 
     const padTop = (advance - size) / 2;
     // Glyphs sit low in the em box — shift strips down ~8% of the size,
@@ -422,7 +371,7 @@ export function buildRenderBlocks(
       }
 
       let bg: RenderRow["bg"] = null;
-      if (row.width > 0 && block.anchor !== "luar-bawah") {
+      if (row.width > 0) {
         if (block.bgMode === "block") {
           bg = { x: origin.x - 6, y: y - padTop + bgShift, w: row.width + 12, h: advance };
         } else if (block.bgMode === "mask") {
@@ -526,9 +475,6 @@ function layoutLines(
 }
 
 function wrapWidthFor(block: ChatBlock, outputWidth: number): number {
-  if (block.anchor === "luar-bawah") {
-    return Math.max(MIN_WRAP, outputWidth - MARGIN_X * 2);
-  }
   if (block.anchor === "free") {
     return Math.max(MIN_WRAP, outputWidth - MARGIN_X - block.x);
   }
@@ -545,13 +491,8 @@ function blockOrigin(
       return { x: block.x, y: block.y };
     case "kiri-atas":
       return { x: MARGIN_X, y: MARGIN_Y };
-    case "kiri-bawah": {
-      const photoH = photoDims()?.h ?? out.h;
-      return { x: MARGIN_X, y: photoH - MARGIN_Y - layout.height };
-    }
-    case "luar-bawah":
-      // Stacked by buildRenderBlocks before this is ever reached.
-      return { x: MARGIN_X, y: (photoDims()?.h ?? out.h) + MARGIN_Y };
+    case "kiri-bawah":
+      return { x: MARGIN_X, y: out.h - MARGIN_Y - layout.height };
   }
 }
 
@@ -643,7 +584,7 @@ function bindInteractions(): void {
       }
     } else if (dragMode === "sticker" && state.image && dragStickerId !== null) {
       const st = state.stickers.find((s) => s.id === dragStickerId);
-      const out = totalDims();
+      const out = outputDims();
       if (st && out) {
         st.x = clamp(st.x + dx / state.zoom, -stickerW(st) + KEEP_ON_IMAGE, out.w - KEEP_ON_IMAGE);
         st.y = clamp(st.y + dy / state.zoom, 0, out.h - KEEP_ON_IMAGE);
@@ -662,12 +603,14 @@ function bindInteractions(): void {
   const endDrag = (ev: PointerEvent) => {
     if (dragMode === "none") return;
     const wasCrop = dragMode === "crop-move" || dragMode === "crop-resize";
+    const wasEdit = dragMode !== "pan";
     dragMode = "none";
     dragBlockId = null;
     dragStickerId = null;
     canvas.classList.remove("panning", "dragging-text");
     canvas.releasePointerCapture(ev.pointerId);
     if (wasCrop) roundCrop();
+    if (wasEdit) commit();
   };
   canvas.addEventListener("pointerup", endDrag);
   canvas.addEventListener("pointercancel", endDrag);

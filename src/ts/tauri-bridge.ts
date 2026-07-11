@@ -46,12 +46,7 @@ export async function exportPresetToml(preset: ParsePreset): Promise<boolean> {
 export interface RenderJobPayload {
   imageBase64: string;
   crop: { x: number; y: number; w: number; h: number };
-  /** Final canvas incl. the black "Luar" extension. */
   output: { w: number; h: number };
-  /** The photo's area within output (pasted at 0,0). */
-  photo: { w: number; h: number };
-  /** Fill color of the Luar strip. */
-  luarColor: string;
   stickers: Array<{ dataBase64: string; x: number; y: number; w: number; h: number }>;
   filters: { brightness: number; grayscale: number; sepia: number; saturate: number; contrast: number };
   fontFamily: string;
@@ -78,7 +73,7 @@ export interface AppSettings {
   fontFamily: string;
   preset: ParsePreset;
   fileNameTemplate: string;
-  luarColor: string;
+  lang: string;
 }
 
 /** Rust: saved settings, or null on first run / browser dev. */

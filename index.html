@@ -15,6 +15,9 @@
         <h1>Screenies<em>Editor</em></h1>
       </div>
       <div class="topbar-right">
+        <button class="btn btn-ghost btn-small" id="btn-undo" title="Undo (Ctrl+Z)" disabled>⟲</button>
+        <button class="btn btn-ghost btn-small" id="btn-redo" title="Redo (Ctrl+Y)" disabled>⟳</button>
+        <button class="btn btn-ghost btn-small" id="lang-toggle" title="Bahasa / Language">EN</button>
         <button class="btn btn-ghost btn-small" id="theme-toggle" aria-label="Ganti tema">☀</button>
         <span class="badge" id="version-badge">v–.–.–</span>
       </div>
@@ -137,10 +140,6 @@
             <span class="meta-chip mono" id="bg-offset-val">0px</span>
           </div>
 
-          <div class="row">
-            <label class="field-label" for="luar-color">Warna area Luar</label>
-            <input type="color" id="luar-color" value="#000000" />
-          </div>
 
           <div class="row">
             <label class="field-label" for="palette-color">Palet</label>

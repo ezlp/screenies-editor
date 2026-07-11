@@ -11,6 +11,8 @@
 import { state } from "./state";
 import { centeredCrop, clampBlocksToOutput, fitImage, outputDims } from "./canvas";
 import { autoTextSize } from "./textstyle";
+import { commit } from "./history";
+import { t } from "./i18n";
 
 interface ResPreset {
   id: string;
@@ -61,6 +63,7 @@ export function initCrop(): void {
   }
 
   editBtn.addEventListener("click", () => setEditing(!state.cropEditing));
+  window.addEventListener("i18n-changed", syncEditButton);
   resetBtn.addEventListener("click", resetToFull);
 
   syncEditButton();
@@ -123,6 +126,7 @@ function resetToFull(): void {
 
 /** Shared tail: text size + block clamps follow the new output, re-fit. */
 function afterCropChange(enterEdit: boolean): void {
+  commit();
   if (enterEdit && state.image) state.cropEditing = true;
   syncEditButton();
 
@@ -141,11 +145,12 @@ function setEditing(on: boolean): void {
   }
   state.cropEditing = on;
   syncEditButton();
+  if (!on) commit(); // leaving edit = one undo step
   fitImage();
 }
 
 function syncEditButton(): void {
-  editBtn.textContent = state.cropEditing ? "✓ Selesai" : "Atur Area Crop";
+  editBtn.textContent = state.cropEditing ? t("cropDone") : t("cropEdit");
   editBtn.classList.toggle("btn-primary", state.cropEditing);
 }
 

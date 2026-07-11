@@ -6,8 +6,8 @@
 //! A corrupt or old-format file never bricks startup: parse failure just
 //! falls back to defaults (and serde(default) fills missing fields).
 
-use crate::chatlog::preset::{self, ParsePreset};
-use crate::error::AppError;
+use screenies_core::chatlog::preset::{self, ParsePreset};
+use screenies_core::error::AppError;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
@@ -22,8 +22,8 @@ pub struct AppSettings {
     pub file_name_template: String,
     /// Last folder a PNG was saved to — reopened by the next save dialog.
     pub last_save_dir: String,
-    /// Solid color of the "Luar" strip below the photo.
-    pub luar_color: String,
+    /// UI language: "id" (default) or "en".
+    pub lang: String,
 }
 
 impl Default for AppSettings {
@@ -34,7 +34,7 @@ impl Default for AppSettings {
             preset: preset::jgrp(),
             file_name_template: "screenie-{tanggal}-{jam}".into(),
             last_save_dir: String::new(),
-            luar_color: "#000000".into(),
+            lang: "id".into(),
         }
     }
 }

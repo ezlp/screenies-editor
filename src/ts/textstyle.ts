@@ -14,6 +14,7 @@
 import { listFonts } from "./tauri-bridge";
 import { effectiveStroke, state, notify } from "./state";
 import { scheduleSaveSettings } from "./settings";
+import { commit } from "./history";
 
 const SIZE_MAX = 60;
 /** Auto-size floor — below this, chat text stops being readable. */
@@ -41,6 +42,15 @@ let strokeSlider: HTMLInputElement | null = null;
 let strokeVal: HTMLElement | null = null;
 let gapSlider: HTMLInputElement | null = null;
 let gapVal: HTMLElement | null = null;
+
+/** Undo/redo: reflect restored sizes on the sliders. */
+export function syncTextStyleUI(): void {
+  syncControls();
+  const bgOffset = document.getElementById("bg-offset") as HTMLInputElement | null;
+  const bgOffsetVal = document.getElementById("bg-offset-val");
+  if (bgOffset) bgOffset.value = String(state.bgOffset);
+  if (bgOffsetVal) bgOffsetVal.textContent = `${state.bgOffset}px`;
+}
 
 export function initTextStyle(): void {
   slider = document.getElementById("text-size") as HTMLInputElement | null;
@@ -79,9 +89,11 @@ export function initTextStyle(): void {
     syncStroke();
     notify();
   });
+  strokeSlider.addEventListener("change", commit);
   strokeAuto.addEventListener("click", () => {
     state.strokeWidth = null; // back to auto (scales with text size)
     syncStroke();
+    commit();
     notify();
   });
 
@@ -90,37 +102,26 @@ export function initTextStyle(): void {
     syncGap();
     notify();
   });
+  gapSlider.addEventListener("change", commit);
   gapReset.addEventListener("click", () => {
     state.lineGap = 122;
     syncGap();
+    commit();
     notify();
   });
 
   const bgOffset = document.getElementById("bg-offset") as HTMLInputElement | null;
   const bgOffsetVal = document.getElementById("bg-offset-val");
-  const luarColor = document.getElementById("luar-color") as HTMLInputElement | null;
-  if (!bgOffset || !bgOffsetVal || !luarColor) throw new Error("Missing BG/Luar controls");
+  if (!bgOffset || !bgOffsetVal) throw new Error("Missing BG controls");
 
   bgOffset.addEventListener("input", () => {
     state.bgOffset = Number(bgOffset.value);
     bgOffsetVal.textContent = `${state.bgOffset}px`;
     notify();
   });
-  luarColor.value = state.luarColor;
-  luarColor.addEventListener("change", () => {
-    state.luarColor = luarColor.value.toUpperCase();
-    scheduleSaveSettings();
-    notify();
-  });
-
+  bgOffset.addEventListener("change", commit);
   syncControls();
   void populateFonts();
-}
-
-/** Called after settings load so the picker reflects the restored color. */
-export function syncLuarColorControl(): void {
-  const el = document.getElementById("luar-color") as HTMLInputElement | null;
-  if (el) el.value = state.luarColor;
 }
 
 function syncStroke(): void {

@@ -1,6 +1,6 @@
 [package]
 name = "screenies-editor"
-version = "1.0.0"
+version = "1.1.0"
 description = "ScreeniesEditor — Screenshot Roleplay editor for the SA-MP community"
 authors = ["Isut Indraputra", "Claude (Anthropic)"]
 edition = "2021"
@@ -10,24 +10,13 @@ rust-version = "1.77"
 tauri-build = { version = "2", features = [] }
 
 [dependencies]
+screenies-core = { path = "../core" }
 tauri = { version = "2", features = [] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-regex = "1"
-fontdb = "0.18"
 toml = "0.8"
 tauri-plugin-dialog = "2"
-image = "0.25"
-ab_glyph = "0.2"
-arboard = "3"
-base64 = "0.22"
 
 # ── Arriving in later milestones (kept out of M1 so the first build stays lean) ──
 # tauri-plugin-fs = "2"             # M3: file writes
 # dirs = "5"                        # M4: config dir for settings/templates
-
-[profile.release]
-strip = true
-lto = true
-codegen-units = 1
-panic = "abort"
