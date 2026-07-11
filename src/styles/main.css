@@ -102,6 +102,16 @@
     repeating-conic-gradient(var(--checker-a) 0% 25%, var(--checker-b) 0% 50%) 0 0 / 22px 22px;
 }
 
+#image-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  /* Filters land here as a plain CSS element filter — supported by every
+     webview (canvas ctx.filter is NOT available on Linux WebKitGTK). */
+}
+
 #preview-canvas {
   position: absolute;
   inset: 0;
@@ -109,6 +119,7 @@
   height: 100%;
   display: block;
   cursor: grab;
+  /* transparent text/UI layer on top of #image-canvas */
 }
 #preview-canvas.panning { cursor: grabbing; }
 #preview-canvas.over-text { cursor: move; }

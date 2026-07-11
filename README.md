@@ -69,7 +69,8 @@ repo's **Releases** page (right sidebar) and download:
 - **Live filters (v0.9.0, M3b):** Brightness / Grayscale / Sepia / Saturate /
   Contrast sliders with instant preview and per-filter reset — only the photo
   is filtered, chat text stays crisp. Dark-mode dropdown lists fixed
-  (`color-scheme`).
+  (`color-scheme`). v0.9.1: filters render via a layered photo canvas so
+  they work on Linux WebKitGTK too (ctx.filter is Chromium-only).
 - **Resolution changer (v0.8.0, M3a):** pick 800×600 / 4:3 / 16:9 / 21:9 /
   4K / custom W×H / Bebas — a crop box drops on the photo (drag to frame,
   corner handles resize, ratio-locked unless Bebas, double-click recenters).

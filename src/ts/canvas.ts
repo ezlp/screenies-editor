@@ -37,8 +37,10 @@ const ZOOM_MIN = 0.05;
 const ZOOM_MAX = 8;
 const ZOOM_STEP = 1.2;
 
-let canvas: HTMLCanvasElement;
+let canvas: HTMLCanvasElement;        // top layer: text, crop UI, pointer events
 let ctx: CanvasRenderingContext2D;
+let imageCanvas: HTMLCanvasElement;   // bottom layer: the photo (CSS-filtered)
+let imgCtx: CanvasRenderingContext2D;
 let viewport: HTMLElement;
 let emptyOverlay: HTMLElement;
 let hudRes: HTMLElement;
@@ -61,14 +63,17 @@ let dragCorner: Corner = "br";
 
 export function initCanvas(): void {
   canvas = mustGet<HTMLCanvasElement>("preview-canvas");
+  imageCanvas = mustGet<HTMLCanvasElement>("image-canvas");
   viewport = mustGet<HTMLElement>("viewport");
   emptyOverlay = mustGet<HTMLElement>("viewport-empty");
   hudRes = mustGet<HTMLElement>("hud-res");
   hudZoom = mustGet<HTMLElement>("hud-zoom");
 
   const context = canvas.getContext("2d");
-  if (!context) throw new Error("Canvas 2D context unavailable");
+  const imageContext = imageCanvas.getContext("2d");
+  if (!context || !imageContext) throw new Error("Canvas 2D context unavailable");
   ctx = context;
+  imgCtx = imageContext;
 
   new ResizeObserver(() => {
     resizeToViewport();
@@ -164,29 +169,42 @@ export function centeredCrop(ratio: number | null): CropRect | null {
 
 function resizeToViewport(): void {
   const dpr = window.devicePixelRatio || 1;
-  canvas.width = Math.max(1, Math.round(viewport.clientWidth * dpr));
-  canvas.height = Math.max(1, Math.round(viewport.clientHeight * dpr));
+  const w = Math.max(1, Math.round(viewport.clientWidth * dpr));
+  const h = Math.max(1, Math.round(viewport.clientHeight * dpr));
+  canvas.width = w;
+  canvas.height = h;
+  imageCanvas.width = w;
+  imageCanvas.height = h;
 }
 
 function draw(): void {
   const dpr = window.devicePixelRatio || 1;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+  imgCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  imgCtx.clearRect(0, 0, imageCanvas.width, imageCanvas.height);
 
   const img = state.image;
   emptyOverlay.classList.toggle("hidden", img !== null);
 
   if (!img) {
     boundsById.clear();
+    imageCanvas.style.filter = "none";
     hudRes.textContent = "RES —";
     hudZoom.textContent = "ZOOM —";
     return;
   }
 
-  ctx.save();
-  ctx.translate(state.panX, state.panY);
-  ctx.scale(state.zoom, state.zoom);
-  ctx.imageSmoothingEnabled = state.zoom < 3;
+  // Filters apply to the photo layer as a CSS element filter — this works
+  // on every webview, unlike ctx.filter (missing on Linux WebKitGTK).
+  imageCanvas.style.filter = cssFilterString();
+
+  for (const c2 of [ctx, imgCtx]) {
+    c2.save();
+    c2.translate(state.panX, state.panY);
+    c2.scale(state.zoom, state.zoom);
+    c2.imageSmoothingEnabled = state.zoom < 3;
+  }
 
   if (state.cropEditing) {
     drawCropEditor(img);
@@ -195,6 +213,7 @@ function draw(): void {
   }
 
   ctx.restore();
+  imgCtx.restore();
 
   const out = outputDims();
   hudRes.textContent = state.cropEditing
@@ -211,28 +230,25 @@ function drawResult(img: HTMLImageElement): void {
   const out = outputDims();
   if (!crop || !out) return;
 
-  ctx.filter = cssFilterString();
-  ctx.drawImage(img, crop.x, crop.y, crop.w, crop.h, 0, 0, out.w, out.h);
-  ctx.filter = "none"; // text stays crisp
-  drawBlocks(out.w);
+  imgCtx.drawImage(img, crop.x, crop.y, crop.w, crop.h, 0, 0, out.w, out.h);
+  drawBlocks(out.w); // text layer on top — never filtered, by construction
 }
 
 /** CROP EDIT MODE: full photo, dim outside the box, handles on corners. */
 function drawCropEditor(img: HTMLImageElement): void {
   boundsById.clear(); // no text hit-testing while editing
-  ctx.filter = cssFilterString(); // preview filters while framing, too
-  ctx.drawImage(img, 0, 0);
-  ctx.filter = "none";
+  imgCtx.drawImage(img, 0, 0); // filtered via the layer's CSS filter
 
   const crop = sourceCrop();
   if (!crop) return;
 
-  // Dim everything, then re-draw the selected region bright.
+  // Dim everything OUTSIDE the crop box (4 strips on the UI layer),
+  // so the selected region stays bright without re-drawing the photo.
   ctx.fillStyle = "rgba(0, 0, 0, 0.55)";
-  ctx.fillRect(0, 0, img.width, img.height);
-  ctx.filter = cssFilterString();
-  ctx.drawImage(img, crop.x, crop.y, crop.w, crop.h, crop.x, crop.y, crop.w, crop.h);
-  ctx.filter = "none";
+  ctx.fillRect(0, 0, img.width, crop.y); // top
+  ctx.fillRect(0, crop.y + crop.h, img.width, img.height - crop.y - crop.h); // bottom
+  ctx.fillRect(0, crop.y, crop.x, crop.h); // left
+  ctx.fillRect(crop.x + crop.w, crop.y, img.width - crop.x - crop.w, crop.h); // right
 
   const lw = 2 / state.zoom; // constant on screen
   ctx.lineWidth = lw;
