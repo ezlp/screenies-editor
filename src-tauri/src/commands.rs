@@ -6,11 +6,11 @@
 //! Every command registered here needs a matching typed wrapper in
 //! `src/ts/tauri-bridge.ts` — keep the two files in sync.
 
-use crate::chatlog::preset::ParsePreset;
-use crate::chatlog::{self, ParsedLine};
-use crate::error::AppError;
+use screenies_core::chatlog::preset::ParsePreset;
+use screenies_core::chatlog::{self, ParsedLine};
+use screenies_core::error::AppError;
 use crate::config::AppSettings;
-use crate::render::{compose, RenderJob};
+use screenies_core::render::{compose, RenderJob};
 
 /// Chatlog text → parsed lines: timestamps stripped, `{RRGGBB}` colors
 /// parsed (case-insensitive), auto-color (`*` ungu, `(( ))` abu-abu,
@@ -63,7 +63,7 @@ pub async fn export_png(
 #[tauri::command]
 pub async fn copy_png(job: RenderJob) -> Result<(), AppError> {
     let img = compose::render(&job)?;
-    crate::clipboard::copy_image(&img)
+    screenies_core::clipboard::copy_image(&img)
 }
 
 /// Saved settings (theme, font, preset). None on first run.
@@ -89,7 +89,7 @@ pub fn save_settings(app: tauri::AppHandle, mut settings: AppSettings) -> Result
 /// Installed system font families for the picker — sorted, deduped.
 #[tauri::command]
 pub fn list_fonts() -> Vec<String> {
-    crate::fonts::families()
+    screenies_core::fonts::families()
 }
 
 /// App version straight from Cargo.toml — shown in the top-bar badge and

@@ -1,6 +1,9 @@
 # release.yml — builds the real installers.
 #
-# Trigger:   git tag v0.1.0 && git push --tags
+# Trigger:   git tag vX.Y.Z && git push origin vX.Y.Z
+# Channels:  vX.Y.Z            → STABLE release (shown as "Latest")
+#            vX.Y.Z-beta.N     → PRE-RELEASE (badge, never "Latest")
+#            (any tag containing "-" is treated as a pre-release)
 # Result:    a GitHub Release with
 #              • Windows: .msi + .exe (NSIS)
 #              • Linux:   .deb + .AppImage
@@ -76,7 +79,7 @@ jobs:
         with:
           args: ${{ matrix.args }}
           tagName: ${{ github.ref_name }}
-          releaseName: "ScreeniesEditor ${{ github.ref_name }}"
+          releaseName: "ScreeniesEditor ${{ github.ref_name }}${{ contains(github.ref_name, '-') && ' (pre-release)' || '' }}"
           releaseBody: |
             ScreeniesEditor — Screenshot Roleplay editor untuk komunitas SA-MP.
 
@@ -87,4 +90,5 @@ jobs:
 
             **Linux:** download `.AppImage` (jalankan langsung) atau `.deb`.
           releaseDraft: false
-          prerelease: false
+          # Semver pre-release tags (v1.1.0-beta.1) never become "Latest".
+          prerelease: ${{ contains(github.ref_name, '-') }}

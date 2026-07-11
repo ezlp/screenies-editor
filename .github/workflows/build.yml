@@ -48,8 +48,8 @@ jobs:
 
       - name: Cache Rust build
         uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri
 
-      - name: Rust tests (compiles everything + runs unit tests)
-        run: cargo test --manifest-path src-tauri/Cargo.toml
+      # Workspace-wide: core (parser/render tests), the Tauri shell, and
+      # the experimental native shell all must keep compiling.
+      - name: Rust tests (whole workspace)
+        run: cargo test --workspace

@@ -2,16 +2,11 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod commands;
-mod error;
 
-mod chatlog;
 
 // ── Later-milestone modules (compiled from day one so the structure is real) ──
-mod clipboard;
 mod config;
 mod files;
-mod fonts;
-mod render;
 
 fn main() {
     tauri::Builder::default()

@@ -1,0 +1,18 @@
+# screenies-core — everything shell-independent: the chatlog parser,
+# presets, the full render/export pipeline, fonts, clipboard.
+# Consumed by src-tauri (desktop app) and native/ (egui experiment);
+# the same crate is the future WASM candidate.
+[package]
+name = "screenies-core"
+version = "1.0.0"
+edition = "2021"
+rust-version = "1.77"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
+regex = "1"
+fontdb = "0.18"
+image = "0.25"
+ab_glyph = "0.2"
+base64 = "0.22"
+arboard = "3"

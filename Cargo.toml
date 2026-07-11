@@ -1,0 +1,11 @@
+# Workspace: one shared Rust core, two shells (Tauri app + native egui app).
+[workspace]
+resolver = "2"
+members = ["core", "src-tauri", "native"]
+
+# Release profile lives at the workspace root (member profiles are ignored).
+[profile.release]
+strip = true
+lto = true
+codegen-units = 1
+panic = "abort"

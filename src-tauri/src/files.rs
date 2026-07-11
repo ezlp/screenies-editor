@@ -3,8 +3,8 @@
 //! ACTIVE: preset import/export as `.toml`, and PNG export via a native
 //! save dialog ("Save Disk"). Last-folder memory arrives with M4 config.
 
-use crate::chatlog::preset::ParsePreset;
-use crate::error::AppError;
+use screenies_core::chatlog::preset::ParsePreset;
+use screenies_core::error::AppError;
 use std::fs;
 use tauri::AppHandle;
 use tauri_plugin_dialog::DialogExt;
@@ -50,7 +50,7 @@ pub fn export_preset(app: &AppHandle, preset: &ParsePreset) -> Result<bool, AppE
 
 #[cfg(test)]
 mod tests {
-    use crate::chatlog::preset;
+    use screenies_core::chatlog::preset;
 
     #[test]
     fn preset_roundtrips_through_toml() {

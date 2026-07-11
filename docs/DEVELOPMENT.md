@@ -2,6 +2,11 @@
 
 How the codebase works, for anyone (including future-us) touching the code.
 
+> **Workspace note:** the Rust side is now a Cargo workspace —
+> `core/` (screenies-core: parser + render, shell-free), `src-tauri/`
+> (the shipping app), `native/` (🧪 egui experiment; see
+> NATIVE-MIGRATION.md). `cargo test --workspace` covers all three.
+
 ## Big picture
 
 ```
@@ -65,9 +70,16 @@ The preview mirrors this with two stacked canvases: `#image-canvas`
 ## Build & release
 
 - Local: `npm install && npm run tauri dev` (needs Rust + Node 22).
-- CI: every push → .github/workflows/build.yml (tsc + vite + cargo test);
-  tag `vX.Y.Z` → release.yml builds Windows x64/x86 + Linux deb/AppImage
-  and drafts a GitHub Release.
+- CI: every push → .github/workflows/build.yml (tsc + vite + cargo test).
+- **Release channels:**
+  - `vX.Y.Z` tag → **stable** release, becomes "Latest".
+  - `vX.Y.Z-beta.N` tag (anything with `-`) → **pre-release** badge,
+    never "Latest". Version files should carry the same string.
+  - Actions → *Nightly (dev snapshot)* → Run workflow → rolling
+    pre-release tagged `nightly`; each run replaces the last, installers
+    are stamped `X.Y.Z-nightly.<sha>` so bug reports pin the commit.
+    Manual-dispatch only (no cron) — press it when there's something
+    worth testing.
 - Rust tests: `cargo test` in src-tauri (parser pins real JGRP lines,
   filter math, TOML round-trips, filename sanitizing, compose smoke test).
 
