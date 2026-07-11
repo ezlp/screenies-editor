@@ -155,7 +155,7 @@ mod tests {
     #[test]
     fn strips_timestamps_and_empty_lines() {
         let input = "[12:34:56] Budi_Santoso says: halo\n\n[1:02:03] * Budi menoleh.\n   \n";
-        let out = parse(input);
+        let out = parse_jgrp(input);
         assert_eq!(out.len(), 2);
         assert_eq!(out[0].spans[0].text, "Budi_Santoso says: halo");
         assert_eq!(out[0].line_type, LineType::Says);
