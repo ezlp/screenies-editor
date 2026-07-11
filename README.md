@@ -66,6 +66,10 @@ repo's **Releases** page (right sidebar) and download:
 - System/game messages (`VEHICLE:`, `ERROR:`, `AdmCmd:` — any `Word:` prefix,
   pattern-based so all ~30 JGRP tags and future ones work) render the tag
   **bold** automatically
+- **Live filters (v0.9.0, M3b):** Brightness / Grayscale / Sepia / Saturate /
+  Contrast sliders with instant preview and per-filter reset — only the photo
+  is filtered, chat text stays crisp. Dark-mode dropdown lists fixed
+  (`color-scheme`).
 - **Resolution changer (v0.8.0, M3a):** pick 800×600 / 4:3 / 16:9 / 21:9 /
   4K / custom W×H / Bebas — a crop box drops on the photo (drag to frame,
   corner handles resize, ratio-locked unless Bebas, double-click recenters).
@@ -144,7 +148,7 @@ src-tauri/src/             Rust backend
   auto-color (`*` ungu, `(( ))` abu-abu, `/do` suffix `((Nama))` ungu),
   generic `says [apapun]:` / `[phone]:` / `[walkie]:` variants, bold tags on
   hex-prefixed lines. Manual color palette → M4. Rules are preset-driven since v0.5.0.
-- [ ] **M3** — image engine, split in three: **M3a crop/resolution ✅ (v0.8.0)** → M3b live filters → M3c Rust export (Save Disk + Copy) + stickers
+- [ ] **M3** — image engine, split in three: **M3a crop/resolution ✅ (v0.8.0)** → **M3b live filters ✅ (v0.9.0)** → M3c Rust export (Save Disk + Copy) + stickers
 - [ ] **M4** — comfort: templates, settings memory, stroke/spacing controls, manual color palette *(fonts already shipped in v0.3.0)*
 - [ ] **v1.0** — polish + release to the community
 

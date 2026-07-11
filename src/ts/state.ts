@@ -50,6 +50,9 @@ export interface AppState {
   /** True while the user is adjusting the crop box on the photo. */
   cropEditing: boolean;
 
+  /** Live image filters, CSS-filter percentages. Text is never filtered. */
+  filters: Filters;
+
   /** Chat text size in image px — auto-scales to image width, user-adjustable. */
   textSize: number;
 
@@ -65,6 +68,23 @@ export interface AppState {
   panX: number;
   panY: number;
 }
+
+/** Image filter values (percent, per the CSS filter spec). */
+export interface Filters {
+  brightness: number;
+  grayscale: number;
+  sepia: number;
+  saturate: number;
+  contrast: number;
+}
+
+export const DEFAULT_FILTERS: Filters = {
+  brightness: 100,
+  grayscale: 0,
+  sepia: 0,
+  saturate: 100,
+  contrast: 100,
+};
 
 /** Default text origin — top-left with a small margin (SSRP convention). */
 export const DEFAULT_TEXT_X = 14;
@@ -93,6 +113,7 @@ export const state: AppState = {
   cropRatio: null,
   outputSize: null,
   cropEditing: false,
+  filters: { ...DEFAULT_FILTERS },
   textSize: 27,
   fontFamily: "Arial",
   preset: structuredClone(DEFAULT_PRESET),

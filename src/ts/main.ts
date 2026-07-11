@@ -12,13 +12,13 @@ import { initTextStyle } from "./textstyle";
 import { initPreset } from "./preset";
 import { initTheme } from "./theme";
 import { initCrop } from "./crop";
+import { initFilters } from "./filters";
 import { appVersion, isTauri } from "./tauri-bridge";
 
 /* Later-milestone modules — imported so tsc type-checks them from day one. */
 import "./zones";
 import "./colorpalette";
 import "./backgrounds";
-import "./filters";
 import "./stickers";
 import "./shortcuts";
 import "./export";
@@ -31,6 +31,7 @@ window.addEventListener("DOMContentLoaded", () => {
   initTextStyle();
   initPreset();
   initCrop();
+  initFilters();
   void showVersion();
 });
 

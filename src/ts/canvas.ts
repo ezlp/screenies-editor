@@ -84,6 +84,18 @@ export function initCanvas(): void {
 
 /* ── shared geometry ── */
 
+/** CSS filter string for the photo (never applied to text). */
+export function cssFilterString(): string {
+  const f = state.filters;
+  const parts: string[] = [];
+  if (f.brightness !== 100) parts.push(`brightness(${f.brightness}%)`);
+  if (f.grayscale !== 0) parts.push(`grayscale(${f.grayscale}%)`);
+  if (f.sepia !== 0) parts.push(`sepia(${f.sepia}%)`);
+  if (f.saturate !== 100) parts.push(`saturate(${f.saturate}%)`);
+  if (f.contrast !== 100) parts.push(`contrast(${f.contrast}%)`);
+  return parts.length > 0 ? parts.join(" ") : "none";
+}
+
 /** The crop rectangle in source pixels (whole photo when crop is null). */
 export function sourceCrop(): CropRect | null {
   const img = state.image;
@@ -199,14 +211,18 @@ function drawResult(img: HTMLImageElement): void {
   const out = outputDims();
   if (!crop || !out) return;
 
+  ctx.filter = cssFilterString();
   ctx.drawImage(img, crop.x, crop.y, crop.w, crop.h, 0, 0, out.w, out.h);
+  ctx.filter = "none"; // text stays crisp
   drawBlocks(out.w);
 }
 
 /** CROP EDIT MODE: full photo, dim outside the box, handles on corners. */
 function drawCropEditor(img: HTMLImageElement): void {
   boundsById.clear(); // no text hit-testing while editing
+  ctx.filter = cssFilterString(); // preview filters while framing, too
   ctx.drawImage(img, 0, 0);
+  ctx.filter = "none";
 
   const crop = sourceCrop();
   if (!crop) return;
@@ -214,7 +230,9 @@ function drawCropEditor(img: HTMLImageElement): void {
   // Dim everything, then re-draw the selected region bright.
   ctx.fillStyle = "rgba(0, 0, 0, 0.55)";
   ctx.fillRect(0, 0, img.width, img.height);
+  ctx.filter = cssFilterString();
   ctx.drawImage(img, crop.x, crop.y, crop.w, crop.h, crop.x, crop.y, crop.w, crop.h);
+  ctx.filter = "none";
 
   const lw = 2 / state.zoom; // constant on screen
   ctx.lineWidth = lw;

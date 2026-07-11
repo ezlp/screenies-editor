@@ -6,6 +6,9 @@
    ═══════════════════════════════════════════════════════════════ */
 
 :root {
+  /* Native controls (select popups, scrollbars, spinners) follow the theme */
+  color-scheme: dark;
+
   /* Surfaces */
   --bg:        #101216;
   --panel:     #171a20;
@@ -48,6 +51,8 @@
 /* ═══ Light theme — token overrides only, so future custom themes are
    just another block like this one. Toggle: html[data-theme="light"]. ═══ */
 :root[data-theme="light"] {
+  color-scheme: light;
+
   --bg:        #eef0f4;
   --panel:     #ffffff;
   --panel-2:   #f6f7fa;

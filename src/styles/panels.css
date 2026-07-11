@@ -294,3 +294,24 @@
   font-size: 12px;
 }
 .input-error { border-color: #e05d5d !important; }
+
+/* Dropdown popup items must follow the theme (WebView2 renders these
+   natively — without this, dark mode showed white text on white). */
+.select option {
+  background: var(--panel-2);
+  color: var(--text);
+}
+
+/* ── Live filter rows ── */
+.filter-row {
+  grid-template-columns: 70px 1fr 42px 24px;
+}
+.filter-val {
+  font-size: 11px;
+  color: var(--faint);
+  text-align: right;
+}
+.filter-row.filter-active .filter-val { color: var(--accent); }
+.filter-row.filter-active label { color: var(--text); }
+.filter-reset { padding: 2px 4px; }
+.filter-reset:disabled { visibility: hidden; }
