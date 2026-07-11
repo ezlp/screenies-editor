@@ -1,0 +1,26 @@
+# ═══════════════════════════════════════════════════════════
+# Preset: JGRP (Jogjagamers Reality Project)
+# Sama persis dengan preset bawaan — dipakai sebagai referensi
+# atau titik awal untuk preset server kamu sendiri.
+# Cara pakai: ScreeniesEditor → Preset format → Impor .toml
+# ═══════════════════════════════════════════════════════════
+
+name = "JGRP (Jogjagamers)"
+
+# ── Pembersihan ──
+stripTimestamps = true        # buang [HH:MM:SS] di awal baris
+hexCodes = true               # baca kode warna {RRGGBB} / {rrggbb}
+
+# ── Aturan pewarnaan otomatis ──
+mePrefix = true               # * Nama melakukan sesuatu      → ungu
+oocWrap = true                # (( obrolan OOC ))             → abu-abu
+doSuffix = true               # deskripsi /do ((Nama))        → ungu
+systemTags = true             # SERVER: / VEHICLE: / Apapun:  → tag bold
+
+# ── Channel radio yang dianggap ucapan ──
+radioChannels = ["phone", "walkie"]
+
+# ── Warna ──
+colorMe = "#C2A2DA"           # ungu /me khas SA-MP
+colorOoc = "#9C9C9C"          # abu-abu OOC
+colorDefault = "#FFFFFF"      # semua teks lain

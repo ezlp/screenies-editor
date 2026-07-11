@@ -1,0 +1,5 @@
+# Preset paling pendek yang sah: field lain otomatis pakai default JGRP.
+# Cocok kalau kamu cuma mau mengubah satu-dua hal.
+
+name = "Cuma ganti warna /me"
+colorMe = "#7FE3A0"

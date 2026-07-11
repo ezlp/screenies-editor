@@ -9,7 +9,7 @@
  * saving/loading custom presets as files.
  */
 
-import { listPresets } from "./tauri-bridge";
+import { exportPresetToml, importPresetToml, listPresets } from "./tauri-bridge";
 import { DEFAULT_PRESET, state, notify } from "./state";
 import type { ParsePreset } from "./types";
 import { reparseAllBlocks } from "./chatlog";
@@ -43,6 +43,29 @@ export function initPreset(): void {
   radioChannels = mustGet<HTMLInputElement>("radio-channels");
 
   select.addEventListener("change", onSelect);
+
+  mustGet<HTMLButtonElement>("import-preset").addEventListener("click", async () => {
+    try {
+      const imported = await importPresetToml();
+      if (!imported) return; // dialog cancelled
+      state.preset = imported;
+      if (!state.preset.name) state.preset.name = "Kustom";
+      select.value = CUSTOM_VALUE;
+      customBox.hidden = false;
+      syncCustomControls();
+      await reparseAllBlocks();
+    } catch (err) {
+      console.error("[screenies-editor] import preset failed:", err);
+    }
+  });
+
+  mustGet<HTMLButtonElement>("export-preset").addEventListener("click", async () => {
+    try {
+      await exportPresetToml(state.preset);
+    } catch (err) {
+      console.error("[screenies-editor] export preset failed:", err);
+    }
+  });
   for (const el of [ckTimestamps, ckMe, ckOoc, ckDo, ckSystag, colorMe, colorOoc]) {
     el.addEventListener("change", onCustomEdit);
   }

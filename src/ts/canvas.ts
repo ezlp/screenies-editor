@@ -1,13 +1,16 @@
 /**
- * canvas.ts — the live preview.
+ * canvas.ts — the live preview, now in two modes.
  *
- * Draws the screenshot plus every chatlog block in *image space*, so text
- * scales naturally with zoom exactly as it will in the final export.
+ * RESULT MODE (default): shows the final output — the cropped region of
+ * the photo scaled to the chosen resolution, chat text drawn in OUTPUT
+ * space. What you see here is exactly what M3c's Rust exporter will save.
  *
- * Controls: Ctrl+Scroll = zoom to cursor · drag image = pan ·
- *           drag a "Bebas" block = move it (anchored blocks are locked) ·
- *           double-click a Bebas block = reset it to the corner ·
- *           FIT / + / − buttons.
+ * CROP EDIT MODE: shows the full source photo dimmed, with a bright
+ * draggable/resizable crop box (corner handles; ratio-locked unless the
+ * resolution is Bebas). Text is hidden while editing.
+ *
+ * Controls: Ctrl+Scroll zoom · drag = pan / move text / move-resize crop ·
+ * double-click text = reset its position · double-click crop box = recenter.
  */
 
 import {
@@ -17,17 +20,18 @@ import {
   onChange,
   notify,
 } from "./state";
-import type { ChatBlock } from "./state";
+import type { ChatBlock, CropRect } from "./state";
 import type { ColorSpan, ParsedLine } from "./types";
 
-/* SSRP text look — size comes from state.textSize (auto-scales to image,
-   adjustable with the "Ukuran teks" slider). Font/stroke controls: M4. */
-const MARGIN_X = 14;      // side margins for anchored blocks & wrap limit
-const MARGIN_Y = 16;      // top/bottom margins for anchored blocks
+const MARGIN_X = 14;
+const MARGIN_Y = 16;
 const LINE_GAP = 1.22;
-const TEXT_HIT_PAD = 8;   // grab area around a free block, image px
-const KEEP_ON_IMAGE = 24; // px of a free block that must stay inside the image
-const MIN_WRAP = 80;      // never wrap narrower than this, image px
+const TEXT_HIT_PAD = 8;
+const KEEP_ON_IMAGE = 24;
+const MIN_WRAP = 80;
+
+const CROP_MIN = 60;        // smallest crop side, source px
+const HANDLE_SCREEN = 12;   // handle hit size in *screen* px
 
 const ZOOM_MIN = 0.05;
 const ZOOM_MAX = 8;
@@ -47,12 +51,13 @@ interface Bounds {
   h: number;
 }
 
-/** Drawn bounds per block id (image px) — refreshed on every draw. */
 const boundsById = new Map<number, Bounds>();
 
-type DragMode = "none" | "pan" | "text";
+type Corner = "tl" | "tr" | "bl" | "br";
+type DragMode = "none" | "pan" | "text" | "crop-move" | "crop-resize";
 let dragMode: DragMode = "none";
 let dragBlockId: number | null = null;
+let dragCorner: Corner = "br";
 
 export function initCanvas(): void {
   canvas = mustGet<HTMLCanvasElement>("preview-canvas");
@@ -77,31 +82,70 @@ export function initCanvas(): void {
   draw();
 }
 
-/** Zoom so the whole image fits the viewport, centered. */
-export function fitImage(): void {
+/* ── shared geometry ── */
+
+/** The crop rectangle in source pixels (whole photo when crop is null). */
+export function sourceCrop(): CropRect | null {
   const img = state.image;
-  if (!img) return;
+  if (!img) return null;
+  return state.crop ?? { x: 0, y: 0, w: img.width, h: img.height };
+}
+
+/** Final output dimensions — what the export will be, and the text space. */
+export function outputDims(): { w: number; h: number } | null {
+  const crop = sourceCrop();
+  if (!crop) return null;
+  if (state.outputSize) return { ...state.outputSize };
+  return { w: Math.round(crop.w), h: Math.round(crop.h) };
+}
+
+/** Zoom so the current subject (output or full photo) fits, centered. */
+export function fitImage(): void {
+  const subject = state.cropEditing
+    ? state.image && { w: state.image.width, h: state.image.height }
+    : outputDims();
+  if (!subject) return;
   const vw = viewport.clientWidth;
   const vh = viewport.clientHeight;
-  const scale = Math.min(vw / img.width, vh / img.height) * 0.96;
+  const scale = Math.min(vw / subject.w, vh / subject.h) * 0.96;
   state.zoom = clampZoom(scale);
-  state.panX = (vw - img.width * state.zoom) / 2;
-  state.panY = (vh - img.height * state.zoom) / 2;
+  state.panX = (vw - subject.w * state.zoom) / 2;
+  state.panY = (vh - subject.h * state.zoom) / 2;
   notify();
 }
 
-/** Last drawn bounds of a block, if it has been drawn (used by the panel UI). */
 export function getBlockBounds(id: number): Bounds | undefined {
   return boundsById.get(id);
 }
 
-/** Keep every free block reachable when a new image (size) arrives. */
-export function clampBlocksToImage(img: HTMLImageElement): void {
+/** Keep every free block reachable when the output dimensions change. */
+export function clampBlocksToOutput(): void {
+  const out = outputDims();
+  if (!out) return;
   for (const block of state.blocks) {
     if (block.anchor !== "free") continue;
-    block.x = clamp(block.x, 0, Math.max(0, img.width - KEEP_ON_IMAGE));
-    block.y = clamp(block.y, 0, Math.max(0, img.height - KEEP_ON_IMAGE));
+    block.x = clamp(block.x, 0, Math.max(0, out.w - KEEP_ON_IMAGE));
+    block.y = clamp(block.y, 0, Math.max(0, out.h - KEEP_ON_IMAGE));
   }
+}
+
+/** Largest crop of the given ratio (null = whole photo), centered. */
+export function centeredCrop(ratio: number | null): CropRect | null {
+  const img = state.image;
+  if (!img) return null;
+  if (ratio === null) return { x: 0, y: 0, w: img.width, h: img.height };
+  let w = img.width;
+  let h = w / ratio;
+  if (h > img.height) {
+    h = img.height;
+    w = h * ratio;
+  }
+  return {
+    x: Math.round((img.width - w) / 2),
+    y: Math.round((img.height - h) / 2),
+    w: Math.round(w),
+    h: Math.round(h),
+  };
 }
 
 /* ── drawing ── */
@@ -130,15 +174,67 @@ function draw(): void {
   ctx.save();
   ctx.translate(state.panX, state.panY);
   ctx.scale(state.zoom, state.zoom);
+  ctx.imageSmoothingEnabled = state.zoom < 3;
 
-  ctx.imageSmoothingEnabled = state.zoom < 3; // crisp pixels when zoomed far in
-  ctx.drawImage(img, 0, 0);
-  drawBlocks(img);
+  if (state.cropEditing) {
+    drawCropEditor(img);
+  } else {
+    drawResult(img);
+  }
 
   ctx.restore();
 
-  hudRes.textContent = `RES ${img.width}×${img.height}`;
+  const out = outputDims();
+  hudRes.textContent = state.cropEditing
+    ? `SUMBER ${img.width}×${img.height}`
+    : out
+      ? `RES ${out.w}×${out.h}`
+      : "RES —";
   hudZoom.textContent = `ZOOM ${(state.zoom * 100).toFixed(0)}%`;
+}
+
+/** RESULT MODE: crop region → output size, text on top in output space. */
+function drawResult(img: HTMLImageElement): void {
+  const crop = sourceCrop();
+  const out = outputDims();
+  if (!crop || !out) return;
+
+  ctx.drawImage(img, crop.x, crop.y, crop.w, crop.h, 0, 0, out.w, out.h);
+  drawBlocks(out.w);
+}
+
+/** CROP EDIT MODE: full photo, dim outside the box, handles on corners. */
+function drawCropEditor(img: HTMLImageElement): void {
+  boundsById.clear(); // no text hit-testing while editing
+  ctx.drawImage(img, 0, 0);
+
+  const crop = sourceCrop();
+  if (!crop) return;
+
+  // Dim everything, then re-draw the selected region bright.
+  ctx.fillStyle = "rgba(0, 0, 0, 0.55)";
+  ctx.fillRect(0, 0, img.width, img.height);
+  ctx.drawImage(img, crop.x, crop.y, crop.w, crop.h, crop.x, crop.y, crop.w, crop.h);
+
+  const lw = 2 / state.zoom; // constant on screen
+  ctx.lineWidth = lw;
+  ctx.strokeStyle = "#c2a2da";
+  ctx.strokeRect(crop.x, crop.y, crop.w, crop.h);
+
+  const hs = HANDLE_SCREEN / state.zoom;
+  ctx.fillStyle = "#c2a2da";
+  for (const [hx, hy] of cropHandlePoints(crop)) {
+    ctx.fillRect(hx - hs / 2, hy - hs / 2, hs, hs);
+  }
+}
+
+function cropHandlePoints(c: CropRect): Array<[number, number]> {
+  return [
+    [c.x, c.y],
+    [c.x + c.w, c.y],
+    [c.x, c.y + c.h],
+    [c.x + c.w, c.y + c.h],
+  ];
 }
 
 interface Token {
@@ -157,11 +253,11 @@ interface BlockLayout {
   height: number;
 }
 
-function drawBlocks(img: HTMLImageElement): void {
+function drawBlocks(outputWidth: number): void {
   boundsById.clear();
 
   const size = state.textSize;
-  const stroke = Math.max(2, Math.round(size / 9)); // outline scales with size
+  const stroke = Math.max(2, Math.round(size / 9));
 
   ctx.textBaseline = "top";
   ctx.lineJoin = "round";
@@ -171,20 +267,15 @@ function drawBlocks(img: HTMLImageElement): void {
   const advance = size * LINE_GAP;
 
   for (const block of state.blocks) {
-    // "Hanya RP" hides system-tagged lines (SERVER:, VEHICLE:, AdmCmd:, …).
-    const lines = state.rpOnly
-      ? block.lines.filter((l) => l.lineType !== "system")
-      : block.lines;
-    if (lines.length === 0) continue;
+    if (block.lines.length === 0) continue;
 
-    const wrapWidth = wrapWidthFor(block, img);
-    const layout = layoutLines(lines, size, wrapWidth, advance);
-    const origin = blockOrigin(block, layout, img);
-    const rightEdge = origin.x + layout.width;
+    const wrapWidth = wrapWidthFor(block, outputWidth);
+    const layout = layoutLines(block.lines, size, wrapWidth, advance);
+    const origin = blockOrigin(block, layout);
 
     let y = origin.y;
     for (const row of layout.rows) {
-      let x = origin.align === "right" ? rightEdge - row.width : origin.x;
+      let x = origin.x;
       for (const token of row.tokens) {
         ctx.font = token.font;
         ctx.strokeText(token.text, x, y);
@@ -198,13 +289,12 @@ function drawBlocks(img: HTMLImageElement): void {
     boundsById.set(block.id, {
       x: origin.x,
       y: origin.y,
-      w: Math.max(layout.width, size), // never a zero-width grab target
+      w: Math.max(layout.width, size),
       h: layout.height,
     });
   }
 }
 
-/** Word-wrap all lines into positioned rows (pass 1: measure only). */
 function layoutLines(
   lines: ParsedLine[],
   size: number,
@@ -230,7 +320,7 @@ function layoutLines(
           rows.push(row);
           if (row.width > blockWidth) blockWidth = row.width;
           row = { tokens: [], width: 0 };
-          if (isSpace) continue; // no leading space on a wrapped row
+          if (isSpace) continue;
         }
         if (!isSpace || row.width > 0) {
           row.tokens.push({ text: raw, font, color: span.color, width });
@@ -247,51 +337,34 @@ function layoutLines(
   return { rows, width: blockWidth, height };
 }
 
-function wrapWidthFor(block: ChatBlock, img: HTMLImageElement): number {
+function wrapWidthFor(block: ChatBlock, outputWidth: number): number {
   if (block.anchor === "free") {
-    return Math.max(MIN_WRAP, img.width - MARGIN_X - block.x);
+    return Math.max(MIN_WRAP, outputWidth - MARGIN_X - block.x);
   }
-  return Math.max(MIN_WRAP, img.width - MARGIN_X * 2);
+  return Math.max(MIN_WRAP, outputWidth - MARGIN_X * 2);
 }
 
 function blockOrigin(
   block: ChatBlock,
   layout: BlockLayout,
-  img: HTMLImageElement,
-): { x: number; y: number; align: "left" | "right" } {
+): { x: number; y: number } {
+  const out = outputDims() ?? { w: 0, h: 0 };
   switch (block.anchor) {
     case "free":
-      return { x: block.x, y: block.y, align: "left" };
+      return { x: block.x, y: block.y };
     case "kiri-atas":
-      return { x: MARGIN_X, y: MARGIN_Y, align: "left" };
-    case "kanan-atas":
-      return {
-        x: img.width - MARGIN_X - layout.width,
-        y: MARGIN_Y,
-        align: "right",
-      };
+      return { x: MARGIN_X, y: MARGIN_Y };
     case "kiri-bawah":
-      return {
-        x: MARGIN_X,
-        y: img.height - MARGIN_Y - layout.height,
-        align: "left",
-      };
-    case "kanan-bawah":
-      return {
-        x: img.width - MARGIN_X - layout.width,
-        y: img.height - MARGIN_Y - layout.height,
-        align: "right",
-      };
+      return { x: MARGIN_X, y: out.h - MARGIN_Y - layout.height };
   }
 }
 
-/** System-tag prefixes render heavier (900) than regular chat (700). */
 function spanFont(span: ColorSpan, size: number): string {
   const weight = span.bold ? "900" : "bold";
   return `${weight} ${size}px "${state.fontFamily}", Arial, sans-serif`;
 }
 
-/* ── interactions: zoom, pan, free block drag ── */
+/* ── interactions ── */
 
 function bindInteractions(): void {
   canvas.addEventListener(
@@ -310,22 +383,39 @@ function bindInteractions(): void {
 
   canvas.addEventListener("pointerdown", (ev) => {
     if (!state.image) return;
-    dragBlockId = hitFreeBlock(ev.offsetX, ev.offsetY);
-    dragMode = dragBlockId !== null ? "text" : "pan";
+
+    if (state.cropEditing) {
+      const corner = hitCropHandle(ev.offsetX, ev.offsetY);
+      if (corner) {
+        dragMode = "crop-resize";
+        dragCorner = corner;
+      } else if (hitInsideCrop(ev.offsetX, ev.offsetY)) {
+        dragMode = "crop-move";
+      } else {
+        dragMode = "pan";
+      }
+    } else {
+      dragBlockId = hitFreeBlock(ev.offsetX, ev.offsetY);
+      dragMode = dragBlockId !== null ? "text" : "pan";
+    }
+
     lastX = ev.clientX;
     lastY = ev.clientY;
     canvas.classList.toggle("panning", dragMode === "pan");
-    canvas.classList.toggle("dragging-text", dragMode === "text");
+    canvas.classList.toggle(
+      "dragging-text",
+      dragMode === "text" || dragMode === "crop-move" || dragMode === "crop-resize",
+    );
     canvas.setPointerCapture(ev.pointerId);
   });
 
   canvas.addEventListener("pointermove", (ev) => {
     if (dragMode === "none") {
-      // Hover feedback: move-cursor over grabbable (Bebas) blocks only.
-      canvas.classList.toggle(
-        "over-text",
-        hitFreeBlock(ev.offsetX, ev.offsetY) !== null,
-      );
+      const over = state.cropEditing
+        ? hitCropHandle(ev.offsetX, ev.offsetY) !== null ||
+          hitInsideCrop(ev.offsetX, ev.offsetY)
+        : hitFreeBlock(ev.offsetX, ev.offsetY) !== null;
+      canvas.classList.toggle("over-text", over);
       return;
     }
 
@@ -337,35 +427,51 @@ function bindInteractions(): void {
     if (dragMode === "pan") {
       state.panX += dx;
       state.panY += dy;
-    } else if (state.image && dragBlockId !== null) {
+    } else if (dragMode === "text" && state.image && dragBlockId !== null) {
       const block = state.blocks.find((b) => b.id === dragBlockId);
-      if (block) {
-        // Free mode: move in image space so zoom doesn't distort the drag.
-        const img = state.image;
+      const out = outputDims();
+      if (block && out) {
         const w = boundsById.get(block.id)?.w ?? 0;
         block.x = clamp(
           block.x + dx / state.zoom,
           -(Math.max(w, KEEP_ON_IMAGE) - KEEP_ON_IMAGE),
-          img.width - KEEP_ON_IMAGE,
+          out.w - KEEP_ON_IMAGE,
         );
-        block.y = clamp(block.y + dy / state.zoom, 0, img.height - KEEP_ON_IMAGE);
+        block.y = clamp(block.y + dy / state.zoom, 0, out.h - KEEP_ON_IMAGE);
       }
+    } else if (dragMode === "crop-move" && state.image && state.crop) {
+      const img = state.image;
+      const c = state.crop;
+      c.x = clamp(c.x + dx / state.zoom, 0, img.width - c.w);
+      c.y = clamp(c.y + dy / state.zoom, 0, img.height - c.h);
+    } else if (dragMode === "crop-resize" && state.image && state.crop) {
+      resizeCrop(dx / state.zoom, dy / state.zoom);
     }
     notify();
   });
 
   const endDrag = (ev: PointerEvent) => {
     if (dragMode === "none") return;
+    const wasCrop = dragMode === "crop-move" || dragMode === "crop-resize";
     dragMode = "none";
     dragBlockId = null;
     canvas.classList.remove("panning", "dragging-text");
     canvas.releasePointerCapture(ev.pointerId);
+    if (wasCrop) roundCrop();
   };
   canvas.addEventListener("pointerup", endDrag);
   canvas.addEventListener("pointercancel", endDrag);
 
-  // Double-click a Bebas block → snap it back to the default corner.
   canvas.addEventListener("dblclick", (ev) => {
+    if (state.cropEditing) {
+      // Recenter the crop box at max size for the current ratio.
+      const c = centeredCrop(state.cropRatio);
+      if (c) {
+        state.crop = c;
+        notify();
+      }
+      return;
+    }
     const id = hitFreeBlock(ev.offsetX, ev.offsetY);
     if (id === null) return;
     const block = state.blocks.find((b) => b.id === id);
@@ -384,23 +490,103 @@ function bindInteractions(): void {
   );
 }
 
-/** Topmost draggable (anchor "free") block under this canvas point, or null. */
+/** Resize from the dragged corner; opposite corner stays anchored. */
+function resizeCrop(dx: number, dy: number): void {
+  const img = state.image;
+  const c = state.crop;
+  if (!img || !c) return;
+
+  // Anchor = the corner opposite to the one being dragged.
+  const anchorX = dragCorner === "tl" || dragCorner === "bl" ? c.x + c.w : c.x;
+  const anchorY = dragCorner === "tl" || dragCorner === "tr" ? c.y + c.h : c.y;
+  const moveX = dragCorner === "tl" || dragCorner === "bl" ? c.x + dx : c.x + c.w + dx;
+  const moveY = dragCorner === "tl" || dragCorner === "tr" ? c.y + dy : c.y + c.h + dy;
+
+  let w = Math.abs(moveX - anchorX);
+  let h = Math.abs(moveY - anchorY);
+
+  if (state.cropRatio !== null) {
+    // Lock to ratio: follow the dominant axis of the drag.
+    if (w / state.cropRatio >= h) h = w / state.cropRatio;
+    else w = h * state.cropRatio;
+  }
+
+  w = Math.max(CROP_MIN, w);
+  h = Math.max(state.cropRatio ? w / state.cropRatio : CROP_MIN, CROP_MIN);
+
+  let x = Math.min(anchorX, anchorX + (moveX >= anchorX ? w : -w));
+  let y = Math.min(anchorY, anchorY + (moveY >= anchorY ? h : -h));
+
+  // Clamp inside the photo, shrinking if the ratio demands it.
+  if (x < 0) { w += x; x = 0; }
+  if (y < 0) { h += y; y = 0; }
+  if (x + w > img.width) w = img.width - x;
+  if (y + h > img.height) h = img.height - y;
+  if (state.cropRatio !== null) {
+    if (w / state.cropRatio > h) w = h * state.cropRatio;
+    else h = w / state.cropRatio;
+  }
+
+  c.x = x;
+  c.y = y;
+  c.w = Math.max(CROP_MIN, w);
+  c.h = Math.max(CROP_MIN, h);
+}
+
+function roundCrop(): void {
+  const c = state.crop;
+  if (!c) return;
+  c.x = Math.round(c.x);
+  c.y = Math.round(c.y);
+  c.w = Math.round(c.w);
+  c.h = Math.round(c.h);
+  notify();
+}
+
+/* ── hit tests ── */
+
+function toImageSpace(cx: number, cy: number): { x: number; y: number } {
+  return { x: (cx - state.panX) / state.zoom, y: (cy - state.panY) / state.zoom };
+}
+
+function hitCropHandle(cx: number, cy: number): Corner | null {
+  const c = state.crop ?? sourceCrop();
+  if (!c) return null;
+  const p = toImageSpace(cx, cy);
+  const r = HANDLE_SCREEN / state.zoom;
+  const corners: Array<[Corner, number, number]> = [
+    ["tl", c.x, c.y],
+    ["tr", c.x + c.w, c.y],
+    ["bl", c.x, c.y + c.h],
+    ["br", c.x + c.w, c.y + c.h],
+  ];
+  for (const [name, hx, hy] of corners) {
+    if (Math.abs(p.x - hx) <= r && Math.abs(p.y - hy) <= r) return name;
+  }
+  return null;
+}
+
+function hitInsideCrop(cx: number, cy: number): boolean {
+  const c = state.crop ?? sourceCrop();
+  if (!c) return false;
+  const p = toImageSpace(cx, cy);
+  return p.x >= c.x && p.x <= c.x + c.w && p.y >= c.y && p.y <= c.y + c.h;
+}
+
 function hitFreeBlock(cx: number, cy: number): number | null {
   if (!state.image) return null;
-  const ix = (cx - state.panX) / state.zoom;
-  const iy = (cy - state.panY) / state.zoom;
+  const p = toImageSpace(cx, cy);
 
-  // Later blocks draw on top, so hit-test in reverse order.
   for (let i = state.blocks.length - 1; i >= 0; i--) {
     const block = state.blocks[i];
     if (block.anchor !== "free") continue;
     const b = boundsById.get(block.id);
     if (!b) continue;
     if (
-      ix >= b.x - TEXT_HIT_PAD &&
-      ix <= b.x + b.w + TEXT_HIT_PAD &&
-      iy >= b.y - TEXT_HIT_PAD &&
-      iy <= b.y + b.h + TEXT_HIT_PAD
+      p.x >= b.x - TEXT_HIT_PAD &&
+      p.x <= b.x + b.w + TEXT_HIT_PAD &&
+      p.y >= b.y - TEXT_HIT_PAD &&
+      p.y <= b.y + b.h + TEXT_HIT_PAD
     ) {
       return block.id;
     }
@@ -408,7 +594,8 @@ function hitFreeBlock(cx: number, cy: number): number | null {
   return null;
 }
 
-/** Zoom keeping the point under (cx, cy) fixed on screen. */
+/* ── zoom helpers ── */
+
 function zoomAround(cx: number, cy: number, factor: number): void {
   if (!state.image) return;
   const next = clampZoom(state.zoom * factor);
@@ -426,8 +613,6 @@ function clampZoom(z: number): number {
 function clamp(v: number, min: number, max: number): number {
   return Math.min(max, Math.max(min, v));
 }
-
-/* ── util ── */
 
 function mustGet<T extends HTMLElement>(id: string): T {
   const el = document.getElementById(id);

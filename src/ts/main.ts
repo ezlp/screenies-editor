@@ -10,11 +10,12 @@ import { initCanvas } from "./canvas";
 import { initUpload, initChatlog } from "./chatlog";
 import { initTextStyle } from "./textstyle";
 import { initPreset } from "./preset";
+import { initTheme } from "./theme";
+import { initCrop } from "./crop";
 import { appVersion, isTauri } from "./tauri-bridge";
 
-/* Milestone 2+ modules — imported so tsc type-checks them from day one. */
+/* Later-milestone modules — imported so tsc type-checks them from day one. */
 import "./zones";
-import "./crop";
 import "./colorpalette";
 import "./backgrounds";
 import "./filters";
@@ -23,11 +24,13 @@ import "./shortcuts";
 import "./export";
 
 window.addEventListener("DOMContentLoaded", () => {
+  initTheme();
   initCanvas();
   initUpload();
   initChatlog();
   initTextStyle();
   initPreset();
+  initCrop();
   void showVersion();
 });
 

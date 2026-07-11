@@ -8,11 +8,9 @@ import type { ParsedLine, ParsePreset } from "./types";
 
 /** Where a chatlog block sits on the photo. */
 export type Anchor =
-  | "free"          // draggable anywhere (seret di preview)
+  | "free"        // draggable anywhere (seret di preview)
   | "kiri-atas"
-  | "kanan-atas"
-  | "kiri-bawah"
-  | "kanan-bawah";
+  | "kiri-bawah";
 
 /** One chatlog block — its own text, its own position. */
 export interface ChatBlock {
@@ -27,6 +25,14 @@ export interface ChatBlock {
   y: number;
 }
 
+/** Crop rectangle in source-image pixels. */
+export interface CropRect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
 export interface AppState {
   /** Loaded screenshot (null until the user uploads one). */
   image: HTMLImageElement | null;
@@ -35,14 +41,21 @@ export interface AppState {
   /** All chatlog blocks, drawn in order (later = on top). */
   blocks: ChatBlock[];
 
+  /** Selected area of the source photo (null = the whole photo). */
+  crop: CropRect | null;
+  /** Locked aspect ratio for the crop box (w/h), null = free. */
+  cropRatio: number | null;
+  /** Fixed output resolution (e.g. 800×600); null = crop's own pixel size. */
+  outputSize: { w: number; h: number } | null;
+  /** True while the user is adjusting the crop box on the photo. */
+  cropEditing: boolean;
+
   /** Chat text size in image px — auto-scales to image width, user-adjustable. */
   textSize: number;
 
   /** Font family for all chat text — picked from the installed system fonts. */
   fontFamily: string;
 
-  /** "Hanya RP": hide system-tagged lines (SERVER:, VEHICLE:, …) from the preview. */
-  rpOnly: boolean;
 
   /** Active parsing rules — sent to Rust with every parse. */
   preset: ParsePreset;
@@ -76,9 +89,12 @@ export const state: AppState = {
   image: null,
   imageName: "",
   blocks: [],
+  crop: null,
+  cropRatio: null,
+  outputSize: null,
+  cropEditing: false,
   textSize: 27,
   fontFamily: "Arial",
-  rpOnly: false,
   preset: structuredClone(DEFAULT_PRESET),
   zoom: 1,
   panX: 0,

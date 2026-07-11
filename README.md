@@ -66,6 +66,16 @@ repo's **Releases** page (right sidebar) and download:
 - System/game messages (`VEHICLE:`, `ERROR:`, `AdmCmd:` — any `Word:` prefix,
   pattern-based so all ~30 JGRP tags and future ones work) render the tag
   **bold** automatically
+- **Resolution changer (v0.8.0, M3a):** pick 800×600 / 4:3 / 16:9 / 21:9 /
+  4K / custom W×H / Bebas — a crop box drops on the photo (drag to frame,
+  corner handles resize, ratio-locked unless Bebas, double-click recenters).
+  The preview then shows the exact output; text lives in output space, so
+  M3c's exporter will match it pixel-for-pixel.
+- **Preset files `.toml` (v0.7.0):** *Impor / Ekspor .toml* buttons — tune
+  Kustom until your server's log looks right, export, share the file on the
+  wiki; friends just import. Step-by-step guide: [`docs/PRESETS.md`](docs/PRESETS.md), ready-made examples in [`examples/presets/`](examples/presets/).
+- **Dark & light mode (v0.6.0):** toggle in the top bar; themes are pure
+  CSS-variable blocks, so custom themes can be added later.
 - **Preset format (v0.5.0):** parsing rules are data, not code — pick
   **JGRP**, **SA-MP Umum**, or **Polos**, or open **Kustom…** to toggle every
   rule and recolor /me & OOC. Schema + examples in
@@ -75,8 +85,8 @@ repo's **Releases** page (right sidebar) and download:
   16px so low-res screenshots stay readable.
 - **Multi-chatlog blocks:** "+ Tambah Chatlog" adds independent blocks, each
   with its own text and position dropdown — **Bebas** (drag it anywhere on the
-  photo, double-click to reset) or locked to **Kiri/Kanan Atas/Bawah** corner
-  presets (kanan anchors right-align the text). Positions stick through zoom.
+  photo, double-click to reset) or locked to **Kiri Atas / Kiri Bawah**.
+  Positions stick through zoom.
 - HUD shows resolution + zoom; version badge proves the TS↔Rust bridge works
 
 Filters, zones, colors, crop, stickers, export = Milestones 2–4
@@ -133,9 +143,9 @@ src-tauri/src/             Rust backend
 - [x] **M2** — text engine ✅ (v0.4.0): `{RRGGBB}` parsing (case-insensitive),
   auto-color (`*` ungu, `(( ))` abu-abu, `/do` suffix `((Nama))` ungu),
   generic `says [apapun]:` / `[phone]:` / `[walkie]:` variants, bold tags on
-  hex-prefixed lines, **"Hanya RP"** filter. Manual color palette → M4. Rules are preset-driven since v0.5.0.
-- [ ] **M3** — image engine: crop (preset/custom/free), live filters, stickers, Rust export (Save Disk + Copy)
-- [ ] **M4** — comfort: templates as JSON, settings memory, stroke/spacing controls, manual color palette *(fonts already shipped in v0.3.0)*
+  hex-prefixed lines. Manual color palette → M4. Rules are preset-driven since v0.5.0.
+- [ ] **M3** — image engine, split in three: **M3a crop/resolution ✅ (v0.8.0)** → M3b live filters → M3c Rust export (Save Disk + Copy) + stickers
+- [ ] **M4** — comfort: templates, settings memory, stroke/spacing controls, manual color palette *(fonts already shipped in v0.3.0)*
 - [ ] **v1.0** — polish + release to the community
 
 ---

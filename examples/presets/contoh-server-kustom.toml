@@ -1,0 +1,24 @@
+# ═══════════════════════════════════════════════════════════
+# Preset: CONTOH server kustom — "Bandung Roleplay" (fiktif)
+# Contoh lengkap preset yang BERBEDA dari JGRP, untuk dicontek:
+#   • /do server ini diawali * (bukan berakhiran ((Nama)))
+#   • punya radio departemen & pemerintah
+#   • warna /me pink, OOC lebih terang
+# ═══════════════════════════════════════════════════════════
+
+name = "Bandung Roleplay (contoh)"
+
+stripTimestamps = true
+hexCodes = true
+
+mePrefix = true
+oocWrap = true
+doSuffix = false              # ⟵ dimatikan: /do di sini pakai *, bukan ((Nama))
+systemTags = true
+
+# Channel tambahan: departemen (dep), pemerintah (gov), radio umum (r)
+radioChannels = ["phone", "walkie", "dep", "gov", "r"]
+
+colorMe = "#FF9DE2"           # pink — bedakan gaya server kamu
+colorOoc = "#B8B8B8"          # abu lebih terang biar kebaca di foto gelap
+colorDefault = "#FFFFFF"

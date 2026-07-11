@@ -147,12 +147,12 @@
 .btn-primary {
   background: var(--accent);
   border-color: var(--accent);
-  color: #17121e;
+  color: var(--accent-contrast);
 }
 .btn-primary:hover:not(:disabled) {
   background: var(--accent-strong);
   border-color: var(--accent-strong);
-  color: #17121e;
+  color: var(--accent-contrast);
 }
 
 .btn-block { width: 100%; }
@@ -274,3 +274,23 @@
   background: transparent;
   cursor: pointer;
 }
+
+/* ── Resolution changer ── */
+.res-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+.res-btn.active {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--accent-dim);
+}
+.input-num {
+  width: 0;
+  flex: 1 1 auto;
+  min-width: 0;
+  font-family: var(--font-mono);
+  font-size: 12px;
+}
+.input-error { border-color: #e05d5d !important; }

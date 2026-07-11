@@ -24,6 +24,26 @@ pub fn list_presets() -> Vec<ParsePreset> {
     chatlog::preset::builtin()
 }
 
+/// Open-file dialog → preset from a community `.toml` file (None = cancel).
+/// MUST be async: blocking dialogs dispatch work to the main thread, and a
+/// sync command would occupy that same thread → deadlock (frozen app).
+#[tauri::command]
+pub async fn import_preset_toml(
+    app: tauri::AppHandle,
+) -> Result<Option<ParsePreset>, AppError> {
+    crate::files::import_preset(&app)
+}
+
+/// Save-file dialog → write the given preset as `.toml` (false = cancel).
+/// Async for the same deadlock reason as import_preset_toml.
+#[tauri::command]
+pub async fn export_preset_toml(
+    app: tauri::AppHandle,
+    preset: ParsePreset,
+) -> Result<bool, AppError> {
+    crate::files::export_preset(&app, &preset)
+}
+
 /// Installed system font families for the picker — sorted, deduped.
 #[tauri::command]
 pub fn list_fonts() -> Vec<String> {
