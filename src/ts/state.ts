@@ -56,6 +56,12 @@ export interface AppState {
   /** Chat text size in image px — auto-scales to image width, user-adjustable. */
   textSize: number;
 
+  /** Outline thickness in px; null = auto (scales with textSize). */
+  strokeWidth: number | null;
+
+  /** Line spacing as percent of textSize (122 = the classic SSRP look). */
+  lineGap: number;
+
   /** Font family for all chat text — picked from the installed system fonts. */
   fontFamily: string;
 
@@ -115,12 +121,19 @@ export const state: AppState = {
   cropEditing: false,
   filters: { ...DEFAULT_FILTERS },
   textSize: 27,
+  strokeWidth: null,
+  lineGap: 122,
   fontFamily: "Arial",
   preset: structuredClone(DEFAULT_PRESET),
   zoom: 1,
   panX: 0,
   panY: 0,
 };
+
+/** The outline width actually used: manual value, or auto from text size. */
+export function effectiveStroke(): number {
+  return state.strokeWidth ?? Math.max(2, Math.round(state.textSize / 9));
+}
 
 type Listener = () => void;
 const listeners: Listener[] = [];

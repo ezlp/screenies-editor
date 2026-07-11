@@ -1,49 +1,40 @@
 /**
  * theme.ts — dark / light mode.
  *
- * Themes are pure CSS-variable override blocks in theme.css, so adding
- * custom themes later = adding another block + an entry here.
- * The choice persists in the webview's localStorage; M4's settings file
- * (config.rs) will take over as the source of truth.
+ * The choice persists in settings.json via settings.ts (v0.11.0 —
+ * replaced the old localStorage stopgap). Themes remain pure CSS-variable
+ * override blocks, so custom themes later = another block + entry.
  */
 
 type ThemeName = "dark" | "light";
-const STORAGE_KEY = "screenies-theme";
 
 let button: HTMLButtonElement | null = null;
+let onToggled: (() => void) | null = null;
 
-export function initTheme(): void {
+export function initTheme(onToggle?: () => void): void {
   button = document.getElementById("theme-toggle") as HTMLButtonElement | null;
   if (!button) throw new Error("Missing #theme-toggle");
+  onToggled = onToggle ?? null;
 
-  apply(loadSaved() ?? "dark");
+  syncButton(); // settings may already have applied a theme before init
   button.addEventListener("click", () => {
-    apply(current() === "dark" ? "light" : "dark");
+    setTheme(currentTheme() === "dark" ? "light" : "dark");
+    onToggled?.();
   });
 }
 
-function current(): ThemeName {
+export function currentTheme(): ThemeName {
   return document.documentElement.dataset.theme === "light" ? "light" : "dark";
 }
 
-function apply(theme: ThemeName): void {
+export function setTheme(theme: ThemeName): void {
   document.documentElement.dataset.theme = theme;
-  if (button) {
-    button.textContent = theme === "dark" ? "☀" : "🌙";
-    button.title = theme === "dark" ? "Ganti ke mode terang" : "Ganti ke mode gelap";
-  }
-  try {
-    localStorage.setItem(STORAGE_KEY, theme);
-  } catch {
-    /* private mode / storage blocked — theme just won't persist */
-  }
+  syncButton();
 }
 
-function loadSaved(): ThemeName | null {
-  try {
-    const v = localStorage.getItem(STORAGE_KEY);
-    return v === "light" || v === "dark" ? v : null;
-  } catch {
-    return null;
-  }
+function syncButton(): void {
+  if (!button) return;
+  const theme = currentTheme();
+  button.textContent = theme === "dark" ? "☀" : "🌙";
+  button.title = theme === "dark" ? "Ganti ke mode terang" : "Ganti ke mode gelap";
 }

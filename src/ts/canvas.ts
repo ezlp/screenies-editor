@@ -20,12 +20,12 @@ import {
   onChange,
   notify,
 } from "./state";
+import { effectiveStroke } from "./state";
 import type { ChatBlock, CropRect } from "./state";
 import type { ColorSpan, ParsedLine } from "./types";
 
 const MARGIN_X = 14;
 const MARGIN_Y = 16;
-const LINE_GAP = 1.22;
 const TEXT_HIT_PAD = 8;
 const KEEP_ON_IMAGE = 24;
 const MIN_WRAP = 80;
@@ -309,7 +309,7 @@ export function buildRenderBlocks(
   outputWidth: number,
 ): Array<{ blockId: number; rows: RenderRow[]; bounds: Bounds | null }> {
   const size = state.textSize;
-  const advance = size * LINE_GAP;
+  const advance = size * (state.lineGap / 100);
   const result: Array<{ blockId: number; rows: RenderRow[]; bounds: Bounds | null }> = [];
 
   for (const block of state.blocks) {
@@ -355,11 +355,11 @@ function drawBlocks(outputWidth: number): void {
   boundsById.clear();
 
   const size = state.textSize;
-  const stroke = Math.max(2, Math.round(size / 9));
+  const stroke = effectiveStroke();
 
   ctx.textBaseline = "top";
   ctx.lineJoin = "round";
-  ctx.lineWidth = stroke;
+  ctx.lineWidth = Math.max(stroke, 0.01); // 0 handled by skipping strokeText
   ctx.strokeStyle = "#000000";
 
   for (const entry of buildRenderBlocks(outputWidth)) {
@@ -368,7 +368,7 @@ function drawBlocks(outputWidth: number): void {
     for (const row of entry.rows) {
       for (const token of row.tokens) {
         ctx.font = spanFont({ text: token.text, color: token.color, bold: token.bold }, size);
-        ctx.strokeText(token.text, token.x, row.y);
+        if (stroke > 0) ctx.strokeText(token.text, token.x, row.y);
         ctx.fillStyle = token.color;
         ctx.fillText(token.text, token.x, row.y);
       }

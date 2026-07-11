@@ -66,6 +66,25 @@ export async function copyPng(job: RenderJobPayload): Promise<void> {
   return invoke<void>("copy_png", { job });
 }
 
+/** Persisted settings — mirrors config.rs AppSettings. */
+export interface AppSettings {
+  theme: string;
+  fontFamily: string;
+  preset: ParsePreset;
+}
+
+/** Rust: saved settings, or null on first run / browser dev. */
+export async function loadSettings(): Promise<AppSettings | null> {
+  if (!isTauri()) return null;
+  return invoke<AppSettings | null>("load_settings");
+}
+
+/** Rust: persist settings to settings.json. */
+export async function saveSettings(settings: AppSettings): Promise<void> {
+  if (!isTauri()) return;
+  return invoke<void>("save_settings", { settings });
+}
+
 /** Rust: installed system font families (sorted). Empty in browser dev. */
 export async function listFonts(): Promise<string[]> {
   if (!isTauri()) return [];

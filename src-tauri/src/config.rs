@@ -1,6 +1,77 @@
-//! config.rs — MILESTONE 4 (not active yet)
+//! config.rs — settings.json in the OS app-config directory (Milestone 4a).
 //!
-//! settings.json in the OS config dir: last save folder, last custom
-//! resolution, last font — small quality-of-life memory.
+//! Windows: %APPDATA%\com.screenies-editor.app\settings.json
+//! Linux:   ~/.config/com.screenies-editor.app/settings.json
+//!
+//! A corrupt or old-format file never bricks startup: parse failure just
+//! falls back to defaults (and serde(default) fills missing fields).
 
-#![allow(dead_code)]
+use crate::chatlog::preset::{self, ParsePreset};
+use crate::error::AppError;
+use serde::{Deserialize, Serialize};
+use std::fs;
+use std::path::PathBuf;
+use tauri::{AppHandle, Manager};
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", default)]
+pub struct AppSettings {
+    pub theme: String,
+    pub font_family: String,
+    pub preset: ParsePreset,
+}
+
+impl Default for AppSettings {
+    fn default() -> Self {
+        Self {
+            theme: "dark".into(),
+            font_family: "Arial".into(),
+            preset: preset::jgrp(),
+        }
+    }
+}
+
+fn settings_path(app: &AppHandle) -> Result<PathBuf, AppError> {
+    let dir = app
+        .path()
+        .app_config_dir()
+        .map_err(|e| AppError::Io(e.to_string()))?;
+    fs::create_dir_all(&dir).map_err(|e| AppError::Io(e.to_string()))?;
+    Ok(dir.join("settings.json"))
+}
+
+/// `Ok(None)` = no settings yet (first run) or unreadable file.
+pub fn load(app: &AppHandle) -> Result<Option<AppSettings>, AppError> {
+    let path = settings_path(app)?;
+    if !path.exists() {
+        return Ok(None);
+    }
+    let text = fs::read_to_string(&path).map_err(|e| AppError::Io(e.to_string()))?;
+    match serde_json::from_str::<AppSettings>(&text) {
+        Ok(s) => Ok(Some(s)),
+        Err(e) => {
+            eprintln!("[screenies-editor] settings.json rusak, pakai default: {e}");
+            Ok(None)
+        }
+    }
+}
+
+pub fn save(app: &AppHandle, settings: &AppSettings) -> Result<(), AppError> {
+    let path = settings_path(app)?;
+    let text =
+        serde_json::to_string_pretty(settings).map_err(|e| AppError::Parse(e.to_string()))?;
+    fs::write(&path, text).map_err(|e| AppError::Io(e.to_string()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn partial_or_old_settings_json_still_parses() {
+        let s: AppSettings = serde_json::from_str(r#"{ "theme": "light" }"#).unwrap();
+        assert_eq!(s.theme, "light");
+        assert_eq!(s.font_family, "Arial"); // defaulted
+        assert!(s.preset.me_prefix); // defaulted to JGRP
+    }
+}

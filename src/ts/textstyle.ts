@@ -12,7 +12,8 @@
  */
 
 import { listFonts } from "./tauri-bridge";
-import { state, notify } from "./state";
+import { effectiveStroke, state, notify } from "./state";
+import { scheduleSaveSettings } from "./settings";
 
 const SIZE_MAX = 60;
 /** Auto-size floor — below this, chat text stops being readable. */
@@ -36,6 +37,10 @@ const FALLBACK_FONTS = [
 let slider: HTMLInputElement | null = null;
 let valueLabel: HTMLElement | null = null;
 let fontSelect: HTMLSelectElement | null = null;
+let strokeSlider: HTMLInputElement | null = null;
+let strokeVal: HTMLElement | null = null;
+let gapSlider: HTMLInputElement | null = null;
+let gapVal: HTMLElement | null = null;
 
 export function initTextStyle(): void {
   slider = document.getElementById("text-size") as HTMLInputElement | null;
@@ -55,6 +60,39 @@ export function initTextStyle(): void {
   fontSelect.addEventListener("change", () => {
     if (!fontSelect) return;
     state.fontFamily = fontSelect.value;
+    scheduleSaveSettings();
+    notify();
+  });
+
+  strokeSlider = document.getElementById("stroke-size") as HTMLInputElement | null;
+  strokeVal = document.getElementById("stroke-val");
+  gapSlider = document.getElementById("line-gap") as HTMLInputElement | null;
+  gapVal = document.getElementById("line-gap-val");
+  const strokeAuto = document.getElementById("stroke-auto");
+  const gapReset = document.getElementById("line-gap-reset");
+  if (!strokeSlider || !strokeVal || !gapSlider || !gapVal || !strokeAuto || !gapReset) {
+    throw new Error("Missing stroke/line-gap controls");
+  }
+
+  strokeSlider.addEventListener("input", () => {
+    state.strokeWidth = Number(strokeSlider!.value);
+    syncStroke();
+    notify();
+  });
+  strokeAuto.addEventListener("click", () => {
+    state.strokeWidth = null; // back to auto (scales with text size)
+    syncStroke();
+    notify();
+  });
+
+  gapSlider.addEventListener("input", () => {
+    state.lineGap = Number(gapSlider!.value);
+    syncGap();
+    notify();
+  });
+  gapReset.addEventListener("click", () => {
+    state.lineGap = 122;
+    syncGap();
     notify();
   });
 
@@ -62,11 +100,24 @@ export function initTextStyle(): void {
   void populateFonts();
 }
 
+function syncStroke(): void {
+  if (!strokeSlider || !strokeVal) return;
+  strokeSlider.value = String(effectiveStroke());
+  strokeVal.textContent = state.strokeWidth === null ? `auto (${effectiveStroke()}px)` : `${state.strokeWidth}px`;
+}
+
+function syncGap(): void {
+  if (!gapSlider || !gapVal) return;
+  gapSlider.value = String(state.lineGap);
+  gapVal.textContent = `${state.lineGap}%`;
+}
+
 /** Called on image load: pick a size that fits this resolution. */
 export function autoTextSize(imageWidth: number): void {
   const size = Math.min(SIZE_MAX, Math.max(AUTO_MIN, Math.round(imageWidth / AUTO_DIVISOR)));
   state.textSize = size;
   syncControls();
+  syncStroke(); // auto stroke follows text size
   notify();
 }
 
@@ -102,6 +153,8 @@ async function populateFonts(): Promise<void> {
 function syncControls(): void {
   if (slider) slider.value = String(state.textSize);
   syncLabel();
+  syncStroke();
+  syncGap();
 }
 
 function syncLabel(): void {

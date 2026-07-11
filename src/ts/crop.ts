@@ -54,6 +54,11 @@ export function initCrop(): void {
   }
 
   mustGet<HTMLButtonElement>("btn-custom-apply").addEventListener("click", applyCustom);
+  for (const input of [customW, customH]) {
+    input.addEventListener("keydown", (ev) => {
+      if (ev.key === "Enter") applyCustom(); // small fix: Enter = Set
+    });
+  }
 
   editBtn.addEventListener("click", () => setEditing(!state.cropEditing));
   resetBtn.addEventListener("click", resetToFull);

@@ -31,6 +31,13 @@ let listEl: HTMLElement;
 /** Per-block "N baris" hints, so preset changes can refresh them. */
 const statusById = new Map<number, HTMLElement>();
 
+/** The chatlog textarea the user last focused — the palette's target. */
+let activeArea: { blockId: number; textarea: HTMLTextAreaElement } | null = null;
+
+export function getActiveChatArea(): HTMLTextAreaElement | null {
+  return activeArea?.textarea ?? null;
+}
+
 /* ── image upload (unchanged behavior) ── */
 
 export function initUpload(): void {
@@ -131,6 +138,7 @@ function addBlock(): void {
 
 function removeBlock(id: number, card: HTMLElement): void {
   statusById.delete(id);
+  if (activeArea?.blockId === id) activeArea = null;
   state.blocks = state.blocks.filter((b) => b.id !== id);
   card.remove();
   refreshTitles();
@@ -190,6 +198,10 @@ function buildCard(block: ChatBlock): HTMLElement {
   status.className = "hint";
   status.textContent = "0 baris";
   statusById.set(block.id, status);
+
+  textarea.addEventListener("focus", () => {
+    activeArea = { blockId: block.id, textarea };
+  });
 
   let timer: number | undefined;
   let requestSeq = 0;

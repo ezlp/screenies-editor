@@ -8,11 +8,11 @@ mod chatlog;
 
 // ── Later-milestone modules (compiled from day one so the structure is real) ──
 mod clipboard;
-mod config; //    M4
+mod config;
 mod files;
 mod fonts;
 mod render;
-mod templates; // M4
+mod templates; // M4c
 
 fn main() {
     tauri::Builder::default()
@@ -24,6 +24,8 @@ fn main() {
             commands::export_preset_toml,
             commands::export_png,
             commands::copy_png,
+            commands::load_settings,
+            commands::save_settings,
             commands::list_fonts,
             commands::app_version,
         ])

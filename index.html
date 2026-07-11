@@ -116,13 +116,31 @@
             <input type="range" id="text-size" class="slider-flex" min="12" max="60" value="27" />
             <span class="meta-chip mono" id="text-size-val">27px</span>
           </div>
+
+          <div class="row">
+            <label class="field-label" for="stroke-size">Outline</label>
+            <input type="range" id="stroke-size" class="slider-flex" min="0" max="10" value="3" />
+            <span class="meta-chip mono" id="stroke-val">auto</span>
+            <button class="btn btn-ghost btn-small" id="stroke-auto" title="Kembali ke otomatis">A</button>
+          </div>
+
+          <div class="row">
+            <label class="field-label" for="line-gap">Jarak baris</label>
+            <input type="range" id="line-gap" class="slider-flex" min="100" max="180" value="122" />
+            <span class="meta-chip mono" id="line-gap-val">122%</span>
+            <button class="btn btn-ghost btn-small" id="line-gap-reset" title="Reset">↺</button>
+          </div>
+
+          <div class="row">
+            <label class="field-label" for="palette-color">Palet</label>
+            <input type="color" id="palette-color" value="#FF0000" />
+            <button class="btn btn-small" id="palette-apply">Terapkan ke seleksi</button>
+          </div>
+          <div class="row" id="palette-swatches"></div>
+          <p class="hint">Blok teks di kotak chatlog → pilih warna → Terapkan. Tanpa seleksi: kode warna disisipkan di kursor.</p>
           <p class="hint">Ukuran otomatis mengikuti resolusi (minimal 16px biar tetap terbaca) — atur manual dengan slider. Font Verdana / Tahoma paling jelas di resolusi rendah. Posisi <em>Bebas</em> bisa diseret di preview (klik dua kali untuk reset); posisi sudut terkunci rapi.</p>
         </section>
 
-        <section class="panel-section panel-section-soon">
-          <h2 class="section-title"><span class="step">3</span> Zona &amp; Warna <span class="soon">Milestone 2</span></h2>
-          <p class="hint">Zona kiri/kanan atas-bawah, auto-warna * ungu &amp; (( )) abu-abu, palet warna manual.</p>
-        </section>
 
       </aside>
 
@@ -157,7 +175,7 @@
       <aside class="panel panel-right">
 
         <section class="panel-section">
-          <h2 class="section-title"><span class="step">4</span> Filter</h2>
+          <h2 class="section-title"><span class="step">3</span> Filter</h2>
           <div class="filter-row" data-filter="brightness">
             <label>Brightness</label>
             <input type="range" min="0" max="200" value="100" />
@@ -192,12 +210,12 @@
         </section>
 
         <section class="panel-section panel-section-soon">
-          <h2 class="section-title"><span class="step">5</span> Stiker / PNG <span class="soon">Milestone 3</span></h2>
+          <h2 class="section-title"><span class="step">4</span> Stiker / PNG <span class="soon">Milestone 4c</span></h2>
           <p class="hint">Import objek, atur ukuran &amp; posisi.</p>
         </section>
 
         <section class="panel-section panel-export">
-          <h2 class="section-title"><span class="step">6</span> Export</h2>
+          <h2 class="section-title"><span class="step">5</span> Export</h2>
           <button class="btn btn-primary btn-block" id="btn-save" disabled>Save Disk (.png)</button>
           <button class="btn btn-block" id="btn-copy" disabled>Copy ke Clipboard</button>
           <p class="hint">Render penuh oleh Rust — persis seperti preview, tajam sampai 4K. Tutup mode crop dulu sebelum export.</p>

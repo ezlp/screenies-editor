@@ -315,3 +315,24 @@
 .filter-row.filter-active label { color: var(--text); }
 .filter-reset { padding: 2px 4px; }
 .filter-reset:disabled { visibility: hidden; }
+
+/* ── Color palette ── */
+#palette-color {
+  width: 34px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: transparent;
+  cursor: pointer;
+}
+#palette-swatches { flex-wrap: wrap; gap: 6px; }
+.swatch {
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  cursor: pointer;
+  padding: 0;
+}
+.swatch:hover { border-color: var(--accent); transform: scale(1.12); }

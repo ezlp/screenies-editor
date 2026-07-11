@@ -9,6 +9,7 @@
 use crate::chatlog::preset::ParsePreset;
 use crate::chatlog::{self, ParsedLine};
 use crate::error::AppError;
+use crate::config::AppSettings;
 use crate::render::{compose, RenderJob};
 
 /// Chatlog text → parsed lines: timestamps stripped, `{RRGGBB}` colors
@@ -59,6 +60,18 @@ pub async fn export_png(app: tauri::AppHandle, job: RenderJob) -> Result<bool, A
 pub async fn copy_png(job: RenderJob) -> Result<(), AppError> {
     let img = compose::render(&job)?;
     crate::clipboard::copy_image(&img)
+}
+
+/// Saved settings (theme, font, preset). None on first run.
+#[tauri::command]
+pub fn load_settings(app: tauri::AppHandle) -> Result<Option<AppSettings>, AppError> {
+    crate::config::load(&app)
+}
+
+/// Persist settings to settings.json in the app config dir.
+#[tauri::command]
+pub fn save_settings(app: tauri::AppHandle, settings: AppSettings) -> Result<(), AppError> {
+    crate::config::save(&app, &settings)
 }
 
 /// Installed system font families for the picker — sorted, deduped.

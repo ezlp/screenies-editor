@@ -66,6 +66,17 @@ repo's **Releases** page (right sidebar) and download:
 - System/game messages (`VEHICLE:`, `ERROR:`, `AdmCmd:` — any `Word:` prefix,
   pattern-based so all ~30 JGRP tags and future ones work) render the tag
   **bold** automatically
+- **Text styling + palette (v0.12.0, M4b):** *Outline* slider (0–10, or Auto
+  that follows text size — 0 disables the stroke entirely, in export too),
+  *Jarak baris* spacing slider, and the ssrp-editor **palette**: select text
+  in a chatlog box → pick a color / quick swatch → `{RRGGBB}` codes wrap the
+  selection. Fixes: Enter applies custom resolution; export no longer
+  re-allocates stroke offsets per glyph.
+- **Settings memory (v0.11.0, M4a):** theme, font, and your full preset
+  (Kustom included) persist in `settings.json` and restore on launch.
+  Exports & the font picker got faster — the system font scan now runs once
+  per session instead of on every call. Dead "Zona & Warna" placeholder
+  removed (its features shipped in v0.2–v0.5).
 - **Export (v0.10.0, M3c):** *Save Disk (.png)* and *Copy ke Clipboard* are
   LIVE. Rust re-renders everything at full resolution — decode → crop →
   Lanczos resize → CSS-spec filter math → your font with a real outline —
@@ -155,7 +166,7 @@ src-tauri/src/             Rust backend
   generic `says [apapun]:` / `[phone]:` / `[walkie]:` variants, bold tags on
   hex-prefixed lines. Manual color palette → M4. Rules are preset-driven since v0.5.0.
 - [x] **M3** — image engine, split in three: **M3a crop/resolution ✅ (v0.8.0)** → **M3b live filters ✅ (v0.9.0)** → **M3c Rust export ✅ (v0.10.0)** — stickers & background modes → M4
-- [ ] **M4** — comfort: templates, settings memory, stroke/spacing controls, manual color palette *(fonts already shipped in v0.3.0)*
+- [ ] **M4** — comfort, split in three: **M4a settings memory + cleanup ✅ (v0.11.0)** → **M4b styling + palette ✅ (v0.12.0)** → M4c stickers, background modes, templates
 - [ ] **v1.0** — polish + release to the community
 
 ---

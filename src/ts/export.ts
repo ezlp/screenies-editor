@@ -6,7 +6,7 @@
  * hands it to Rust for a pixel-exact full-resolution render.
  */
 
-import { state, onChange } from "./state";
+import { effectiveStroke, state, onChange } from "./state";
 import { buildRenderBlocks, outputDims, sourceCrop } from "./canvas";
 import { copyPng, exportPng } from "./tauri-bridge";
 import type { RenderJobPayload } from "./tauri-bridge";
@@ -84,7 +84,7 @@ function buildJob(): RenderJobPayload | null {
     filters: { ...state.filters },
     fontFamily: state.fontFamily,
     textSize: state.textSize,
-    strokeWidth: Math.max(2, Math.round(state.textSize / 9)),
+    strokeWidth: effectiveStroke(),
     blocks: buildRenderBlocks(out.w)
       .filter((b) => b.rows.length > 0)
       .map((b) => ({ rows: b.rows })),

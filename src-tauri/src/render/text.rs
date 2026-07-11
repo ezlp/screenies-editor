@@ -22,20 +22,26 @@ pub fn draw_blocks(img: &mut RgbaImage, job: &RenderJob) -> Result<(), AppError>
     }
     let faces = load_faces(&job.font_family)?;
     let scale = PxScale::from(job.text_size);
-    let stroke_r = (job.stroke_width / 2.0).max(1.0);
+    // Precomputed once (v0.12.0 fix: was re-allocated per token). Empty
+    // when stroke is 0 → the outline pass is skipped entirely.
+    let offsets = if job.stroke_width > 0.0 {
+        stroke_offsets((job.stroke_width / 2.0).max(0.5))
+    } else {
+        Vec::new()
+    };
 
     for block in &job.blocks {
-        draw_block(img, block, &faces, scale, stroke_r);
+        draw_block(img, block, &faces, scale, &offsets);
     }
     Ok(())
 }
 
-fn draw_block(img: &mut RgbaImage, block: &ExportBlock, faces: &Faces, scale: PxScale, stroke_r: f32) {
+fn draw_block(img: &mut RgbaImage, block: &ExportBlock, faces: &Faces, scale: PxScale, offsets: &[(f32, f32)]) {
     for row in &block.rows {
         // Pass 1: black outline for every token in the row…
         for token in &row.tokens {
             let font = if token.bold { &faces.heavy } else { &faces.bold };
-            for (dx, dy) in stroke_offsets(stroke_r) {
+            for &(dx, dy) in offsets {
                 draw_token(img, font, scale, token.x + dx, row.y + dy, [0, 0, 0], &token.text);
             }
         }
@@ -118,15 +124,14 @@ fn parse_hex(s: &str) -> [u8; 3] {
 /// Load bold(700) + heavy(900) faces of the family from the system, with
 /// graceful fallbacks (900→700, family→generic sans).
 fn load_faces(family: &str) -> Result<Faces, AppError> {
-    let mut db = fontdb::Database::new();
-    db.load_system_fonts();
+    let db = crate::fonts::database(); // shared, scanned once per app run
 
-    let bold = face_bytes(&db, family, fontdb::Weight::BOLD)
-        .or_else(|| face_bytes(&db, family, fontdb::Weight::NORMAL))
-        .or_else(|| generic_bytes(&db, fontdb::Weight::BOLD))
+    let bold = face_bytes(db, family, fontdb::Weight::BOLD)
+        .or_else(|| face_bytes(db, family, fontdb::Weight::NORMAL))
+        .or_else(|| generic_bytes(db, fontdb::Weight::BOLD))
         .ok_or_else(|| AppError::Render(format!("font '{family}' tidak ditemukan")))?;
-    let heavy = face_bytes(&db, family, fontdb::Weight::BLACK)
-        .or_else(|| face_bytes(&db, family, fontdb::Weight::EXTRA_BOLD))
+    let heavy = face_bytes(db, family, fontdb::Weight::BLACK)
+        .or_else(|| face_bytes(db, family, fontdb::Weight::EXTRA_BOLD))
         .unwrap_or_else(|| bold.clone());
 
     Ok(Faces {

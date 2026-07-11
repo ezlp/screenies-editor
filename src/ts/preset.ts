@@ -13,6 +13,7 @@ import { exportPresetToml, importPresetToml, listPresets } from "./tauri-bridge"
 import { DEFAULT_PRESET, state, notify } from "./state";
 import type { ParsePreset } from "./types";
 import { reparseAllBlocks } from "./chatlog";
+import { scheduleSaveSettings } from "./settings";
 
 const CUSTOM_VALUE = "__custom__";
 
@@ -53,6 +54,7 @@ export function initPreset(): void {
       select.value = CUSTOM_VALUE;
       customBox.hidden = false;
       syncCustomControls();
+      scheduleSaveSettings();
       await reparseAllBlocks();
     } catch (err) {
       console.error("[screenies-editor] import preset failed:", err);
@@ -94,9 +96,17 @@ async function populate(): Promise<void> {
   custom.textContent = "Kustom…";
   select.appendChild(custom);
 
-  // Boot with the first built-in (authoritative from Rust).
-  state.preset = structuredClone(builtins[0]);
-  select.value = "0";
+  // Restore whatever settings.ts loaded: a matching built-in selects
+  // itself; anything else (a saved Kustom) opens the custom controls.
+  const idx = builtins.findIndex((b) => b.name === state.preset.name);
+  if (idx >= 0) {
+    state.preset = structuredClone(builtins[idx]);
+    select.value = String(idx);
+    customBox.hidden = true;
+  } else {
+    select.value = CUSTOM_VALUE;
+    customBox.hidden = false;
+  }
   syncCustomControls();
   await reparseAllBlocks();
 }
@@ -112,6 +122,7 @@ function onSelect(): void {
     state.preset = structuredClone(builtins[idx] ?? builtins[0]);
     customBox.hidden = true;
   }
+  scheduleSaveSettings();
   void reparseAllBlocks();
 }
 
@@ -129,6 +140,7 @@ function onCustomEdit(): void {
     .split(",")
     .map((c) => c.trim())
     .filter((c) => c.length > 0);
+  scheduleSaveSettings();
   notify();
   void reparseAllBlocks();
 }
