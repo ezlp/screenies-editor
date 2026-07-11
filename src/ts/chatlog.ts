@@ -207,7 +207,11 @@ function buildCard(block: ChatBlock): HTMLElement {
   remove.title = "Hapus chatlog ini";
   remove.addEventListener("click", () => removeBlock(block.id, card));
 
-  head.append(title, select, bgSelect, remove);
+  head.append(title, remove);
+
+  const controls = document.createElement("div");
+  controls.className = "chat-controls";
+  controls.append(select, bgSelect);
 
   // ── textarea ──
   const textarea = document.createElement("textarea");
@@ -246,7 +250,7 @@ function buildCard(block: ChatBlock): HTMLElement {
     }, DEBOUNCE_MS);
   });
 
-  card.append(head, textarea, status);
+  card.append(head, controls, textarea, status);
   return card;
 }
 

@@ -56,11 +56,8 @@ interface Bounds {
 const boundsById = new Map<number, Bounds>();
 const stickerBoundsById = new Map<number, Bounds>();
 
-/** Height of the "Luar" strip — set on every layout pass. */
+/** Height of the "Luar" strip below the photo — set on every layout pass. */
 let lastExtension = 0;
-let prevExtension = -1; // detects strip growth → re-locks the crop ratio
-/** Cap: the strip may take at most this share of a fixed output's height. */
-const LUAR_MAX_SHARE = 0.4;
 
 type Corner = "tl" | "tr" | "bl" | "br";
 type DragMode = "none" | "pan" | "text" | "sticker" | "crop-move" | "crop-resize";
@@ -116,38 +113,23 @@ export function sourceCrop(): CropRect | null {
   return state.crop ?? { x: 0, y: 0, w: img.width, h: img.height };
 }
 
-/**
- * FINAL output dimensions (the saved PNG, text space, HUD).
- * Fixed resolutions stay EXACTLY as chosen — the Luar strip is carved from
- * inside. Bebas / ratio-only modes grow by the strip instead (no promised
- * resolution to keep).
- */
-export function outputDims(): { w: number; h: number } | null {
+/** The photo's area — the chosen resolution (or the crop's own pixels). */
+export function photoDims(): { w: number; h: number } | null {
   const crop = sourceCrop();
   if (!crop) return null;
   if (state.outputSize) return { ...state.outputSize };
-  return { w: Math.round(crop.w), h: Math.round(crop.h) + lastExtension };
+  return { w: Math.round(crop.w), h: Math.round(crop.h) };
 }
 
-/** The photo's area within the output (pasted at 0,0). */
-export function photoDims(): { w: number; h: number } | null {
-  const out = outputDims();
-  if (!out) return null;
-  if (state.outputSize) {
-    const maxStrip = Math.round(out.h * LUAR_MAX_SHARE);
-    return { w: out.w, h: out.h - Math.min(lastExtension, maxStrip) };
-  }
-  return { w: out.w, h: out.h - lastExtension };
-}
-
-/** Crop lock: follows the photo area when a Luar strip eats into a fixed
- *  output; otherwise the user's chosen ratio. */
-export function effectiveCropRatio(): number | null {
-  if (state.outputSize && lastExtension > 0) {
-    const p = photoDims();
-    if (p && p.h > 0) return p.w / p.h;
-  }
-  return state.cropRatio;
+/**
+ * FINAL output dimensions (saved PNG, text space, HUD): the photo area
+ * plus the "Luar" strip below it. With Luar text, the PNG is TALLER than
+ * the chosen resolution — by design, so the photo itself never shrinks.
+ */
+export function outputDims(): { w: number; h: number } | null {
+  const photo = photoDims();
+  if (!photo) return null;
+  return { w: photo.w, h: photo.h + lastExtension };
 }
 
 /** Zoom so the current subject (output or full photo) fits, centered. */
@@ -281,13 +263,6 @@ function drawResult(img: HTMLImageElement): void {
 
   const built = buildRenderBlocks(out.w); // refreshes lastExtension
 
-  // Luar strip changed size → re-lock the crop box onto the photo area
-  // (this is the "play with crop" step from the old design, automated).
-  if (lastExtension !== prevExtension) {
-    prevExtension = lastExtension;
-    relockCropToPhotoArea(img);
-  }
-
   const crop = sourceCrop();
   const photo = photoDims();
   if (!crop || !photo) return;
@@ -305,35 +280,6 @@ function drawResult(img: HTMLImageElement): void {
   drawBuilt(built);
 }
 
-/** Fixed output + Luar: reshape the crop to the photo area's ratio,
- *  keeping its width and center where possible. */
-function relockCropToPhotoArea(img: HTMLImageElement): void {
-  if (!state.outputSize || !state.crop) return;
-  const ratio = effectiveCropRatio();
-  if (ratio === null) return;
-
-  const c = state.crop;
-  if (Math.abs(c.w / c.h - ratio) < 0.005) return; // already matches
-
-  const cx = c.x + c.w / 2;
-  const cy = c.y + c.h / 2;
-
-  let w = c.w;
-  let h = w / ratio;
-  if (h > img.height) {
-    h = img.height;
-    w = h * ratio;
-  }
-  if (w > img.width) {
-    w = img.width;
-    h = w / ratio;
-  }
-
-  c.w = Math.round(w);
-  c.h = Math.round(h);
-  c.x = Math.round(clamp(cx - c.w / 2, 0, img.width - c.w));
-  c.y = Math.round(clamp(cy - c.h / 2, 0, img.height - c.h));
-}
 
 function drawStickers(): void {
   stickerBoundsById.clear();
@@ -425,24 +371,21 @@ export function buildRenderBlocks(
   const advance = size * (state.lineGap / 100);
   const result: Array<{ blockId: number; rows: RenderRow[]; bounds: Bounds | null }> = [];
 
-  // Luar layout is two-pass: measure luar heights → strip size → photo
-  // bottom → real origins. Pass 1 (heights only):
-  const size0 = state.textSize;
-  const advance0 = size0 * (state.lineGap / 100);
+  // Luar is two-pass: measure Luar block heights first (strip size),
+  // then lay everything out for real. Measured layouts are cached and
+  // reused in pass 2 — each Luar block is laid out exactly once.
+  const luarLayouts = new Map<number, BlockLayout>();
   let stripNeed = 0;
   for (const b of state.blocks) {
     if (b.anchor !== "luar-bawah" || b.lines.length === 0) continue;
-    const lay = layoutLines(b.lines, size0, Math.max(MIN_WRAP, outputWidth - MARGIN_X * 2), advance0);
+    const lay = layoutLines(b.lines, size, wrapWidthFor(b, outputWidth), advance);
+    luarLayouts.set(b.id, lay);
     stripNeed += lay.height + MARGIN_Y;
   }
   lastExtension = stripNeed > 0 ? Math.round(stripNeed + MARGIN_Y) : 0;
-  if (state.outputSize) {
-    lastExtension = Math.min(lastExtension, Math.round((outputDims()?.h ?? 0) * LUAR_MAX_SHARE));
-  }
 
   const photoBottom = photoDims()?.h ?? 0;
   let luarY = photoBottom + MARGIN_Y;
-  let luarUsed = false;
 
   for (const block of state.blocks) {
     if (block.lines.length === 0) {
@@ -450,14 +393,14 @@ export function buildRenderBlocks(
       continue;
     }
 
-    const wrapWidth = wrapWidthFor(block, outputWidth);
-    const layout = layoutLines(block.lines, size, wrapWidth, advance);
+    const layout =
+      luarLayouts.get(block.id) ??
+      layoutLines(block.lines, size, wrapWidthFor(block, outputWidth), advance);
 
     let origin: { x: number; y: number };
     if (block.anchor === "luar-bawah") {
       origin = { x: MARGIN_X, y: luarY };
       luarY += layout.height + MARGIN_Y;
-      luarUsed = true;
     } else {
       origin = blockOrigin(block, layout);
     }
@@ -503,7 +446,6 @@ export function buildRenderBlocks(
     });
   }
 
-  void luarUsed;
   return result;
 }
 
@@ -773,7 +715,7 @@ function resizeCrop(dx: number, dy: number): void {
   let w = Math.abs(moveX - anchorX);
   let h = Math.abs(moveY - anchorY);
 
-  const lockRatio = effectiveCropRatio();
+  const lockRatio = state.cropRatio;
   if (lockRatio !== null) {
     // Lock to ratio: follow the dominant axis of the drag.
     if (w / lockRatio >= h) h = w / lockRatio;

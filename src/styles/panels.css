@@ -351,3 +351,17 @@
 .select-compact { flex: 0 0 auto; width: auto; padding: 5px 6px; font-size: 11px; }
 .template-chips { flex-wrap: wrap; gap: 6px; }
 .template-chip { text-transform: none; letter-spacing: 0; }
+
+/* ── Chatlog card: posisi + BG dropdowns side by side (v1.0 layout fix) ── */
+.chat-controls {
+  display: flex;
+  gap: 6px;
+}
+.chat-controls .select {
+  flex: 1 1 0;
+  min-width: 0;
+}
+.chat-controls .select-compact {
+  flex: 1 1 0;   /* equal width with the position select */
+  width: auto;
+}

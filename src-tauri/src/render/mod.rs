@@ -7,11 +7,10 @@
 //!
 //! Pipeline (compose.rs): decode → crop → resize → filters → text → done.
 
-pub mod background; // M4: per-line blocks / mask / outside-image area
 pub mod compose;
 pub mod crop;
 pub mod filters;
-pub mod sticker; //   M4: PNG overlays
+pub mod sticker;
 pub mod text;
 
 use serde::Deserialize;

@@ -19,9 +19,6 @@ import { initColorPalette } from "./colorpalette";
 import { initStickers } from "./stickers";
 import { appVersion, isTauri } from "./tauri-bridge";
 
-/* Later-milestone modules — imported so tsc type-checks them from day one. */
-import "./zones";
-import "./backgrounds";
 
 window.addEventListener("DOMContentLoaded", () => {
   void boot();
