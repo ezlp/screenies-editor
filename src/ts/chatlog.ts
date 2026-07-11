@@ -207,6 +207,7 @@ function addBlock(): ChatBlock {
   listEl.appendChild(buildCard(block));
   refreshTitles();
   notify();
+  return block;
 }
 
 function removeBlock(id: number, card: HTMLElement): void {
