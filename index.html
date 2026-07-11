@@ -15,7 +15,7 @@
         <h1>Screenies<em>Editor</em></h1>
       </div>
       <div class="topbar-right">
-        <button class="btn btn-ghost btn-small" id="theme-toggle" aria-label="Ganti tema">☀</button>
+        <span class="badge badge-milestone">MILESTONE 1</span>
         <span class="badge" id="version-badge">v–.–.–</span>
       </div>
     </header>
@@ -52,11 +52,6 @@
             <select id="preset-select" class="select"></select>
           </div>
 
-          <div class="row">
-            <button class="btn btn-small" id="import-preset">Impor .toml</button>
-            <button class="btn btn-small" id="export-preset">Ekspor .toml</button>
-          </div>
-
           <div id="preset-custom" class="preset-custom" hidden>
             <label class="row checkline" for="ck-timestamps">
               <input type="checkbox" id="ck-timestamps" /><span>Hapus timestamp [00:00:00]</span>
@@ -89,6 +84,10 @@
 
           <button class="btn btn-block" id="btn-add-chatlog">+ Tambah Chatlog</button>
 
+          <label class="row checkline" for="rp-only">
+            <input type="checkbox" id="rp-only" />
+            <span>Hanya RP — sembunyikan pesan sistem (SERVER:, VEHICLE:, dll)</span>
+          </label>
 
           <div class="row">
             <label class="field-label" for="font-select">Font</label>

@@ -22,11 +22,6 @@
   --accent:        #c2a2da;
   --accent-strong: #a97fd1;
   --accent-dim:    rgba(194, 162, 218, 0.14);
-  --accent-contrast: #17121e; /* text on accent-filled buttons */
-
-  /* Viewport checkerboard */
-  --checker-a: #15181d;
-  --checker-b: #191c22;
 
   /* Chat colors (SA-MP conventions, used from M2 on) */
   --chat-white: #ffffff;
@@ -43,30 +38,6 @@
   --gap:      14px;
 
   --shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
-}
-
-/* ═══ Light theme — token overrides only, so future custom themes are
-   just another block like this one. Toggle: html[data-theme="light"]. ═══ */
-:root[data-theme="light"] {
-  --bg:        #eef0f4;
-  --panel:     #ffffff;
-  --panel-2:   #f6f7fa;
-  --line:      #d7dbe3;
-  --line-soft: #e4e7ed;
-
-  --text:      #21252d;
-  --muted:     #5b6270;
-  --faint:     #8d94a3;
-
-  --accent:        #8a5fc0; /* darker purple for contrast on light */
-  --accent-strong: #7647ad;
-  --accent-dim:    rgba(138, 95, 192, 0.14);
-  --accent-contrast: #ffffff;
-
-  --checker-a: #e7e9ee;
-  --checker-b: #dee1e8;
-
-  --shadow: 0 8px 28px rgba(30, 35, 60, 0.14);
 }
 
 * { box-sizing: border-box; }

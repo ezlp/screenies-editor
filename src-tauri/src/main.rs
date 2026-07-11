@@ -16,12 +16,9 @@ mod templates; // M4
 
 fn main() {
     tauri::Builder::default()
-        .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             commands::parse_chatlog,
             commands::list_presets,
-            commands::import_preset_toml,
-            commands::export_preset_toml,
             commands::list_fonts,
             commands::app_version,
         ])

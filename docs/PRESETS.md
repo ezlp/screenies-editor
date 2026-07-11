@@ -1,105 +1,65 @@
-# Membuat Preset Sendiri (.toml) — ScreeniesEditor
+# Preset Format — ScreeniesEditor
 
-> Halaman ini siap dicopy ke GitHub Wiki. Untuk komunitas: kalau kamu sudah
-> membuat preset untuk server kamu, bagikan file `.toml`-nya di wiki ini
-> supaya pemain lain tinggal **Impor**.
+> Halaman ini siap dicopy ke GitHub Wiki.
 
-Preset menentukan bagaimana ScreeniesEditor membaca dan mewarnai chatlog
-server kamu — semua aturannya adalah data, bukan kode. Satu preset = satu
-file `.toml` yang bisa dibagikan.
+ScreeniesEditor tidak menghardcode format satu server. Semua aturan parsing
+chatlog didefinisikan oleh sebuah **preset** — dan kamu bisa mengaturnya
+sendiri lewat dropdown **Preset format → Kustom…** di panel kiri.
 
-## Cara tercepat (tanpa nulis file)
+## Preset bawaan
 
-1. Buka app → panel kiri → **Preset format** → pilih **Kustom…**
-2. Atur toggle & warna sampai chatlog kamu terlihat benar di preview
-3. Klik **Ekspor .toml** → simpan, misalnya `preset-serverku.toml`
-4. Bagikan file itu — teman kamu tinggal klik **Impor .toml**
+| Preset | Untuk siapa | Catatan |
+|---|---|---|
+| **JGRP (Jogjagamers)** | Pemain JGRP | Semua aturan aktif, termasuk deteksi `/do` yang berakhiran `((Nama))` |
+| **SA-MP Umum** | Server SA-MP RP lain | Sama seperti JGRP tapi tanpa deteksi `/do ((Nama))` (khas JGRP) |
+| **Polos (tanpa auto-warna)** | Format yang belum didukung | Hanya hapus timestamp + kode warna `{RRGGBB}`; tanpa pewarnaan otomatis |
 
-Selesai. Sisanya di halaman ini untuk yang mau menulis / mengedit file
-langsung.
+## Aturan yang bisa diatur (mode Kustom)
 
-## Anatomi file preset
+| Aturan | Efek |
+|---|---|
+| Hapus timestamp | Buang `[HH:MM:SS]` di awal baris |
+| Warna otomatis `*` | Baris diawali `*` → warna /me (default ungu `#C2A2DA`) |
+| Warna otomatis `(( ))` | Baris diawali `((` → warna OOC (default abu `#9C9C9C`) |
+| Deteksi `/do ((Nama))` | Baris yang **berakhir** `((Nama))` → warna /me |
+| Tag sistem bold | `SERVER:`, `VEHICLE:`, `AdmCmd:`, dan `Apapun:` lainnya → tag jadi **bold** + bisa disembunyikan lewat "Hanya RP" |
+| Warna /me & OOC | Ganti warnanya sesuka hati |
+| Channel radio | Daftar channel `[...]:` yang dianggap ucapan, pisahkan koma. Contoh: `phone, walkie, dep, gov` |
 
-Buat file teks berakhiran `.toml`, isi seperti ini:
+Aturan yang **selalu aktif** (universal SA-MP): deteksi `says:` /
+`shouts:` termasuk varian `says [low]:`, `says [apapun]:`.
 
-```toml
-# Preset untuk Server Saya — dibuat oleh Isut
-name = "Server Saya"
+## Skema JSON
 
-# ── Pembersihan ──
-stripTimestamps = true      # buang [HH:MM:SS] di awal baris
-hexCodes = true             # baca kode warna {RRGGBB} / {rrggbb}
+Preset adalah JSON biasa. Field yang tidak ditulis otomatis memakai nilai
+default, jadi preset versi lama tetap jalan di versi app yang lebih baru.
 
-# ── Aturan pewarnaan otomatis ──
-mePrefix = true             # baris diawali *  → warna /me
-oocWrap = true              # baris diawali (( → warna OOC
-doSuffix = false            # baris berakhiran ((Nama)) → warna /me (khas JGRP)
-systemTags = true           # SERVER:, VEHICLE:, Apapun:  → tag jadi bold
-
-# ── Channel radio yang dianggap ucapan ──
-radioChannels = ["phone", "walkie"]
-
-# ── Warna (hex, pakai tanda #) ──
-colorMe = "#C2A2DA"
-colorOoc = "#9C9C9C"
-colorDefault = "#FFFFFF"
+```json
+{
+  "name": "Server Saya",
+  "stripTimestamps": true,
+  "hexCodes": true,
+  "mePrefix": true,
+  "oocWrap": true,
+  "doSuffix": false,
+  "systemTags": true,
+  "radioChannels": ["phone", "walkie", "dep"],
+  "colorMe": "#C2A2DA",
+  "colorOoc": "#9C9C9C",
+  "colorDefault": "#FFFFFF"
+}
 ```
 
-Baris berawalan `#` adalah komentar — bebas dipakai untuk catatan.
+> **Rencana M4:** simpan / muat preset Kustom sebagai file `.json`, supaya
+> preset server kamu bisa dibagikan ke teman satu komunitas lewat wiki ini.
 
-## Referensi field
+## Contoh untuk server lain
 
-| Field | Tipe | Default | Artinya |
-|---|---|---|---|
-| `name` | teks | `"JGRP (Jogjagamers)"` | Nama yang tampil |
-| `stripTimestamps` | true/false | `true` | Hapus `[HH:MM:SS]` |
-| `hexCodes` | true/false | `true` | Parse `{RRGGBB}` (huruf besar/kecil sama saja) |
-| `mePrefix` | true/false | `true` | `*` di awal → warna /me |
-| `oocWrap` | true/false | `true` | `((` di awal → warna OOC |
-| `doSuffix` | true/false | `true` | Berakhiran `((Nama))` → warna /me |
-| `systemTags` | true/false | `true` | `Apapun:` di awal → tag **bold** |
-| `radioChannels` | daftar teks | `["phone", "walkie"]` | `[channel]:` dianggap ucapan |
-| `colorMe` | hex | `"#C2A2DA"` | Warna /me dan /do |
-| `colorOoc` | hex | `"#9C9C9C"` | Warna OOC |
-| `colorDefault` | hex | `"#FFFFFF"` | Warna dasar semua teks lain |
+Server yang `/do`-nya diawali `*` (bukan berakhiran `((Nama))`):
+matikan **Deteksi /do ((Nama))** — baris `*` sudah tertangkap aturan `*`.
 
-**Field yang tidak ditulis otomatis memakai default** — jadi preset lama
-tetap jalan di versi app yang lebih baru, dan file minimal ini pun sah:
+Server dengan radio departemen: isi channel radio dengan
+`phone, walkie, dep, r, gov` sesuai format server kamu.
 
-```toml
-name = "Cuma ganti warna me"
-colorMe = "#FF9DE2"
-```
-
-Yang **selalu aktif** (tidak perlu diatur): deteksi `says:` / `shouts:`
-termasuk semua varian kurung seperti `says [low]:`, `says [radio]:`.
-
-## Resep per jenis server
-
-**Server yang `/do`-nya diawali `*` (bukan berakhiran `((Nama))`)**
-→ `doSuffix = false`. Baris `*` sudah tertangkap `mePrefix`.
-
-**Server dengan radio departemen** → tambah channelnya:
-`radioChannels = ["phone", "walkie", "dep", "gov", "r"]`
-
-**Server dengan warna /me berbeda** → ganti `colorMe`, contoh MTA-style
-pink: `colorMe = "#FF66CC"`.
-
-**Format yang belum cocok sama sekali** → matikan semua aturan
-(`mePrefix/oocWrap/doSuffix/systemTags = false`) lalu warnai manual dengan
-kode `{RRGGBB}` langsung di teks chatlog.
-
-## Kalau impor gagal
-
-App menolak file yang TOML-nya rusak dan menunjukkan pesan errornya di
-console (Ctrl+Shift+I). Penyebab paling umum: lupa tanda kutip pada teks
-(`name = Server Saya` ❌ → `name = "Server Saya"` ✅) atau koma di dalam
-daftar (`["phone" "walkie"]` ❌ → `["phone", "walkie"]` ✅).
-
-## Berbagi di wiki
-
-Konvensi yang disarankan untuk halaman wiki komunitas:
-
-1. Satu halaman per server: **Preset: NamaServer**
-2. Tempel isi `.toml` dalam code block + screenshot hasilnya
-3. Tulis tanggal & versi app saat preset diuji
+Server non-RP / log custom: pakai **Polos**, lalu warnai manual dengan kode
+`{RRGGBB}` di teks (palet warna klik-klik menyusul di M4).

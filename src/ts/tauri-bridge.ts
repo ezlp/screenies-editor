@@ -29,18 +29,6 @@ export async function listPresets(): Promise<ParsePreset[]> {
   return invoke<ParsePreset[]>("list_presets");
 }
 
-/** Rust: open-file dialog → preset from a .toml file (null = cancelled). */
-export async function importPresetToml(): Promise<ParsePreset | null> {
-  if (!isTauri()) return null;
-  return invoke<ParsePreset | null>("import_preset_toml");
-}
-
-/** Rust: save-file dialog → write preset as .toml (false = cancelled). */
-export async function exportPresetToml(preset: ParsePreset): Promise<boolean> {
-  if (!isTauri()) return false;
-  return invoke<boolean>("export_preset_toml", { preset });
-}
-
 /** Rust: installed system font families (sorted). Empty in browser dev. */
 export async function listFonts(): Promise<string[]> {
   if (!isTauri()) return [];

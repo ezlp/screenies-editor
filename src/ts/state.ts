@@ -8,9 +8,11 @@ import type { ParsedLine, ParsePreset } from "./types";
 
 /** Where a chatlog block sits on the photo. */
 export type Anchor =
-  | "free"        // draggable anywhere (seret di preview)
+  | "free"          // draggable anywhere (seret di preview)
   | "kiri-atas"
-  | "kiri-bawah";
+  | "kanan-atas"
+  | "kiri-bawah"
+  | "kanan-bawah";
 
 /** One chatlog block — its own text, its own position. */
 export interface ChatBlock {
@@ -39,6 +41,8 @@ export interface AppState {
   /** Font family for all chat text — picked from the installed system fonts. */
   fontFamily: string;
 
+  /** "Hanya RP": hide system-tagged lines (SERVER:, VEHICLE:, …) from the preview. */
+  rpOnly: boolean;
 
   /** Active parsing rules — sent to Rust with every parse. */
   preset: ParsePreset;
@@ -74,6 +78,7 @@ export const state: AppState = {
   blocks: [],
   textSize: 27,
   fontFamily: "Arial",
+  rpOnly: false,
   preset: structuredClone(DEFAULT_PRESET),
   zoom: 1,
   panX: 0,

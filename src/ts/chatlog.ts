@@ -22,7 +22,9 @@ const NEW_BLOCK_STEP = 70;
 const ANCHOR_OPTIONS: Array<{ value: Anchor; label: string }> = [
   { value: "free", label: "Bebas (seret)" },
   { value: "kiri-atas", label: "Kiri Atas" },
+  { value: "kanan-atas", label: "Kanan Atas" },
   { value: "kiri-bawah", label: "Kiri Bawah" },
+  { value: "kanan-bawah", label: "Kanan Bawah" },
 ];
 
 let blockSeq = 0;
@@ -106,6 +108,13 @@ export function initUpload(): void {
 export function initChatlog(): void {
   listEl = mustGet<HTMLElement>("chatlog-list");
   const addBtn = mustGet<HTMLButtonElement>("btn-add-chatlog");
+  const rpOnly = mustGet<HTMLInputElement>("rp-only");
+
+  rpOnly.addEventListener("change", () => {
+    state.rpOnly = rpOnly.checked;
+    notify();
+  });
+
   addBtn.addEventListener("click", () => addBlock());
   if (state.blocks.length === 0) addBlock(); // start with one block
 }

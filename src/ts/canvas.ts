@@ -171,15 +171,20 @@ function drawBlocks(img: HTMLImageElement): void {
   const advance = size * LINE_GAP;
 
   for (const block of state.blocks) {
-    if (block.lines.length === 0) continue;
+    // "Hanya RP" hides system-tagged lines (SERVER:, VEHICLE:, AdmCmd:, …).
+    const lines = state.rpOnly
+      ? block.lines.filter((l) => l.lineType !== "system")
+      : block.lines;
+    if (lines.length === 0) continue;
 
     const wrapWidth = wrapWidthFor(block, img);
-    const layout = layoutLines(block.lines, size, wrapWidth, advance);
+    const layout = layoutLines(lines, size, wrapWidth, advance);
     const origin = blockOrigin(block, layout, img);
+    const rightEdge = origin.x + layout.width;
 
     let y = origin.y;
     for (const row of layout.rows) {
-      let x = origin.x;
+      let x = origin.align === "right" ? rightEdge - row.width : origin.x;
       for (const token of row.tokens) {
         ctx.font = token.font;
         ctx.strokeText(token.text, x, y);
@@ -253,14 +258,30 @@ function blockOrigin(
   block: ChatBlock,
   layout: BlockLayout,
   img: HTMLImageElement,
-): { x: number; y: number } {
+): { x: number; y: number; align: "left" | "right" } {
   switch (block.anchor) {
     case "free":
-      return { x: block.x, y: block.y };
+      return { x: block.x, y: block.y, align: "left" };
     case "kiri-atas":
-      return { x: MARGIN_X, y: MARGIN_Y };
+      return { x: MARGIN_X, y: MARGIN_Y, align: "left" };
+    case "kanan-atas":
+      return {
+        x: img.width - MARGIN_X - layout.width,
+        y: MARGIN_Y,
+        align: "right",
+      };
     case "kiri-bawah":
-      return { x: MARGIN_X, y: img.height - MARGIN_Y - layout.height };
+      return {
+        x: MARGIN_X,
+        y: img.height - MARGIN_Y - layout.height,
+        align: "left",
+      };
+    case "kanan-bawah":
+      return {
+        x: img.width - MARGIN_X - layout.width,
+        y: img.height - MARGIN_Y - layout.height,
+        align: "right",
+      };
   }
 }
 
