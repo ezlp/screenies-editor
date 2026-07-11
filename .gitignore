@@ -1,0 +1,12 @@
+# Node / frontend
+node_modules/
+dist/
+
+# Rust / Tauri
+src-tauri/target/
+
+# Editors & OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

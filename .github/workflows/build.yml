@@ -1,0 +1,55 @@
+# build.yml — runs on every push & PR.
+# Compiles the frontend (TypeScript) and tests the backend (Rust).
+# No installers here — that's release.yml's job. This exists to catch
+# errors early and show the exact failing line in the Actions log.
+
+name: Build Check
+
+on:
+  push:
+    branches: ["**"]
+    tags-ignore: ["v*"]
+  pull_request:
+
+jobs:
+  check:
+    name: TypeScript + Rust check
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Install frontend deps
+        run: npm install
+
+      # `npm run build` = tsc (type check) + vite build.
+      # The dist/ it produces is also required by Rust: tauri's
+      # generate_context! embeds frontend assets at compile time.
+      - name: Build frontend (type check + bundle)
+        run: npm run build
+
+      - name: Install Tauri system deps (Linux)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            build-essential curl wget file \
+            libxdo-dev libssl-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Rust tests (compiles everything + runs unit tests)
+        run: cargo test --manifest-path src-tauri/Cargo.toml

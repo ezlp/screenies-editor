@@ -1,0 +1,90 @@
+# release.yml — builds the real installers.
+#
+# Trigger:   git tag v0.1.0 && git push --tags
+# Result:    a GitHub Release with
+#              • Windows: .msi + .exe (NSIS)
+#              • Linux:   .deb + .AppImage
+# Duration:  ~15–20 min the first time, faster after caching.
+
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write # needed to create the Release and upload installers
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: windows-latest # 64-bit Windows
+            args: ""
+            targets: ""
+            cache-key: win-x64
+          - platform: windows-latest # 32-bit Windows — for older PCs
+            args: "--target i686-pc-windows-msvc"
+            targets: "i686-pc-windows-msvc"
+            cache-key: win-x86
+          - platform: ubuntu-22.04 # 64-bit Linux
+            args: ""
+            targets: ""
+            cache-key: linux-x64
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Node
+        uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.targets }}
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          key: ${{ matrix.cache-key }}
+
+      - name: Install Tauri system deps (Linux only)
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            build-essential curl wget file \
+            libxdo-dev libssl-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev
+
+      - name: Install frontend deps
+        run: npm install
+
+      - name: Build & publish installers
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          args: ${{ matrix.args }}
+          tagName: ${{ github.ref_name }}
+          releaseName: "ScreeniesEditor ${{ github.ref_name }}"
+          releaseBody: |
+            ScreeniesEditor — Screenshot Roleplay editor untuk komunitas SA-MP.
+
+            **Windows 64-bit:** download `.msi` / `.exe` biasa (x64).
+            **Windows 32-bit** (PC lama): download file yang ada `x86`-nya.
+            Kalau muncul "Windows protected your PC" → klik **More info** → **Run anyway**
+            (normal untuk aplikasi tanpa code-signing certificate).
+
+            **Linux:** download `.AppImage` (jalankan langsung) atau `.deb`.
+          releaseDraft: false
+          prerelease: false
