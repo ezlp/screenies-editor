@@ -147,12 +147,12 @@
 .btn-primary {
   background: var(--accent);
   border-color: var(--accent);
-  color: #17121e;
+  color: var(--accent-contrast);
 }
 .btn-primary:hover:not(:disabled) {
   background: var(--accent-strong);
   border-color: var(--accent-strong);
-  color: #17121e;
+  color: var(--accent-contrast);
 }
 
 .btn-block { width: 100%; }

@@ -99,7 +99,7 @@
   border-radius: var(--radius);
   overflow: hidden;
   background:
-    repeating-conic-gradient(#15181d 0% 25%, #191c22 0% 50%) 0 0 / 22px 22px;
+    repeating-conic-gradient(var(--checker-a) 0% 25%, var(--checker-b) 0% 50%) 0 0 / 22px 22px;
 }
 
 #preview-canvas {

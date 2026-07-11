@@ -10,10 +10,8 @@ use serde::Serialize;
 #[serde(tag = "kind", content = "message", rename_all = "camelCase")]
 pub enum AppError {
     /// Input text/data was invalid or unprocessable.
-    #[allow(dead_code)] // first used in Milestone 2
     Parse(String),
-    /// File system problem (load/save). Used from Milestone 3.
-    #[allow(dead_code)]
+    /// File system problem (load/save).
     Io(String),
     /// Image decode/encode/render problem. Used from Milestone 3.
     #[allow(dead_code)]
