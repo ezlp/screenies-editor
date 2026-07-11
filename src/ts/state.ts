@@ -10,7 +10,11 @@ import type { ParsedLine, ParsePreset } from "./types";
 export type Anchor =
   | "free"        // draggable anywhere (seret di preview)
   | "kiri-atas"
-  | "kiri-bawah";
+  | "kiri-bawah"
+  | "luar-bawah"; // black extension BELOW the photo — screenshot stays clean
+
+/** Background behind a block's rows. */
+export type BgMode = "none" | "block" | "mask";
 
 /** One chatlog block — its own text, its own position. */
 export interface ChatBlock {
@@ -20,9 +24,25 @@ export interface ChatBlock {
   /** Parsed lines from Rust (timestamps stripped, tags bolded). */
   lines: ParsedLine[];
   anchor: Anchor;
+  /** Background: none, per-row block, or full-width mask strip. */
+  bgMode: BgMode;
   /** Origin in image px — only used while anchor === "free". */
   x: number;
   y: number;
+}
+
+/** A PNG overlay (objek/stiker), draggable, drawn under the text. */
+export interface Sticker {
+  id: number;
+  name: string;
+  /** Original file bytes (base64) — what the exporter decodes. */
+  dataBase64: string;
+  img: HTMLImageElement;
+  /** Top-left in output px. */
+  x: number;
+  y: number;
+  /** Percent of natural size. */
+  scale: number;
 }
 
 /** Crop rectangle in source-image pixels. */
@@ -40,6 +60,9 @@ export interface AppState {
 
   /** All chatlog blocks, drawn in order (later = on top). */
   blocks: ChatBlock[];
+
+  /** PNG overlays, drawn between the photo and the text. */
+  stickers: Sticker[];
 
   /** Selected area of the source photo (null = the whole photo). */
   crop: CropRect | null;
@@ -118,6 +141,7 @@ export const state: AppState = {
   image: null,
   imageName: "",
   blocks: [],
+  stickers: [],
   crop: null,
   cropRatio: null,
   outputSize: null,

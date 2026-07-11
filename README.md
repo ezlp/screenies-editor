@@ -66,6 +66,13 @@ repo's **Releases** page (right sidebar) and download:
 - System/game messages (`VEHICLE:`, `ERROR:`, `AdmCmd:` — any `Word:` prefix,
   pattern-based so all ~30 JGRP tags and future ones work) render the tag
   **bold** automatically
+- **M4c (v0.14.0) — the last feature milestone:** **Stickers** (import PNG/
+  WebP, drag on the preview, per-sticker scale, alpha-blended in export);
+  **background modes** per block — *blok* behind each row, *mask* full-width,
+  and the ssrp-editor special **Luar (bawah foto)**: text in a black area
+  appended below the photo so the screenshot stays 100% clean; **quick-text
+  templates** persisted as templates.json (click chip = insert at cursor);
+  and the save dialog now **remembers your last folder**.
 - **Revisions (v0.13.0):** brightness now reaches **300%** (night shots),
   text size slider goes down to **8px** with an auto-outline that thins at
   small sizes so tiny text stays readable, and **custom save-file naming** —
@@ -170,7 +177,7 @@ src-tauri/src/             Rust backend
   generic `says [apapun]:` / `[phone]:` / `[walkie]:` variants, bold tags on
   hex-prefixed lines. Manual color palette → M4. Rules are preset-driven since v0.5.0.
 - [x] **M3** — image engine, split in three: **M3a crop/resolution ✅ (v0.8.0)** → **M3b live filters ✅ (v0.9.0)** → **M3c Rust export ✅ (v0.10.0)** — stickers & background modes → M4
-- [ ] **M4** — comfort, split in three: **M4a settings memory + cleanup ✅ (v0.11.0)** → **M4b styling + palette ✅ (v0.12.0)** → M4c stickers, background modes, templates
+- [x] **M4** — comfort, split in three: **M4a settings memory + cleanup ✅ (v0.11.0)** → **M4b styling + palette ✅ (v0.12.0)** → **M4c stickers, backgrounds, templates ✅ (v0.14.0)**
 - [ ] **v1.0** — polish + release to the community
 
 ---

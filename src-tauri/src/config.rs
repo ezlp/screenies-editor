@@ -20,6 +20,8 @@ pub struct AppSettings {
     pub font_family: String,
     pub preset: ParsePreset,
     pub file_name_template: String,
+    /// Last folder a PNG was saved to — reopened by the next save dialog.
+    pub last_save_dir: String,
 }
 
 impl Default for AppSettings {
@@ -29,6 +31,7 @@ impl Default for AppSettings {
             font_family: "Arial".into(),
             preset: preset::jgrp(),
             file_name_template: "screenie-{tanggal}-{jam}".into(),
+            last_save_dir: String::new(),
         }
     }
 }

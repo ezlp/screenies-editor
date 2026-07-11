@@ -46,7 +46,11 @@ export async function exportPresetToml(preset: ParsePreset): Promise<boolean> {
 export interface RenderJobPayload {
   imageBase64: string;
   crop: { x: number; y: number; w: number; h: number };
+  /** Final canvas incl. the black "Luar" extension. */
   output: { w: number; h: number };
+  /** The photo's area within output (pasted at 0,0). */
+  photo: { w: number; h: number };
+  stickers: Array<{ dataBase64: string; x: number; y: number; w: number; h: number }>;
   filters: { brightness: number; grayscale: number; sepia: number; saturate: number; contrast: number };
   fontFamily: string;
   textSize: number;
@@ -64,6 +68,24 @@ export async function exportPng(job: RenderJobPayload, fileName: string): Promis
 export async function copyPng(job: RenderJobPayload): Promise<void> {
   if (!isTauri()) return;
   return invoke<void>("copy_png", { job });
+}
+
+/** A quick-text template — mirrors templates.rs QuickText. */
+export interface QuickText {
+  label: string;
+  text: string;
+}
+
+/** Rust: saved quick-text templates. */
+export async function listTemplates(): Promise<QuickText[]> {
+  if (!isTauri()) return [];
+  return invoke<QuickText[]>("list_templates");
+}
+
+/** Rust: persist the full template list. */
+export async function saveTemplates(items: QuickText[]): Promise<void> {
+  if (!isTauri()) return;
+  return invoke<void>("save_templates", { items });
 }
 
 /** Persisted settings — mirrors config.rs AppSettings. */

@@ -21,7 +21,7 @@ import {
   notify,
 } from "./state";
 import { effectiveStroke } from "./state";
-import type { ChatBlock, CropRect } from "./state";
+import type { ChatBlock, CropRect, Sticker } from "./state";
 import type { ColorSpan, ParsedLine } from "./types";
 
 const MARGIN_X = 14;
@@ -54,11 +54,16 @@ interface Bounds {
 }
 
 const boundsById = new Map<number, Bounds>();
+const stickerBoundsById = new Map<number, Bounds>();
+
+/** Height of the black "Luar" area below the photo — set on every layout. */
+let lastExtension = 0;
 
 type Corner = "tl" | "tr" | "bl" | "br";
-type DragMode = "none" | "pan" | "text" | "crop-move" | "crop-resize";
+type DragMode = "none" | "pan" | "text" | "sticker" | "crop-move" | "crop-resize";
 let dragMode: DragMode = "none";
 let dragBlockId: number | null = null;
+let dragStickerId: number | null = null;
 let dragCorner: Corner = "br";
 
 export function initCanvas(): void {
@@ -120,7 +125,7 @@ export function outputDims(): { w: number; h: number } | null {
 export function fitImage(): void {
   const subject = state.cropEditing
     ? state.image && { w: state.image.width, h: state.image.height }
-    : outputDims();
+    : (totalDims() ?? outputDims());
   if (!subject) return;
   const vw = viewport.clientWidth;
   const vh = viewport.clientHeight;
@@ -131,19 +136,37 @@ export function fitImage(): void {
   notify();
 }
 
+/** Output including the black "Luar" extension — what the export saves. */
+export function totalDims(): { w: number; h: number } | null {
+  const out = outputDims();
+  if (!out) return null;
+  return { w: out.w, h: out.h + lastExtension };
+}
+
 export function getBlockBounds(id: number): Bounds | undefined {
   return boundsById.get(id);
 }
 
 /** Keep every free block reachable when the output dimensions change. */
 export function clampBlocksToOutput(): void {
-  const out = outputDims();
+  const out = totalDims() ?? outputDims();
   if (!out) return;
   for (const block of state.blocks) {
     if (block.anchor !== "free") continue;
     block.x = clamp(block.x, 0, Math.max(0, out.w - KEEP_ON_IMAGE));
     block.y = clamp(block.y, 0, Math.max(0, out.h - KEEP_ON_IMAGE));
   }
+  for (const st of state.stickers) {
+    st.x = clamp(st.x, -stickerW(st) + KEEP_ON_IMAGE, out.w - KEEP_ON_IMAGE);
+    st.y = clamp(st.y, 0, out.h - KEEP_ON_IMAGE);
+  }
+}
+
+function stickerW(st: Sticker): number {
+  return Math.max(1, (st.img.width * st.scale) / 100);
+}
+function stickerH(st: Sticker): number {
+  return Math.max(1, (st.img.height * st.scale) / 100);
 }
 
 /** Largest crop of the given ratio (null = whole photo), centered. */
@@ -231,7 +254,28 @@ function drawResult(img: HTMLImageElement): void {
   if (!crop || !out) return;
 
   imgCtx.drawImage(img, crop.x, crop.y, crop.w, crop.h, 0, 0, out.w, out.h);
-  drawBlocks(out.w); // text layer on top — never filtered, by construction
+
+  const built = buildRenderBlocks(out.w); // also refreshes lastExtension
+
+  // Black "Luar" area BELOW the photo — on the UI layer so filters
+  // (e.g. low contrast) can never lift it from pure black.
+  if (lastExtension > 0) {
+    ctx.fillStyle = "#000000";
+    ctx.fillRect(0, out.h, out.w, lastExtension);
+  }
+
+  drawStickers();
+  drawBuilt(built);
+}
+
+function drawStickers(): void {
+  stickerBoundsById.clear();
+  for (const st of state.stickers) {
+    const w = stickerW(st);
+    const h = stickerH(st);
+    ctx.drawImage(st.img, st.x, st.y, w, h);
+    stickerBoundsById.set(st.id, { x: st.x, y: st.y, w, h });
+  }
 }
 
 /** CROP EDIT MODE: full photo, dim outside the box, handles on corners. */
@@ -298,6 +342,8 @@ export interface RenderToken {
 export interface RenderRow {
   y: number;
   tokens: RenderToken[];
+  /** Optional dark rect behind this row (BG blok / mask), output px. */
+  bg: { x: number; y: number; w: number; h: number } | null;
 }
 
 /**
@@ -312,6 +358,11 @@ export function buildRenderBlocks(
   const advance = size * (state.lineGap / 100);
   const result: Array<{ blockId: number; rows: RenderRow[]; bounds: Bounds | null }> = [];
 
+  const baseH = outputDims()?.h ?? 0;
+  // "Luar" blocks stack in the black area below the photo.
+  let luarY = baseH + MARGIN_Y;
+  let luarUsed = false;
+
   for (const block of state.blocks) {
     if (block.lines.length === 0) {
       result.push({ blockId: block.id, rows: [], bounds: null });
@@ -320,8 +371,17 @@ export function buildRenderBlocks(
 
     const wrapWidth = wrapWidthFor(block, outputWidth);
     const layout = layoutLines(block.lines, size, wrapWidth, advance);
-    const origin = blockOrigin(block, layout);
 
+    let origin: { x: number; y: number };
+    if (block.anchor === "luar-bawah") {
+      origin = { x: MARGIN_X, y: luarY };
+      luarY += layout.height + MARGIN_Y;
+      luarUsed = true;
+    } else {
+      origin = blockOrigin(block, layout);
+    }
+
+    const padTop = (advance - size) / 2;
     const rows: RenderRow[] = [];
     let y = origin.y;
     for (const row of layout.rows) {
@@ -333,7 +393,17 @@ export function buildRenderBlocks(
         }
         x += token.width;
       }
-      rows.push({ y, tokens });
+
+      let bg: RenderRow["bg"] = null;
+      if (row.width > 0 && block.anchor !== "luar-bawah") {
+        if (block.bgMode === "block") {
+          bg = { x: origin.x - 6, y: y - padTop, w: row.width + 12, h: advance };
+        } else if (block.bgMode === "mask") {
+          bg = { x: 0, y: y - padTop, w: outputWidth, h: advance };
+        }
+      }
+
+      rows.push({ y, tokens, bg });
       y += advance;
     }
 
@@ -348,10 +418,14 @@ export function buildRenderBlocks(
       },
     });
   }
+
+  lastExtension = luarUsed ? Math.max(0, Math.round(luarY - baseH)) : 0;
   return result;
 }
 
-function drawBlocks(outputWidth: number): void {
+function drawBuilt(
+  built: Array<{ blockId: number; rows: RenderRow[]; bounds: Bounds | null }>,
+): void {
   boundsById.clear();
 
   const size = state.textSize;
@@ -362,9 +436,15 @@ function drawBlocks(outputWidth: number): void {
   ctx.lineWidth = Math.max(stroke, 0.01); // 0 handled by skipping strokeText
   ctx.strokeStyle = "#000000";
 
-  for (const entry of buildRenderBlocks(outputWidth)) {
+  for (const entry of built) {
     if (entry.bounds === null) continue;
 
+    for (const row of entry.rows) {
+      if (row.bg) {
+        ctx.fillStyle = "rgba(0, 0, 0, 0.55)";
+        ctx.fillRect(row.bg.x, row.bg.y, row.bg.w, row.bg.h);
+      }
+    }
     for (const row of entry.rows) {
       for (const token of row.tokens) {
         ctx.font = spanFont({ text: token.text, color: token.color, bold: token.bold }, size);
@@ -420,6 +500,9 @@ function layoutLines(
 }
 
 function wrapWidthFor(block: ChatBlock, outputWidth: number): number {
+  if (block.anchor === "luar-bawah") {
+    return Math.max(MIN_WRAP, outputWidth - MARGIN_X * 2);
+  }
   if (block.anchor === "free") {
     return Math.max(MIN_WRAP, outputWidth - MARGIN_X - block.x);
   }
@@ -438,6 +521,9 @@ function blockOrigin(
       return { x: MARGIN_X, y: MARGIN_Y };
     case "kiri-bawah":
       return { x: MARGIN_X, y: out.h - MARGIN_Y - layout.height };
+    case "luar-bawah":
+      // Stacked by buildRenderBlocks before this is ever reached.
+      return { x: MARGIN_X, y: out.h + MARGIN_Y };
   }
 }
 
@@ -478,7 +564,12 @@ function bindInteractions(): void {
       }
     } else {
       dragBlockId = hitFreeBlock(ev.offsetX, ev.offsetY);
-      dragMode = dragBlockId !== null ? "text" : "pan";
+      if (dragBlockId !== null) {
+        dragMode = "text";
+      } else {
+        dragStickerId = hitSticker(ev.offsetX, ev.offsetY);
+        dragMode = dragStickerId !== null ? "sticker" : "pan";
+      }
     }
 
     lastX = ev.clientX;
@@ -486,7 +577,7 @@ function bindInteractions(): void {
     canvas.classList.toggle("panning", dragMode === "pan");
     canvas.classList.toggle(
       "dragging-text",
-      dragMode === "text" || dragMode === "crop-move" || dragMode === "crop-resize",
+      dragMode === "text" || dragMode === "sticker" || dragMode === "crop-move" || dragMode === "crop-resize",
     );
     canvas.setPointerCapture(ev.pointerId);
   });
@@ -496,7 +587,8 @@ function bindInteractions(): void {
       const over = state.cropEditing
         ? hitCropHandle(ev.offsetX, ev.offsetY) !== null ||
           hitInsideCrop(ev.offsetX, ev.offsetY)
-        : hitFreeBlock(ev.offsetX, ev.offsetY) !== null;
+        : hitFreeBlock(ev.offsetX, ev.offsetY) !== null ||
+          hitSticker(ev.offsetX, ev.offsetY) !== null;
       canvas.classList.toggle("over-text", over);
       return;
     }
@@ -521,6 +613,13 @@ function bindInteractions(): void {
         );
         block.y = clamp(block.y + dy / state.zoom, 0, out.h - KEEP_ON_IMAGE);
       }
+    } else if (dragMode === "sticker" && state.image && dragStickerId !== null) {
+      const st = state.stickers.find((s) => s.id === dragStickerId);
+      const out = totalDims();
+      if (st && out) {
+        st.x = clamp(st.x + dx / state.zoom, -stickerW(st) + KEEP_ON_IMAGE, out.w - KEEP_ON_IMAGE);
+        st.y = clamp(st.y + dy / state.zoom, 0, out.h - KEEP_ON_IMAGE);
+      }
     } else if (dragMode === "crop-move" && state.image && state.crop) {
       const img = state.image;
       const c = state.crop;
@@ -537,6 +636,7 @@ function bindInteractions(): void {
     const wasCrop = dragMode === "crop-move" || dragMode === "crop-resize";
     dragMode = "none";
     dragBlockId = null;
+    dragStickerId = null;
     canvas.classList.remove("panning", "dragging-text");
     canvas.releasePointerCapture(ev.pointerId);
     if (wasCrop) roundCrop();
@@ -653,6 +753,19 @@ function hitInsideCrop(cx: number, cy: number): boolean {
   if (!c) return false;
   const p = toImageSpace(cx, cy);
   return p.x >= c.x && p.x <= c.x + c.w && p.y >= c.y && p.y <= c.y + c.h;
+}
+
+function hitSticker(cx: number, cy: number): number | null {
+  if (!state.image) return null;
+  const p = toImageSpace(cx, cy);
+  for (let i = state.stickers.length - 1; i >= 0; i--) {
+    const b = stickerBoundsById.get(state.stickers[i].id);
+    if (!b) continue;
+    if (p.x >= b.x && p.x <= b.x + b.w && p.y >= b.y && p.y <= b.y + b.h) {
+      return state.stickers[i].id;
+    }
+  }
+  return null;
 }
 
 function hitFreeBlock(cx: number, cy: number): number | null {

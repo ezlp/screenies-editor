@@ -7,7 +7,7 @@
  */
 
 import { effectiveStroke, state, onChange } from "./state";
-import { buildRenderBlocks, outputDims, sourceCrop } from "./canvas";
+import { buildRenderBlocks, outputDims, sourceCrop, totalDims } from "./canvas";
 import { copyPng, exportPng } from "./tauri-bridge";
 import { scheduleSaveSettings } from "./settings";
 import type { RenderJobPayload } from "./tauri-bridge";
@@ -85,17 +85,28 @@ function buildJob(): RenderJobPayload | null {
     return null;
   }
 
+  const blocks = buildRenderBlocks(out.w)
+    .filter((b) => b.rows.length > 0)
+    .map((b) => ({ rows: b.rows }));
+  const total = totalDims() ?? out; // build above refreshed the extension
+
   return {
     imageBase64: img.src.slice(comma + 1),
     crop: { x: crop.x, y: crop.y, w: crop.w, h: crop.h },
-    output: { w: out.w, h: out.h },
+    output: { w: total.w, h: total.h },
+    photo: { w: out.w, h: out.h },
+    stickers: state.stickers.map((st) => ({
+      dataBase64: st.dataBase64,
+      x: Math.round(st.x),
+      y: Math.round(st.y),
+      w: Math.max(1, Math.round((st.img.width * st.scale) / 100)),
+      h: Math.max(1, Math.round((st.img.height * st.scale) / 100)),
+    })),
     filters: { ...state.filters },
     fontFamily: state.fontFamily,
     textSize: state.textSize,
     strokeWidth: effectiveStroke(),
-    blocks: buildRenderBlocks(out.w)
-      .filter((b) => b.rows.length > 0)
-      .map((b) => ({ rows: b.rows })),
+    blocks,
   };
 }
 

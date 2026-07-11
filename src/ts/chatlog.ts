@@ -10,7 +10,7 @@
 
 import { parseChatlog } from "./tauri-bridge";
 import { DEFAULT_TEXT_X, DEFAULT_TEXT_Y, state, notify } from "./state";
-import type { Anchor, ChatBlock } from "./state";
+import type { Anchor, BgMode, ChatBlock } from "./state";
 import { fitImage, getBlockBounds } from "./canvas";
 import { onImageLoaded } from "./crop";
 import { autoTextSize } from "./textstyle";
@@ -24,6 +24,13 @@ const ANCHOR_OPTIONS: Array<{ value: Anchor; label: string }> = [
   { value: "free", label: "Bebas (seret)" },
   { value: "kiri-atas", label: "Kiri Atas" },
   { value: "kiri-bawah", label: "Kiri Bawah" },
+  { value: "luar-bawah", label: "Luar (bawah foto)" },
+];
+
+const BG_OPTIONS: Array<{ value: BgMode; label: string }> = [
+  { value: "none", label: "BG: tanpa" },
+  { value: "block", label: "BG: blok" },
+  { value: "mask", label: "BG: mask" },
 ];
 
 let blockSeq = 0;
@@ -124,6 +131,7 @@ function addBlock(): void {
     rawText: "",
     lines: [],
     anchor: "free",
+    bgMode: "none",
     x: DEFAULT_TEXT_X,
     y: DEFAULT_TEXT_Y + NEW_BLOCK_STEP * state.blocks.length,
   };
@@ -178,13 +186,28 @@ function buildCard(block: ChatBlock): HTMLElement {
     notify();
   });
 
+  const bgSelect = document.createElement("select");
+  bgSelect.className = "select select-compact";
+  bgSelect.title = "Background di belakang teks";
+  for (const opt of BG_OPTIONS) {
+    const o = document.createElement("option");
+    o.value = opt.value;
+    o.textContent = opt.label;
+    bgSelect.appendChild(o);
+  }
+  bgSelect.value = block.bgMode;
+  bgSelect.addEventListener("change", () => {
+    block.bgMode = bgSelect.value as BgMode;
+    notify();
+  });
+
   const remove = document.createElement("button");
   remove.className = "btn btn-ghost btn-small chat-block-remove";
   remove.textContent = "✕";
   remove.title = "Hapus chatlog ini";
   remove.addEventListener("click", () => removeBlock(block.id, card));
 
-  head.append(title, select, remove);
+  head.append(title, select, bgSelect, remove);
 
   // ── textarea ──
   const textarea = document.createElement("textarea");

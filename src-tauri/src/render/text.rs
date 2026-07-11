@@ -37,6 +37,12 @@ pub fn draw_blocks(img: &mut RgbaImage, job: &RenderJob) -> Result<(), AppError>
 }
 
 fn draw_block(img: &mut RgbaImage, block: &ExportBlock, faces: &Faces, scale: PxScale, offsets: &[(f32, f32)]) {
+    // Pass 0: background strips (BG blok / mask) — 55% black, like preview.
+    for row in &block.rows {
+        if let Some(bg) = &row.bg {
+            fill_rect_alpha(img, bg.x, bg.y, bg.w, bg.h, 0.55);
+        }
+    }
     for row in &block.rows {
         // Pass 1: black outline for every token in the row…
         for token in &row.tokens {
@@ -81,6 +87,22 @@ fn draw_token(img: &mut RgbaImage, font: &FontVec, scale: PxScale, x: f32, y: f3
         }
         pen += scaled.h_advance(id);
         prev = Some(id);
+    }
+}
+
+fn fill_rect_alpha(img: &mut RgbaImage, x: f32, y: f32, w: f32, h: f32, a: f32) {
+    let x0 = x.max(0.0) as u32;
+    let y0 = y.max(0.0) as u32;
+    let x1 = ((x + w).max(0.0) as u32).min(img.width());
+    let y1 = ((y + h).max(0.0) as u32).min(img.height());
+    for py in y0..y1 {
+        for px in x0..x1 {
+            let d = img.get_pixel_mut(px, py);
+            for i in 0..3 {
+                d[i] = ((d[i] as f32) * (1.0 - a)).round() as u8;
+            }
+            d[3] = 255;
+        }
     }
 }
 

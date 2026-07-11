@@ -16,13 +16,13 @@ import { initCrop } from "./crop";
 import { initFilters } from "./filters";
 import { initExport } from "./export";
 import { initColorPalette } from "./colorpalette";
+import { initStickers } from "./stickers";
+import { initShortcuts } from "./shortcuts";
 import { appVersion, isTauri } from "./tauri-bridge";
 
 /* Later-milestone modules — imported so tsc type-checks them from day one. */
 import "./zones";
 import "./backgrounds";
-import "./stickers";
-import "./shortcuts";
 
 window.addEventListener("DOMContentLoaded", () => {
   void boot();
@@ -40,6 +40,8 @@ async function boot(): Promise<void> {
   initFilters();
   initExport();
   initColorPalette();
+  initStickers();
+  initShortcuts();
   void showVersion();
 }
 

@@ -209,13 +209,29 @@
           <p class="hint">Live — hanya foto yang terfilter, teks chat tetap tajam. Hasil export akan sama persis.</p>
         </section>
 
-        <section class="panel-section panel-section-soon">
-          <h2 class="section-title"><span class="step">4</span> Stiker / PNG <span class="soon">Milestone 4c</span></h2>
-          <p class="hint">Import objek, atur ukuran &amp; posisi.</p>
+        <section class="panel-section">
+          <h2 class="section-title"><span class="step">4</span> Stiker / PNG</h2>
+          <button class="btn btn-block" id="btn-add-sticker">+ Import Stiker (PNG)</button>
+          <input type="file" id="sticker-input" accept="image/png,image/webp" hidden />
+          <div id="sticker-list" class="sticker-list"></div>
+          <p class="hint">Seret stiker langsung di preview untuk memindahkan.</p>
+        </section>
+
+        <section class="panel-section">
+          <h2 class="section-title"><span class="step">5</span> Template Teks</h2>
+          <div id="template-chips" class="row template-chips"></div>
+          <div class="row">
+            <input type="text" id="template-label" class="input" placeholder="Label" />
+          </div>
+          <div class="row">
+            <input type="text" id="template-text" class="input mono" placeholder="Teks yang disisipkan" />
+            <button class="btn btn-small" id="btn-add-template">＋</button>
+          </div>
+          <p class="hint">Klik chip untuk sisipkan ke kotak chatlog aktif · klik kanan chip untuk hapus. Tersimpan di templates.json.</p>
         </section>
 
         <section class="panel-section panel-export">
-          <h2 class="section-title"><span class="step">5</span> Export</h2>
+          <h2 class="section-title"><span class="step">6</span> Export</h2>
           <label class="field-label" for="file-name-template">Nama file</label>
           <input type="text" id="file-name-template" class="input mono" spellcheck="false"
                  placeholder="screenie-{tanggal}-{jam}" />

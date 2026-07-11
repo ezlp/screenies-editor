@@ -66,6 +66,21 @@ pub async fn copy_png(job: RenderJob) -> Result<(), AppError> {
     crate::clipboard::copy_image(&img)
 }
 
+/// Quick-text templates from templates.json.
+#[tauri::command]
+pub fn list_templates(app: tauri::AppHandle) -> Result<Vec<crate::templates::QuickText>, AppError> {
+    crate::templates::load(&app)
+}
+
+/// Persist the full quick-text template list.
+#[tauri::command]
+pub fn save_templates(
+    app: tauri::AppHandle,
+    items: Vec<crate::templates::QuickText>,
+) -> Result<(), AppError> {
+    crate::templates::save(&app, &items)
+}
+
 /// Saved settings (theme, font, preset). None on first run.
 #[tauri::command]
 pub fn load_settings(app: tauri::AppHandle) -> Result<Option<AppSettings>, AppError> {

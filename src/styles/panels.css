@@ -336,3 +336,18 @@
   padding: 0;
 }
 .swatch:hover { border-color: var(--accent); transform: scale(1.12); }
+
+/* ── Stickers & templates (M4c) ── */
+.sticker-list { display: flex; flex-direction: column; gap: 8px; }
+.sticker-card {
+  background: var(--panel);
+  border: 1px solid var(--line-soft);
+  border-radius: var(--radius-s);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.select-compact { flex: 0 0 auto; width: auto; padding: 5px 6px; font-size: 11px; }
+.template-chips { flex-wrap: wrap; gap: 6px; }
+.template-chip { text-transform: none; letter-spacing: 0; }

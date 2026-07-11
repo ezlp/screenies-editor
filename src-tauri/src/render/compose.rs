@@ -1,9 +1,9 @@
 //! compose.rs — the export pipeline, start to finish.
 
-use super::{crop, filters, text, RenderJob};
+use super::{crop, filters, sticker, text, RenderJob};
 use crate::error::AppError;
 use base64::Engine;
-use image::RgbaImage;
+use image::{Rgba, RgbaImage};
 use std::io::Cursor;
 
 /// Full render: base64 photo → cropped, resized, filtered, text-stamped RGBA.
@@ -16,8 +16,17 @@ pub fn render(job: &RenderJob) -> Result<RgbaImage, AppError> {
         .map_err(|e| AppError::Render(format!("decode foto: {e}")))?
         .to_rgba8();
 
-    let mut out = crop::crop_and_resize(&src, &job.crop, &job.output)?;
-    filters::apply(&mut out, &job.filters);
+    // 1. Photo: crop → resize to its area → filters (photo only —
+    //    the black "Luar" area must stay pure black at any filter value).
+    let mut photo = crop::crop_and_resize(&src, &job.crop, &job.photo)?;
+    filters::apply(&mut photo, &job.filters);
+
+    // 2. Final canvas (photo + optional extension), black, photo at (0,0).
+    let mut out = RgbaImage::from_pixel(job.output.w, job.output.h, Rgba([0, 0, 0, 255]));
+    image::imageops::overlay(&mut out, &photo, 0, 0);
+
+    // 3. Stickers under the text, then text (with its bg strips).
+    sticker::overlay_all(&mut out, &job.stickers)?;
     text::draw_blocks(&mut out, job)?;
     Ok(out)
 }
@@ -44,7 +53,9 @@ mod tests {
         RenderJob {
             image_base64: base64::engine::general_purpose::STANDARD.encode(png.into_inner()),
             crop: CropRect { x: 0.0, y: 0.0, w: 4.0, h: 4.0 },
-            output: Size { w: 8, h: 8 },
+            output: Size { w: 8, h: 10 }, // 2px black "Luar" extension
+            photo: Size { w: 8, h: 8 },
+            stickers: vec![],
             filters: FilterValues { brightness: 100.0, grayscale: 100.0, sepia: 0.0, saturate: 100.0, contrast: 100.0 },
             font_family: "__none__".into(),
             text_size: 20.0,
@@ -56,7 +67,9 @@ mod tests {
     #[test]
     fn pipeline_decodes_resizes_filters_and_encodes() {
         let img = render(&tiny_job()).unwrap();
-        assert_eq!((img.width(), img.height()), (8, 8));
+        assert_eq!((img.width(), img.height()), (8, 10));
+        let ext = img.get_pixel(4, 9);
+        assert_eq!(ext.0, [0, 0, 0, 255]); // extension stays pure black
         let p = img.get_pixel(4, 4);
         assert_eq!(p[0], p[1]); // grayscale 100% → r == g == b
         assert_eq!(p[1], p[2]);

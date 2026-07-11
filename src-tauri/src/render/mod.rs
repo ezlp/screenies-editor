@@ -22,7 +22,11 @@ pub struct RenderJob {
     /// Source photo bytes, base64 (PNG/JPEG/WebP/BMP).
     pub image_base64: String,
     pub crop: CropRect,
+    /// Final canvas incl. the black "Luar" extension below the photo.
     pub output: Size,
+    /// The photo's area within output — pasted at (0,0).
+    pub photo: Size,
+    pub stickers: Vec<StickerJob>,
     pub filters: FilterValues,
     pub font_family: String,
     /// Text size in output px.
@@ -70,6 +74,27 @@ pub struct ExportRow {
     /// Top of the row's em box, output px (canvas textBaseline "top").
     pub y: f32,
     pub tokens: Vec<ExportToken>,
+    /// Optional dark strip behind the row (BG blok / mask), 55% black.
+    pub bg: Option<BgRect>,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BgRect {
+    pub x: f32,
+    pub y: f32,
+    pub w: f32,
+    pub h: f32,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StickerJob {
+    pub data_base64: String,
+    pub x: i64,
+    pub y: i64,
+    pub w: u32,
+    pub h: u32,
 }
 
 #[derive(Debug, Clone, Deserialize)]

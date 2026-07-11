@@ -75,18 +75,34 @@ mod tests {
 /// `file_name` comes pre-expanded from the frontend template; it is
 /// sanitized here as the last line of defense.
 pub fn save_png(app: &AppHandle, png: &[u8], file_name: &str) -> Result<bool, AppError> {
-    let Some(picked) = app
+    let mut dialog = app
         .dialog()
         .file()
         .add_filter("Gambar PNG", &["png"])
-        .set_file_name(&sanitize_png_name(file_name))
-        .blocking_save_file()
-    else {
+        .set_file_name(&sanitize_png_name(file_name));
+
+    // Last-folder memory: reopen where the user saved last time.
+    if let Ok(Some(settings)) = crate::config::load(app) {
+        if !settings.last_save_dir.is_empty() {
+            let dir = std::path::PathBuf::from(&settings.last_save_dir);
+            if dir.is_dir() {
+                dialog = dialog.set_directory(dir);
+            }
+        }
+    }
+
+    let Some(picked) = dialog.blocking_save_file() else {
         return Ok(false);
     };
 
     let path = picked.into_path().map_err(|e| AppError::Io(e.to_string()))?;
     fs::write(&path, png).map_err(|e| AppError::Io(e.to_string()))?;
+
+    if let Some(parent) = path.parent() {
+        let mut settings = crate::config::load(app)?.unwrap_or_default();
+        settings.last_save_dir = parent.to_string_lossy().into_owned();
+        let _ = crate::config::save(app, &settings); // best-effort
+    }
     Ok(true)
 }
 
