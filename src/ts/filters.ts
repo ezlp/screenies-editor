@@ -16,7 +16,7 @@ interface FilterDef {
 }
 
 const DEFS: FilterDef[] = [
-  { key: "brightness", max: 200 },
+  { key: "brightness", max: 300 }, // night screenshots need real headroom
   { key: "grayscale", max: 100 },
   { key: "sepia", max: 100 },
   { key: "saturate", max: 200 },

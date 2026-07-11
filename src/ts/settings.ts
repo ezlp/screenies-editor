@@ -20,6 +20,7 @@ export async function applyLoadedSettings(): Promise<void> {
     if (!s) return;
     state.fontFamily = s.fontFamily;
     state.preset = s.preset;
+    if (s.fileNameTemplate) state.fileNameTemplate = s.fileNameTemplate;
     setTheme(s.theme === "light" ? "light" : "dark");
   } catch (err) {
     console.error("[screenies-editor] load_settings failed:", err);
@@ -38,6 +39,7 @@ async function persist(): Promise<void> {
       theme: currentTheme(),
       fontFamily: state.fontFamily,
       preset: state.preset,
+      fileNameTemplate: state.fileNameTemplate,
     });
   } catch (err) {
     console.error("[screenies-editor] save_settings failed:", err);

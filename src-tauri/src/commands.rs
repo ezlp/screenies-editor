@@ -49,10 +49,14 @@ pub async fn export_preset_toml(
 /// Render the full export and save it via a native dialog ("Save Disk").
 /// Async: rendering a 4K image takes real time, and the dialog blocks.
 #[tauri::command]
-pub async fn export_png(app: tauri::AppHandle, job: RenderJob) -> Result<bool, AppError> {
+pub async fn export_png(
+    app: tauri::AppHandle,
+    job: RenderJob,
+    file_name: String,
+) -> Result<bool, AppError> {
     let img = compose::render(&job)?;
     let png = compose::encode_png(&img)?;
-    crate::files::save_png(&app, &png)
+    crate::files::save_png(&app, &png, &file_name)
 }
 
 /// Render the full export and put it on the clipboard ("Copy").

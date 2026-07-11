@@ -55,9 +55,9 @@ export interface RenderJobPayload {
 }
 
 /** Rust: render the job and save it via a native dialog (false = cancel). */
-export async function exportPng(job: RenderJobPayload): Promise<boolean> {
+export async function exportPng(job: RenderJobPayload, fileName: string): Promise<boolean> {
   if (!isTauri()) return false;
-  return invoke<boolean>("export_png", { job });
+  return invoke<boolean>("export_png", { job, fileName });
 }
 
 /** Rust: render the job and put it on the system clipboard. */
@@ -71,6 +71,7 @@ export interface AppSettings {
   theme: string;
   fontFamily: string;
   preset: ParsePreset;
+  fileNameTemplate: string;
 }
 
 /** Rust: saved settings, or null on first run / browser dev. */

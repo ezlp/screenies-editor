@@ -66,6 +66,10 @@ repo's **Releases** page (right sidebar) and download:
 - System/game messages (`VEHICLE:`, `ERROR:`, `AdmCmd:` — any `Word:` prefix,
   pattern-based so all ~30 JGRP tags and future ones work) render the tag
   **bold** automatically
+- **Revisions (v0.13.0):** brightness now reaches **300%** (night shots),
+  text size slider goes down to **8px** with an auto-outline that thins at
+  small sizes so tiny text stays readable, and **custom save-file naming** —
+  a persisted template with `{tanggal} {jam} {res} {foto}` placeholders.
 - **Text styling + palette (v0.12.0, M4b):** *Outline* slider (0–10, or Auto
   that follows text size — 0 disables the stroke entirely, in export too),
   *Jarak baris* spacing slider, and the ssrp-editor **palette**: select text

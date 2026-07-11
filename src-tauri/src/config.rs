@@ -19,6 +19,7 @@ pub struct AppSettings {
     pub theme: String,
     pub font_family: String,
     pub preset: ParsePreset,
+    pub file_name_template: String,
 }
 
 impl Default for AppSettings {
@@ -27,6 +28,7 @@ impl Default for AppSettings {
             theme: "dark".into(),
             font_family: "Arial".into(),
             preset: preset::jgrp(),
+            file_name_template: "screenie-{tanggal}-{jam}".into(),
         }
     }
 }
@@ -72,6 +74,7 @@ mod tests {
         let s: AppSettings = serde_json::from_str(r#"{ "theme": "light" }"#).unwrap();
         assert_eq!(s.theme, "light");
         assert_eq!(s.font_family, "Arial"); // defaulted
-        assert!(s.preset.me_prefix); // defaulted to JGRP
+        assert!(s.preset.me_prefix); // defaulted
+        assert_eq!(s.file_name_template, "screenie-{tanggal}-{jam}"); // defaulted to JGRP
     }
 }

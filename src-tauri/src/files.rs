@@ -72,12 +72,14 @@ mod tests {
 }
 
 /// Save-file dialog → write the rendered PNG. `Ok(false)` = cancelled.
-pub fn save_png(app: &AppHandle, png: &[u8]) -> Result<bool, AppError> {
+/// `file_name` comes pre-expanded from the frontend template; it is
+/// sanitized here as the last line of defense.
+pub fn save_png(app: &AppHandle, png: &[u8], file_name: &str) -> Result<bool, AppError> {
     let Some(picked) = app
         .dialog()
         .file()
         .add_filter("Gambar PNG", &["png"])
-        .set_file_name("screenie.png")
+        .set_file_name(&sanitize_png_name(file_name))
         .blocking_save_file()
     else {
         return Ok(false);
@@ -86,4 +88,38 @@ pub fn save_png(app: &AppHandle, png: &[u8]) -> Result<bool, AppError> {
     let path = picked.into_path().map_err(|e| AppError::Io(e.to_string()))?;
     fs::write(&path, png).map_err(|e| AppError::Io(e.to_string()))?;
     Ok(true)
+}
+
+/// Strip filesystem-hostile characters, guarantee a non-empty ".png" name.
+fn sanitize_png_name(raw: &str) -> String {
+    let mut name: String = raw
+        .chars()
+        .map(|c| match c {
+            '<' | '>' | ':' | '"' | '/' | '\\' | '|' | '?' | '*' => '-',
+            c if c.is_control() => '-',
+            c => c,
+        })
+        .collect::<String>()
+        .trim()
+        .trim_matches('.')
+        .to_string();
+    if name.is_empty() {
+        name = "screenie".into();
+    }
+    if !name.to_lowercase().ends_with(".png") {
+        name.push_str(".png");
+    }
+    name
+}
+
+#[cfg(test)]
+mod name_tests {
+    use super::sanitize_png_name;
+
+    #[test]
+    fn sanitizes_and_ensures_extension() {
+        assert_eq!(sanitize_png_name("rp/rampok: part2"), "rp-rampok- part2.png");
+        assert_eq!(sanitize_png_name("sudah.png"), "sudah.png");
+        assert_eq!(sanitize_png_name("   "), "screenie.png");
+    }
 }

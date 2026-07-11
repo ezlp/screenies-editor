@@ -69,6 +69,9 @@ export interface AppState {
   /** Active parsing rules — sent to Rust with every parse. */
   preset: ParsePreset;
 
+  /** Save-file name template, e.g. "screenie-{tanggal}-{jam}". */
+  fileNameTemplate: string;
+
   /** Viewport transform: canvas px per image px, and pan offset in canvas px. */
   zoom: number;
   panX: number;
@@ -125,6 +128,7 @@ export const state: AppState = {
   lineGap: 122,
   fontFamily: "Arial",
   preset: structuredClone(DEFAULT_PRESET),
+  fileNameTemplate: "screenie-{tanggal}-{jam}",
   zoom: 1,
   panX: 0,
   panY: 0,
@@ -132,7 +136,11 @@ export const state: AppState = {
 
 /** The outline width actually used: manual value, or auto from text size. */
 export function effectiveStroke(): number {
-  return state.strokeWidth ?? Math.max(2, Math.round(state.textSize / 9));
+  if (state.strokeWidth !== null) return state.strokeWidth;
+  // Auto: scales with size, but thins to 1px below 14px — a 2px outline
+  // drowns small glyphs, which was what made tiny text unreadable.
+  const min = state.textSize < 14 ? 1 : 2;
+  return Math.max(min, Math.round(state.textSize / 9));
 }
 
 type Listener = () => void;

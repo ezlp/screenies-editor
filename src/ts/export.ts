@@ -9,6 +9,7 @@
 import { effectiveStroke, state, onChange } from "./state";
 import { buildRenderBlocks, outputDims, sourceCrop } from "./canvas";
 import { copyPng, exportPng } from "./tauri-bridge";
+import { scheduleSaveSettings } from "./settings";
 import type { RenderJobPayload } from "./tauri-bridge";
 
 let saveBtn: HTMLButtonElement;
@@ -18,6 +19,13 @@ let busy = false;
 export function initExport(): void {
   saveBtn = mustGet<HTMLButtonElement>("btn-save");
   copyBtn = mustGet<HTMLButtonElement>("btn-copy");
+
+  const template = mustGet<HTMLInputElement>("file-name-template");
+  template.value = state.fileNameTemplate;
+  template.addEventListener("input", () => {
+    state.fileNameTemplate = template.value;
+    scheduleSaveSettings();
+  });
 
   saveBtn.addEventListener("click", () => void run("save"));
   copyBtn.addEventListener("click", () => void run("copy"));
@@ -46,7 +54,7 @@ async function run(kind: "save" | "copy"): Promise<void> {
 
   try {
     if (kind === "save") {
-      await exportPng(job); // false = user cancelled the dialog — fine
+      await exportPng(job, expandFileName()); // false = dialog cancelled — fine
       btn.textContent = idle;
     } else {
       await copyPng(job);
@@ -89,6 +97,29 @@ function buildJob(): RenderJobPayload | null {
       .filter((b) => b.rows.length > 0)
       .map((b) => ({ rows: b.rows })),
   };
+}
+
+/** Expand {placeholder}s in the template. Indonesian + English aliases. */
+function expandFileName(): string {
+  const now = new Date();
+  const p2 = (n: number) => String(n).padStart(2, "0");
+  const date = `${now.getFullYear()}-${p2(now.getMonth() + 1)}-${p2(now.getDate())}`;
+  const time = `${p2(now.getHours())}-${p2(now.getMinutes())}-${p2(now.getSeconds())}`;
+  const out = outputDims();
+  const res = out ? `${out.w}x${out.h}` : "";
+  const foto = state.imageName.replace(/\.[^.]+$/, "");
+
+  const values: Record<string, string> = {
+    tanggal: date, date,
+    jam: time, time,
+    res,
+    foto, name: foto,
+  };
+
+  const raw = state.fileNameTemplate.trim() || "screenie-{tanggal}-{jam}";
+  const expanded = raw.replace(/\{(\w+)\}/g, (whole, key: string) => values[key] ?? whole);
+  // Light client-side sanitize; Rust does the authoritative pass.
+  return expanded.replace(/[<>:"/\\|?*]/g, "-");
 }
 
 function mustGet<T extends HTMLElement>(id: string): T {

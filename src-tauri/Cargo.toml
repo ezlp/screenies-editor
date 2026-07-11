@@ -1,6 +1,6 @@
 [package]
 name = "screenies-editor"
-version = "0.12.0"
+version = "0.13.0"
 description = "ScreeniesEditor — Screenshot Roleplay editor for the SA-MP community"
 authors = ["Isut Indraputra", "Claude (Anthropic)"]
 edition = "2021"
