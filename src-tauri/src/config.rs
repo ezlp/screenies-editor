@@ -22,6 +22,8 @@ pub struct AppSettings {
     pub file_name_template: String,
     /// Last folder a PNG was saved to — reopened by the next save dialog.
     pub last_save_dir: String,
+    /// Solid color of the "Luar" strip below the photo.
+    pub luar_color: String,
 }
 
 impl Default for AppSettings {
@@ -32,6 +34,7 @@ impl Default for AppSettings {
             preset: preset::jgrp(),
             file_name_template: "screenie-{tanggal}-{jam}".into(),
             last_save_dir: String::new(),
+            luar_color: "#000000".into(),
         }
     }
 }

@@ -96,8 +96,31 @@ export function initTextStyle(): void {
     notify();
   });
 
+  const bgOffset = document.getElementById("bg-offset") as HTMLInputElement | null;
+  const bgOffsetVal = document.getElementById("bg-offset-val");
+  const luarColor = document.getElementById("luar-color") as HTMLInputElement | null;
+  if (!bgOffset || !bgOffsetVal || !luarColor) throw new Error("Missing BG/Luar controls");
+
+  bgOffset.addEventListener("input", () => {
+    state.bgOffset = Number(bgOffset.value);
+    bgOffsetVal.textContent = `${state.bgOffset}px`;
+    notify();
+  });
+  luarColor.value = state.luarColor;
+  luarColor.addEventListener("change", () => {
+    state.luarColor = luarColor.value.toUpperCase();
+    scheduleSaveSettings();
+    notify();
+  });
+
   syncControls();
   void populateFonts();
+}
+
+/** Called after settings load so the picker reflects the restored color. */
+export function syncLuarColorControl(): void {
+  const el = document.getElementById("luar-color") as HTMLInputElement | null;
+  if (el) el.value = state.luarColor;
 }
 
 function syncStroke(): void {

@@ -7,7 +7,7 @@
  */
 
 import { effectiveStroke, state, onChange } from "./state";
-import { buildRenderBlocks, outputDims, sourceCrop, totalDims } from "./canvas";
+import { buildRenderBlocks, outputDims, photoDims, sourceCrop } from "./canvas";
 import { copyPng, exportPng } from "./tauri-bridge";
 import { scheduleSaveSettings } from "./settings";
 import type { RenderJobPayload } from "./tauri-bridge";
@@ -88,13 +88,15 @@ function buildJob(): RenderJobPayload | null {
   const blocks = buildRenderBlocks(out.w)
     .filter((b) => b.rows.length > 0)
     .map((b) => ({ rows: b.rows }));
-  const total = totalDims() ?? out; // build above refreshed the extension
+  const total = outputDims() ?? out; // build refreshed the Luar strip
+  const photo = photoDims() ?? total;
 
   return {
     imageBase64: img.src.slice(comma + 1),
     crop: { x: crop.x, y: crop.y, w: crop.w, h: crop.h },
     output: { w: total.w, h: total.h },
-    photo: { w: out.w, h: out.h },
+    photo: { w: photo.w, h: photo.h },
+    luarColor: state.luarColor,
     stickers: state.stickers.map((st) => ({
       dataBase64: st.dataBase64,
       x: Math.round(st.x),

@@ -66,6 +66,12 @@ repo's **Releases** page (right sidebar) and download:
 - System/game messages (`VEHICLE:`, `ERROR:`, `AdmCmd:` — any `Word:` prefix,
   pattern-based so all ~30 JGRP tags and future ones work) render the tag
   **bold** automatically
+- **Pre-1.0 fixes (v0.15.0):** **Luar redesigned** — fixed resolutions stay
+  EXACTLY as chosen: the strip is carved from inside, the photo shrinks into
+  the remaining area, the crop box re-locks to it automatically, and the
+  strip color is pickable (persisted; strip capped at 40% of the output).
+  **BG strips** now sit on the glyphs (auto shift + a "Geser BG" fine-tune
+  slider). **Template section removed** (unused).
 - **M4c (v0.14.0) — the last feature milestone:** **Stickers** (import PNG/
   WebP, drag on the preview, per-sticker scale, alpha-blended in export);
   **background modes** per block — *blok* behind each row, *mask* full-width,
@@ -179,6 +185,19 @@ src-tauri/src/             Rust backend
 - [x] **M3** — image engine, split in three: **M3a crop/resolution ✅ (v0.8.0)** → **M3b live filters ✅ (v0.9.0)** → **M3c Rust export ✅ (v0.10.0)** — stickers & background modes → M4
 - [x] **M4** — comfort, split in three: **M4a settings memory + cleanup ✅ (v0.11.0)** → **M4b styling + palette ✅ (v0.12.0)** → **M4c stickers, backgrounds, templates ✅ (v0.14.0)**
 - [ ] **v1.0** — polish + release to the community
+
+## Rencana setelah 1.0 (disepakati, belum dijadwalkan)
+
+1. **Chatlog browser/parser** — buka folder chatlog SA-MP, di-index ke memori,
+   cari di dalam app (hover = konteks baris sekitar), kirim baris terpilih ke
+   Chatlog N. *Butuh info: format file chatlog server (satu file besar vs
+   per-hari) & ukuran tipikal.*
+2. **Efek per-AREA (bukan global):** gambar kotak → blur / pixelate / invert /
+   hue di dalamnya, **opsional termasuk teks** (sensor nama pemain). Catatan
+   arsitektur: efek area dijalankan SETELAH teks dikomposit — pass terakhir
+   pipeline, preview lewat kanvas ketiga.
+3. **Galeri** — folder galeri + thumbnail hasil edit, buka/reveal; opsi
+   "Simpan ke Galeri" tanpa dialog.
 
 ---
 

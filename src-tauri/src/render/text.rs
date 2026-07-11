@@ -134,7 +134,7 @@ fn stroke_offsets(r: f32) -> Vec<(f32, f32)> {
     out
 }
 
-fn parse_hex(s: &str) -> [u8; 3] {
+pub fn parse_hex(s: &str) -> [u8; 3] {
     let h = s.trim_start_matches('#');
     if h.len() != 6 {
         return [255, 255, 255];

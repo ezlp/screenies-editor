@@ -12,7 +12,6 @@ mod config;
 mod files;
 mod fonts;
 mod render;
-mod templates;
 
 fn main() {
     tauri::Builder::default()
@@ -24,8 +23,6 @@ fn main() {
             commands::export_preset_toml,
             commands::export_png,
             commands::copy_png,
-            commands::list_templates,
-            commands::save_templates,
             commands::load_settings,
             commands::save_settings,
             commands::list_fonts,

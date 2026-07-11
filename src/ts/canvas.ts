@@ -56,8 +56,11 @@ interface Bounds {
 const boundsById = new Map<number, Bounds>();
 const stickerBoundsById = new Map<number, Bounds>();
 
-/** Height of the black "Luar" area below the photo — set on every layout. */
+/** Height of the "Luar" strip — set on every layout pass. */
 let lastExtension = 0;
+let prevExtension = -1; // detects strip growth → re-locks the crop ratio
+/** Cap: the strip may take at most this share of a fixed output's height. */
+const LUAR_MAX_SHARE = 0.4;
 
 type Corner = "tl" | "tr" | "bl" | "br";
 type DragMode = "none" | "pan" | "text" | "sticker" | "crop-move" | "crop-resize";
@@ -113,12 +116,38 @@ export function sourceCrop(): CropRect | null {
   return state.crop ?? { x: 0, y: 0, w: img.width, h: img.height };
 }
 
-/** Final output dimensions — what the export will be, and the text space. */
+/**
+ * FINAL output dimensions (the saved PNG, text space, HUD).
+ * Fixed resolutions stay EXACTLY as chosen — the Luar strip is carved from
+ * inside. Bebas / ratio-only modes grow by the strip instead (no promised
+ * resolution to keep).
+ */
 export function outputDims(): { w: number; h: number } | null {
   const crop = sourceCrop();
   if (!crop) return null;
   if (state.outputSize) return { ...state.outputSize };
-  return { w: Math.round(crop.w), h: Math.round(crop.h) };
+  return { w: Math.round(crop.w), h: Math.round(crop.h) + lastExtension };
+}
+
+/** The photo's area within the output (pasted at 0,0). */
+export function photoDims(): { w: number; h: number } | null {
+  const out = outputDims();
+  if (!out) return null;
+  if (state.outputSize) {
+    const maxStrip = Math.round(out.h * LUAR_MAX_SHARE);
+    return { w: out.w, h: out.h - Math.min(lastExtension, maxStrip) };
+  }
+  return { w: out.w, h: out.h - lastExtension };
+}
+
+/** Crop lock: follows the photo area when a Luar strip eats into a fixed
+ *  output; otherwise the user's chosen ratio. */
+export function effectiveCropRatio(): number | null {
+  if (state.outputSize && lastExtension > 0) {
+    const p = photoDims();
+    if (p && p.h > 0) return p.w / p.h;
+  }
+  return state.cropRatio;
 }
 
 /** Zoom so the current subject (output or full photo) fits, centered. */
@@ -136,11 +165,9 @@ export function fitImage(): void {
   notify();
 }
 
-/** Output including the black "Luar" extension — what the export saves. */
+/** Alias — output already includes the Luar strip in every mode. */
 export function totalDims(): { w: number; h: number } | null {
-  const out = outputDims();
-  if (!out) return null;
-  return { w: out.w, h: out.h + lastExtension };
+  return outputDims();
 }
 
 export function getBlockBounds(id: number): Bounds | undefined {
@@ -249,23 +276,63 @@ function draw(): void {
 
 /** RESULT MODE: crop region → output size, text on top in output space. */
 function drawResult(img: HTMLImageElement): void {
-  const crop = sourceCrop();
   const out = outputDims();
-  if (!crop || !out) return;
+  if (!out) return;
 
-  imgCtx.drawImage(img, crop.x, crop.y, crop.w, crop.h, 0, 0, out.w, out.h);
+  const built = buildRenderBlocks(out.w); // refreshes lastExtension
 
-  const built = buildRenderBlocks(out.w); // also refreshes lastExtension
+  // Luar strip changed size → re-lock the crop box onto the photo area
+  // (this is the "play with crop" step from the old design, automated).
+  if (lastExtension !== prevExtension) {
+    prevExtension = lastExtension;
+    relockCropToPhotoArea(img);
+  }
 
-  // Black "Luar" area BELOW the photo — on the UI layer so filters
-  // (e.g. low contrast) can never lift it from pure black.
-  if (lastExtension > 0) {
-    ctx.fillStyle = "#000000";
-    ctx.fillRect(0, out.h, out.w, lastExtension);
+  const crop = sourceCrop();
+  const photo = photoDims();
+  if (!crop || !photo) return;
+
+  imgCtx.drawImage(img, crop.x, crop.y, crop.w, crop.h, 0, 0, photo.w, photo.h);
+
+  // The Luar strip — on the UI layer, in the chosen solid color, never
+  // touched by the photo filters.
+  if (photo.h < out.h) {
+    ctx.fillStyle = state.luarColor;
+    ctx.fillRect(0, photo.h, out.w, out.h - photo.h);
   }
 
   drawStickers();
   drawBuilt(built);
+}
+
+/** Fixed output + Luar: reshape the crop to the photo area's ratio,
+ *  keeping its width and center where possible. */
+function relockCropToPhotoArea(img: HTMLImageElement): void {
+  if (!state.outputSize || !state.crop) return;
+  const ratio = effectiveCropRatio();
+  if (ratio === null) return;
+
+  const c = state.crop;
+  if (Math.abs(c.w / c.h - ratio) < 0.005) return; // already matches
+
+  const cx = c.x + c.w / 2;
+  const cy = c.y + c.h / 2;
+
+  let w = c.w;
+  let h = w / ratio;
+  if (h > img.height) {
+    h = img.height;
+    w = h * ratio;
+  }
+  if (w > img.width) {
+    w = img.width;
+    h = w / ratio;
+  }
+
+  c.w = Math.round(w);
+  c.h = Math.round(h);
+  c.x = Math.round(clamp(cx - c.w / 2, 0, img.width - c.w));
+  c.y = Math.round(clamp(cy - c.h / 2, 0, img.height - c.h));
 }
 
 function drawStickers(): void {
@@ -358,9 +425,23 @@ export function buildRenderBlocks(
   const advance = size * (state.lineGap / 100);
   const result: Array<{ blockId: number; rows: RenderRow[]; bounds: Bounds | null }> = [];
 
-  const baseH = outputDims()?.h ?? 0;
-  // "Luar" blocks stack in the black area below the photo.
-  let luarY = baseH + MARGIN_Y;
+  // Luar layout is two-pass: measure luar heights → strip size → photo
+  // bottom → real origins. Pass 1 (heights only):
+  const size0 = state.textSize;
+  const advance0 = size0 * (state.lineGap / 100);
+  let stripNeed = 0;
+  for (const b of state.blocks) {
+    if (b.anchor !== "luar-bawah" || b.lines.length === 0) continue;
+    const lay = layoutLines(b.lines, size0, Math.max(MIN_WRAP, outputWidth - MARGIN_X * 2), advance0);
+    stripNeed += lay.height + MARGIN_Y;
+  }
+  lastExtension = stripNeed > 0 ? Math.round(stripNeed + MARGIN_Y) : 0;
+  if (state.outputSize) {
+    lastExtension = Math.min(lastExtension, Math.round((outputDims()?.h ?? 0) * LUAR_MAX_SHARE));
+  }
+
+  const photoBottom = photoDims()?.h ?? 0;
+  let luarY = photoBottom + MARGIN_Y;
   let luarUsed = false;
 
   for (const block of state.blocks) {
@@ -382,6 +463,9 @@ export function buildRenderBlocks(
     }
 
     const padTop = (advance - size) / 2;
+    // Glyphs sit low in the em box — shift strips down ~8% of the size,
+    // plus the user's fine-tune nudge.
+    const bgShift = Math.round(size * 0.08) + state.bgOffset;
     const rows: RenderRow[] = [];
     let y = origin.y;
     for (const row of layout.rows) {
@@ -397,9 +481,9 @@ export function buildRenderBlocks(
       let bg: RenderRow["bg"] = null;
       if (row.width > 0 && block.anchor !== "luar-bawah") {
         if (block.bgMode === "block") {
-          bg = { x: origin.x - 6, y: y - padTop, w: row.width + 12, h: advance };
+          bg = { x: origin.x - 6, y: y - padTop + bgShift, w: row.width + 12, h: advance };
         } else if (block.bgMode === "mask") {
-          bg = { x: 0, y: y - padTop, w: outputWidth, h: advance };
+          bg = { x: 0, y: y - padTop + bgShift, w: outputWidth, h: advance };
         }
       }
 
@@ -419,7 +503,7 @@ export function buildRenderBlocks(
     });
   }
 
-  lastExtension = luarUsed ? Math.max(0, Math.round(luarY - baseH)) : 0;
+  void luarUsed;
   return result;
 }
 
@@ -519,11 +603,13 @@ function blockOrigin(
       return { x: block.x, y: block.y };
     case "kiri-atas":
       return { x: MARGIN_X, y: MARGIN_Y };
-    case "kiri-bawah":
-      return { x: MARGIN_X, y: out.h - MARGIN_Y - layout.height };
+    case "kiri-bawah": {
+      const photoH = photoDims()?.h ?? out.h;
+      return { x: MARGIN_X, y: photoH - MARGIN_Y - layout.height };
+    }
     case "luar-bawah":
       // Stacked by buildRenderBlocks before this is ever reached.
-      return { x: MARGIN_X, y: out.h + MARGIN_Y };
+      return { x: MARGIN_X, y: (photoDims()?.h ?? out.h) + MARGIN_Y };
   }
 }
 
@@ -687,14 +773,15 @@ function resizeCrop(dx: number, dy: number): void {
   let w = Math.abs(moveX - anchorX);
   let h = Math.abs(moveY - anchorY);
 
-  if (state.cropRatio !== null) {
+  const lockRatio = effectiveCropRatio();
+  if (lockRatio !== null) {
     // Lock to ratio: follow the dominant axis of the drag.
-    if (w / state.cropRatio >= h) h = w / state.cropRatio;
-    else w = h * state.cropRatio;
+    if (w / lockRatio >= h) h = w / lockRatio;
+    else w = h * lockRatio;
   }
 
   w = Math.max(CROP_MIN, w);
-  h = Math.max(state.cropRatio ? w / state.cropRatio : CROP_MIN, CROP_MIN);
+  h = Math.max(lockRatio ? w / lockRatio : CROP_MIN, CROP_MIN);
 
   let x = Math.min(anchorX, anchorX + (moveX >= anchorX ? w : -w));
   let y = Math.min(anchorY, anchorY + (moveY >= anchorY ? h : -h));
@@ -704,9 +791,9 @@ function resizeCrop(dx: number, dy: number): void {
   if (y < 0) { h += y; y = 0; }
   if (x + w > img.width) w = img.width - x;
   if (y + h > img.height) h = img.height - y;
-  if (state.cropRatio !== null) {
-    if (w / state.cropRatio > h) w = h * state.cropRatio;
-    else h = w / state.cropRatio;
+  if (lockRatio !== null) {
+    if (w / lockRatio > h) w = h * lockRatio;
+    else h = w / lockRatio;
   }
 
   c.x = x;

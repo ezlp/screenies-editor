@@ -132,6 +132,17 @@
           </div>
 
           <div class="row">
+            <label class="field-label" for="bg-offset">Geser BG</label>
+            <input type="range" id="bg-offset" class="slider-flex" min="-10" max="10" value="0" />
+            <span class="meta-chip mono" id="bg-offset-val">0px</span>
+          </div>
+
+          <div class="row">
+            <label class="field-label" for="luar-color">Warna area Luar</label>
+            <input type="color" id="luar-color" value="#000000" />
+          </div>
+
+          <div class="row">
             <label class="field-label" for="palette-color">Palet</label>
             <input type="color" id="palette-color" value="#FF0000" />
             <button class="btn btn-small" id="palette-apply">Terapkan ke seleksi</button>
@@ -217,21 +228,9 @@
           <p class="hint">Seret stiker langsung di preview untuk memindahkan.</p>
         </section>
 
-        <section class="panel-section">
-          <h2 class="section-title"><span class="step">5</span> Template Teks</h2>
-          <div id="template-chips" class="row template-chips"></div>
-          <div class="row">
-            <input type="text" id="template-label" class="input" placeholder="Label" />
-          </div>
-          <div class="row">
-            <input type="text" id="template-text" class="input mono" placeholder="Teks yang disisipkan" />
-            <button class="btn btn-small" id="btn-add-template">＋</button>
-          </div>
-          <p class="hint">Klik chip untuk sisipkan ke kotak chatlog aktif · klik kanan chip untuk hapus. Tersimpan di templates.json.</p>
-        </section>
 
         <section class="panel-section panel-export">
-          <h2 class="section-title"><span class="step">6</span> Export</h2>
+          <h2 class="section-title"><span class="step">5</span> Export</h2>
           <label class="field-label" for="file-name-template">Nama file</label>
           <input type="text" id="file-name-template" class="input mono" spellcheck="false"
                  placeholder="screenie-{tanggal}-{jam}" />

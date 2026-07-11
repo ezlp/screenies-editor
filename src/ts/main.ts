@@ -8,7 +8,7 @@ import "../styles/panels.css";
 
 import { initCanvas } from "./canvas";
 import { initUpload, initChatlog } from "./chatlog";
-import { initTextStyle } from "./textstyle";
+import { initTextStyle, syncLuarColorControl } from "./textstyle";
 import { initPreset } from "./preset";
 import { initTheme } from "./theme";
 import { applyLoadedSettings, scheduleSaveSettings } from "./settings";
@@ -17,7 +17,6 @@ import { initFilters } from "./filters";
 import { initExport } from "./export";
 import { initColorPalette } from "./colorpalette";
 import { initStickers } from "./stickers";
-import { initShortcuts } from "./shortcuts";
 import { appVersion, isTauri } from "./tauri-bridge";
 
 /* Later-milestone modules — imported so tsc type-checks them from day one. */
@@ -35,13 +34,13 @@ async function boot(): Promise<void> {
   initUpload();
   initChatlog();
   initTextStyle();
+  syncLuarColorControl();
   initPreset();
   initCrop();
   initFilters();
   initExport();
   initColorPalette();
   initStickers();
-  initShortcuts();
   void showVersion();
 }
 

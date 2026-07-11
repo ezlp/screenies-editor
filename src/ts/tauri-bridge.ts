@@ -50,6 +50,8 @@ export interface RenderJobPayload {
   output: { w: number; h: number };
   /** The photo's area within output (pasted at 0,0). */
   photo: { w: number; h: number };
+  /** Fill color of the Luar strip. */
+  luarColor: string;
   stickers: Array<{ dataBase64: string; x: number; y: number; w: number; h: number }>;
   filters: { brightness: number; grayscale: number; sepia: number; saturate: number; contrast: number };
   fontFamily: string;
@@ -70,30 +72,13 @@ export async function copyPng(job: RenderJobPayload): Promise<void> {
   return invoke<void>("copy_png", { job });
 }
 
-/** A quick-text template — mirrors templates.rs QuickText. */
-export interface QuickText {
-  label: string;
-  text: string;
-}
-
-/** Rust: saved quick-text templates. */
-export async function listTemplates(): Promise<QuickText[]> {
-  if (!isTauri()) return [];
-  return invoke<QuickText[]>("list_templates");
-}
-
-/** Rust: persist the full template list. */
-export async function saveTemplates(items: QuickText[]): Promise<void> {
-  if (!isTauri()) return;
-  return invoke<void>("save_templates", { items });
-}
-
 /** Persisted settings — mirrors config.rs AppSettings. */
 export interface AppSettings {
   theme: string;
   fontFamily: string;
   preset: ParsePreset;
   fileNameTemplate: string;
+  luarColor: string;
 }
 
 /** Rust: saved settings, or null on first run / browser dev. */

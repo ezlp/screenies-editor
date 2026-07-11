@@ -21,8 +21,9 @@ pub fn render(job: &RenderJob) -> Result<RgbaImage, AppError> {
     let mut photo = crop::crop_and_resize(&src, &job.crop, &job.photo)?;
     filters::apply(&mut photo, &job.filters);
 
-    // 2. Final canvas (photo + optional extension), black, photo at (0,0).
-    let mut out = RgbaImage::from_pixel(job.output.w, job.output.h, Rgba([0, 0, 0, 255]));
+    // 2. Final canvas in the Luar color, photo pasted at (0,0).
+    let [lr, lg, lb] = text::parse_hex(&job.luar_color);
+    let mut out = RgbaImage::from_pixel(job.output.w, job.output.h, Rgba([lr, lg, lb, 255]));
     image::imageops::overlay(&mut out, &photo, 0, 0);
 
     // 3. Stickers under the text, then text (with its bg strips).
@@ -53,8 +54,9 @@ mod tests {
         RenderJob {
             image_base64: base64::engine::general_purpose::STANDARD.encode(png.into_inner()),
             crop: CropRect { x: 0.0, y: 0.0, w: 4.0, h: 4.0 },
-            output: Size { w: 8, h: 10 }, // 2px black "Luar" extension
+            output: Size { w: 8, h: 10 }, // 2px "Luar" strip
             photo: Size { w: 8, h: 8 },
+            luar_color: "#112233".into(),
             stickers: vec![],
             filters: FilterValues { brightness: 100.0, grayscale: 100.0, sepia: 0.0, saturate: 100.0, contrast: 100.0 },
             font_family: "__none__".into(),
@@ -69,7 +71,7 @@ mod tests {
         let img = render(&tiny_job()).unwrap();
         assert_eq!((img.width(), img.height()), (8, 10));
         let ext = img.get_pixel(4, 9);
-        assert_eq!(ext.0, [0, 0, 0, 255]); // extension stays pure black
+        assert_eq!(ext.0, [0x11, 0x22, 0x33, 255]); // strip takes the chosen color, unfiltered
         let p = img.get_pixel(4, 4);
         assert_eq!(p[0], p[1]); // grayscale 100% → r == g == b
         assert_eq!(p[1], p[2]);

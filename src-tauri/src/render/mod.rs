@@ -26,6 +26,8 @@ pub struct RenderJob {
     pub output: Size,
     /// The photo's area within output — pasted at (0,0).
     pub photo: Size,
+    /// Fill color of the "Luar" strip (e.g. "#000000").
+    pub luar_color: String,
     pub stickers: Vec<StickerJob>,
     pub filters: FilterValues,
     pub font_family: String,

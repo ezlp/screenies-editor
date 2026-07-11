@@ -85,6 +85,12 @@ export interface AppState {
   /** Line spacing as percent of textSize (122 = the classic SSRP look). */
   lineGap: number;
 
+  /** Vertical nudge for BG strips, px (fine-tune around the auto shift). */
+  bgOffset: number;
+
+  /** Solid color of the "Luar" area below the photo. */
+  luarColor: string;
+
   /** Font family for all chat text — picked from the installed system fonts. */
   fontFamily: string;
 
@@ -150,6 +156,8 @@ export const state: AppState = {
   textSize: 27,
   strokeWidth: null,
   lineGap: 122,
+  bgOffset: 0,
+  luarColor: "#000000",
   fontFamily: "Arial",
   preset: structuredClone(DEFAULT_PRESET),
   fileNameTemplate: "screenie-{tanggal}-{jam}",

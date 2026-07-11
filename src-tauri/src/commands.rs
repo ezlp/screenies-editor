@@ -66,21 +66,6 @@ pub async fn copy_png(job: RenderJob) -> Result<(), AppError> {
     crate::clipboard::copy_image(&img)
 }
 
-/// Quick-text templates from templates.json.
-#[tauri::command]
-pub fn list_templates(app: tauri::AppHandle) -> Result<Vec<crate::templates::QuickText>, AppError> {
-    crate::templates::load(&app)
-}
-
-/// Persist the full quick-text template list.
-#[tauri::command]
-pub fn save_templates(
-    app: tauri::AppHandle,
-    items: Vec<crate::templates::QuickText>,
-) -> Result<(), AppError> {
-    crate::templates::save(&app, &items)
-}
-
 /// Saved settings (theme, font, preset). None on first run.
 #[tauri::command]
 pub fn load_settings(app: tauri::AppHandle) -> Result<Option<AppSettings>, AppError> {
@@ -88,8 +73,16 @@ pub fn load_settings(app: tauri::AppHandle) -> Result<Option<AppSettings>, AppEr
 }
 
 /// Persist settings to settings.json in the app config dir.
+/// `last_save_dir` is Rust-owned (written by the save dialog) — the
+/// frontend never sends it, so we merge the on-disk value to avoid
+/// wiping folder memory on every theme/font change.
 #[tauri::command]
-pub fn save_settings(app: tauri::AppHandle, settings: AppSettings) -> Result<(), AppError> {
+pub fn save_settings(app: tauri::AppHandle, mut settings: AppSettings) -> Result<(), AppError> {
+    if settings.last_save_dir.is_empty() {
+        if let Ok(Some(existing)) = crate::config::load(&app) {
+            settings.last_save_dir = existing.last_save_dir;
+        }
+    }
     crate::config::save(&app, &settings)
 }
 
