@@ -7,11 +7,11 @@ mod error;
 mod chatlog;
 
 // ── Later-milestone modules (compiled from day one so the structure is real) ──
-mod clipboard; // M3
+mod clipboard;
 mod config; //    M4
-mod files; //     M3
+mod files;
 mod fonts;
-mod render; //    M3
+mod render;
 mod templates; // M4
 
 fn main() {
@@ -22,6 +22,8 @@ fn main() {
             commands::list_presets,
             commands::import_preset_toml,
             commands::export_preset_toml,
+            commands::export_png,
+            commands::copy_png,
             commands::list_fonts,
             commands::app_version,
         ])

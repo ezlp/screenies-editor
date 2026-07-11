@@ -11,6 +11,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import type { ParsedLine, ParsePreset } from "./types";
+import type { RenderRow } from "./canvas";
 
 /** True when running inside the Tauri shell (vs a plain browser tab). */
 export function isTauri(): boolean {
@@ -39,6 +40,30 @@ export async function importPresetToml(): Promise<ParsePreset | null> {
 export async function exportPresetToml(preset: ParsePreset): Promise<boolean> {
   if (!isTauri()) return false;
   return invoke<boolean>("export_preset_toml", { preset });
+}
+
+/** Everything Rust needs for one export — mirrors render/mod.rs RenderJob. */
+export interface RenderJobPayload {
+  imageBase64: string;
+  crop: { x: number; y: number; w: number; h: number };
+  output: { w: number; h: number };
+  filters: { brightness: number; grayscale: number; sepia: number; saturate: number; contrast: number };
+  fontFamily: string;
+  textSize: number;
+  strokeWidth: number;
+  blocks: Array<{ rows: RenderRow[] }>;
+}
+
+/** Rust: render the job and save it via a native dialog (false = cancel). */
+export async function exportPng(job: RenderJobPayload): Promise<boolean> {
+  if (!isTauri()) return false;
+  return invoke<boolean>("export_png", { job });
+}
+
+/** Rust: render the job and put it on the system clipboard. */
+export async function copyPng(job: RenderJobPayload): Promise<void> {
+  if (!isTauri()) return;
+  return invoke<void>("copy_png", { job });
 }
 
 /** Rust: installed system font families (sorted). Empty in browser dev. */

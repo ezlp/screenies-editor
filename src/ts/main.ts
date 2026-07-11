@@ -13,6 +13,7 @@ import { initPreset } from "./preset";
 import { initTheme } from "./theme";
 import { initCrop } from "./crop";
 import { initFilters } from "./filters";
+import { initExport } from "./export";
 import { appVersion, isTauri } from "./tauri-bridge";
 
 /* Later-milestone modules — imported so tsc type-checks them from day one. */
@@ -21,7 +22,6 @@ import "./colorpalette";
 import "./backgrounds";
 import "./stickers";
 import "./shortcuts";
-import "./export";
 
 window.addEventListener("DOMContentLoaded", () => {
   initTheme();
@@ -32,6 +32,7 @@ window.addEventListener("DOMContentLoaded", () => {
   initPreset();
   initCrop();
   initFilters();
+  initExport();
   void showVersion();
 });
 

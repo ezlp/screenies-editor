@@ -275,6 +275,7 @@ interface Token {
   text: string;
   font: string;
   color: string;
+  bold: boolean;
   width: number;
 }
 interface Row {
@@ -285,6 +286,69 @@ interface BlockLayout {
   rows: Row[];
   width: number;
   height: number;
+}
+
+/** One positioned token — the shared contract between preview & export. */
+export interface RenderToken {
+  text: string;
+  x: number;
+  color: string;
+  bold: boolean;
+}
+export interface RenderRow {
+  y: number;
+  tokens: RenderToken[];
+}
+
+/**
+ * Lay out every block into absolutely-positioned rows in output space.
+ * drawBlocks paints these; export.ts ships the SAME rows to Rust — which
+ * is why the saved PNG can't wrap or sit differently than the preview.
+ */
+export function buildRenderBlocks(
+  outputWidth: number,
+): Array<{ blockId: number; rows: RenderRow[]; bounds: Bounds | null }> {
+  const size = state.textSize;
+  const advance = size * LINE_GAP;
+  const result: Array<{ blockId: number; rows: RenderRow[]; bounds: Bounds | null }> = [];
+
+  for (const block of state.blocks) {
+    if (block.lines.length === 0) {
+      result.push({ blockId: block.id, rows: [], bounds: null });
+      continue;
+    }
+
+    const wrapWidth = wrapWidthFor(block, outputWidth);
+    const layout = layoutLines(block.lines, size, wrapWidth, advance);
+    const origin = blockOrigin(block, layout);
+
+    const rows: RenderRow[] = [];
+    let y = origin.y;
+    for (const row of layout.rows) {
+      const tokens: RenderToken[] = [];
+      let x = origin.x;
+      for (const token of row.tokens) {
+        if (token.text.trim().length > 0) {
+          tokens.push({ text: token.text, x, color: token.color, bold: token.bold });
+        }
+        x += token.width;
+      }
+      rows.push({ y, tokens });
+      y += advance;
+    }
+
+    result.push({
+      blockId: block.id,
+      rows,
+      bounds: {
+        x: origin.x,
+        y: origin.y,
+        w: Math.max(layout.width, size),
+        h: layout.height,
+      },
+    });
+  }
+  return result;
 }
 
 function drawBlocks(outputWidth: number): void {
@@ -298,34 +362,18 @@ function drawBlocks(outputWidth: number): void {
   ctx.lineWidth = stroke;
   ctx.strokeStyle = "#000000";
 
-  const advance = size * LINE_GAP;
+  for (const entry of buildRenderBlocks(outputWidth)) {
+    if (entry.bounds === null) continue;
 
-  for (const block of state.blocks) {
-    if (block.lines.length === 0) continue;
-
-    const wrapWidth = wrapWidthFor(block, outputWidth);
-    const layout = layoutLines(block.lines, size, wrapWidth, advance);
-    const origin = blockOrigin(block, layout);
-
-    let y = origin.y;
-    for (const row of layout.rows) {
-      let x = origin.x;
+    for (const row of entry.rows) {
       for (const token of row.tokens) {
-        ctx.font = token.font;
-        ctx.strokeText(token.text, x, y);
+        ctx.font = spanFont({ text: token.text, color: token.color, bold: token.bold }, size);
+        ctx.strokeText(token.text, token.x, row.y);
         ctx.fillStyle = token.color;
-        ctx.fillText(token.text, x, y);
-        x += token.width;
+        ctx.fillText(token.text, token.x, row.y);
       }
-      y += advance;
     }
-
-    boundsById.set(block.id, {
-      x: origin.x,
-      y: origin.y,
-      w: Math.max(layout.width, size),
-      h: layout.height,
-    });
+    boundsById.set(entry.blockId, entry.bounds);
   }
 }
 
@@ -357,7 +405,7 @@ function layoutLines(
           if (isSpace) continue;
         }
         if (!isSpace || row.width > 0) {
-          row.tokens.push({ text: raw, font, color: span.color, width });
+          row.tokens.push({ text: raw, font, color: span.color, bold: span.bold, width });
           row.width += width;
         }
       }

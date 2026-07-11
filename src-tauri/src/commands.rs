@@ -9,6 +9,7 @@
 use crate::chatlog::preset::ParsePreset;
 use crate::chatlog::{self, ParsedLine};
 use crate::error::AppError;
+use crate::render::{compose, RenderJob};
 
 /// Chatlog text → parsed lines: timestamps stripped, `{RRGGBB}` colors
 /// parsed (case-insensitive), auto-color (`*` ungu, `(( ))` abu-abu,
@@ -42,6 +43,22 @@ pub async fn export_preset_toml(
     preset: ParsePreset,
 ) -> Result<bool, AppError> {
     crate::files::export_preset(&app, &preset)
+}
+
+/// Render the full export and save it via a native dialog ("Save Disk").
+/// Async: rendering a 4K image takes real time, and the dialog blocks.
+#[tauri::command]
+pub async fn export_png(app: tauri::AppHandle, job: RenderJob) -> Result<bool, AppError> {
+    let img = compose::render(&job)?;
+    let png = compose::encode_png(&img)?;
+    crate::files::save_png(&app, &png)
+}
+
+/// Render the full export and put it on the clipboard ("Copy").
+#[tauri::command]
+pub async fn copy_png(job: RenderJob) -> Result<(), AppError> {
+    let img = compose::render(&job)?;
+    crate::clipboard::copy_image(&img)
 }
 
 /// Installed system font families for the picker — sorted, deduped.

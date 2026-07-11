@@ -1,6 +1,6 @@
 [package]
 name = "screenies-editor"
-version = "0.9.1"
+version = "0.10.0"
 description = "ScreeniesEditor — Screenshot Roleplay editor for the SA-MP community"
 authors = ["Isut Indraputra", "Claude (Anthropic)"]
 edition = "2021"
@@ -17,11 +17,12 @@ regex = "1"
 fontdb = "0.18"
 toml = "0.8"
 tauri-plugin-dialog = "2"
+image = "0.25"
+ab_glyph = "0.2"
+arboard = "3"
+base64 = "0.22"
 
 # ── Arriving in later milestones (kept out of M1 so the first build stays lean) ──
-# image = "0.25"                    # M3: decode/encode + filters
-# cosmic-text = "0.12"              # M3: text layout & stroke for export
-# arboard = "3"                     # M3: copy PNG to clipboard
 # tauri-plugin-fs = "2"             # M3: file writes
 # dirs = "5"                        # M4: config dir for settings/templates
 

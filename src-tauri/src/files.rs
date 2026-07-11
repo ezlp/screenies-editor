@@ -1,8 +1,7 @@
 //! files.rs — file dialogs & disk I/O.
 //!
-//! ACTIVE: preset import/export as `.toml` — the community-shareable
-//! format documented in docs/PRESETS.md (wiki).
-//! MILESTONE 3 adds: PNG export with a folder picker + last-folder memory.
+//! ACTIVE: preset import/export as `.toml`, and PNG export via a native
+//! save dialog ("Save Disk"). Last-folder memory arrives with M4 config.
 
 use crate::chatlog::preset::ParsePreset;
 use crate::error::AppError;
@@ -70,4 +69,21 @@ mod tests {
         assert!(!p.do_suffix);
         assert!(p.me_prefix); // defaulted
     }
+}
+
+/// Save-file dialog → write the rendered PNG. `Ok(false)` = cancelled.
+pub fn save_png(app: &AppHandle, png: &[u8]) -> Result<bool, AppError> {
+    let Some(picked) = app
+        .dialog()
+        .file()
+        .add_filter("Gambar PNG", &["png"])
+        .set_file_name("screenie.png")
+        .blocking_save_file()
+    else {
+        return Ok(false);
+    };
+
+    let path = picked.into_path().map_err(|e| AppError::Io(e.to_string()))?;
+    fs::write(&path, png).map_err(|e| AppError::Io(e.to_string()))?;
+    Ok(true)
 }

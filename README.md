@@ -66,6 +66,11 @@ repo's **Releases** page (right sidebar) and download:
 - System/game messages (`VEHICLE:`, `ERROR:`, `AdmCmd:` — any `Word:` prefix,
   pattern-based so all ~30 JGRP tags and future ones work) render the tag
   **bold** automatically
+- **Export (v0.10.0, M3c):** *Save Disk (.png)* and *Copy ke Clipboard* are
+  LIVE. Rust re-renders everything at full resolution — decode → crop →
+  Lanczos resize → CSS-spec filter math → your font with a real outline —
+  and the frontend ships its exact text layout, so the PNG matches the
+  preview by construction. Stickers & background modes move to M4.
 - **Live filters (v0.9.0, M3b):** Brightness / Grayscale / Sepia / Saturate /
   Contrast sliders with instant preview and per-filter reset — only the photo
   is filtered, chat text stays crisp. Dark-mode dropdown lists fixed
@@ -149,7 +154,7 @@ src-tauri/src/             Rust backend
   auto-color (`*` ungu, `(( ))` abu-abu, `/do` suffix `((Nama))` ungu),
   generic `says [apapun]:` / `[phone]:` / `[walkie]:` variants, bold tags on
   hex-prefixed lines. Manual color palette → M4. Rules are preset-driven since v0.5.0.
-- [ ] **M3** — image engine, split in three: **M3a crop/resolution ✅ (v0.8.0)** → **M3b live filters ✅ (v0.9.0)** → M3c Rust export (Save Disk + Copy) + stickers
+- [x] **M3** — image engine, split in three: **M3a crop/resolution ✅ (v0.8.0)** → **M3b live filters ✅ (v0.9.0)** → **M3c Rust export ✅ (v0.10.0)** — stickers & background modes → M4
 - [ ] **M4** — comfort: templates, settings memory, stroke/spacing controls, manual color palette *(fonts already shipped in v0.3.0)*
 - [ ] **v1.0** — polish + release to the community
 
