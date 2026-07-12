@@ -1,7 +1,13 @@
 # build.yml — runs on every push & PR.
-# Compiles the frontend (TypeScript) and tests the backend (Rust).
-# No installers here — that's release.yml's job. This exists to catch
-# errors early and show the exact failing line in the Actions log.
+# 2.0 is a native Rust (egui) app, so this check is Rust-only: it builds and
+# tests `core` (the engine — parser, render incl. blur/pixelate + layout,
+# chatlog_library, gallery). No TypeScript/Node here.
+#
+# NOT built by this check:
+#   • src-tauri/ — the frozen 1.x safety-net app. It needs the TS/Vite `dist`
+#     bundle to compile, so its installers are still cut by release.yml on tags.
+#   • native/   — the 2.0 egui shell (excluded from the workspace; needs GUI
+#     system-deps). Its own CI arrives in migration phase 6.
 
 name: Build Check
 
@@ -13,35 +19,11 @@ on:
 
 jobs:
   check:
-    name: TypeScript + Rust check
+    name: Rust check (core)
     runs-on: ubuntu-22.04
     steps:
       - name: Checkout
         uses: actions/checkout@v5
-
-      - name: Setup Node
-        uses: actions/setup-node@v5
-        with:
-          node-version: 22
-
-      - name: Install frontend deps
-        run: npm install
-
-      # `npm run build` = tsc (type check) + vite build.
-      # The dist/ it produces is also required by Rust: tauri's
-      # generate_context! embeds frontend assets at compile time.
-      - name: Build frontend (type check + bundle)
-        run: npm run build
-
-      - name: Install Tauri system deps (Linux)
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
-            libwebkit2gtk-4.1-dev \
-            build-essential curl wget file \
-            libxdo-dev libssl-dev \
-            libayatana-appindicator3-dev \
-            librsvg2-dev
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
@@ -49,7 +31,5 @@ jobs:
       - name: Cache Rust build
         uses: Swatinem/rust-cache@v2
 
-      # Workspace-wide: core (parser/render tests) and the Tauri shell
-      # must keep compiling.
-      - name: Rust tests (whole workspace)
-        run: cargo test --workspace
+      - name: Test the engine (core)
+        run: cargo test -p screenies-core
