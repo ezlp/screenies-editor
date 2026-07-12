@@ -1,7 +1,7 @@
 //! error.rs — one error type for every command.
 //!
-//! Tauri serializes command errors to the frontend; keeping a single
-//! serializable enum means TypeScript always receives a predictable
+//! The shell serializes command errors to the UI; keeping a single
+//! serializable enum means the frontend always receives a predictable
 //! `{ kind, message }` object it can show to the user.
 
 use serde::Serialize;

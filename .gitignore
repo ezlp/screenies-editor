@@ -1,10 +1,6 @@
-# Node / frontend
-node_modules/
-dist/
-
-# Rust (workspace target at the root now)
+# Rust — root workspace target, plus qt/ (excluded crate, its own target dir)
 /target/
-src-tauri/target/
+qt/target/
 
 # Editors & OS
 .vscode/

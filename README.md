@@ -29,15 +29,15 @@ Semua offline, tanpa upload ke mana-mana.
 
 > **English:** see [README.en.md](README.en.md)
 
-## ⚠️ Catatan Windows: butuh WebView2 (runtime Edge)
+## 🚧 Status: migrasi ke 2.0 (Qt)
 
-Versi saat ini memakai **Microsoft WebView2**. Windows 11 & Windows 10
-terbaru sudah punya bawaan; **laptop lama** mungkin belum — installer akan
-mengunduhnya otomatis saat pemasangan (butuh internet sekali). Kalau
-gagal, pasang manual "WebView2 Runtime (Evergreen)" dari situs Microsoft.
+Sedang berlangsung **migrasi dari Tauri (WebView2/WebKitGTK) ke shell Qt**,
+dengan backend Rust yang tetap sama. Tujuannya: jalan di laptop lama tanpa
+perlu WebView2 sama sekali. Rencana lengkap: [docs/2.0-MIGRATION.md](docs/2.0-MIGRATION.md).
 
-**Kabar baiknya:** kami sedang **migrasi ke teknologi lain** yang lebih
-ringan dan tanpa WebView2 sama sekali, supaya laptop lama tetap bisa jalan.
+Selama migrasi, **belum ada build 2.0 yang bisa dijalankan**. Versi stabil
+**1.x** (berbasis WebView2) tetap tersedia lewat **[Releases](../../releases)**
+dan branch `main`.
 
 ## 📥 Download & Install
 
@@ -57,14 +57,15 @@ Linux `.deb` / `.AppImage`. Pakai yang berlabel **Latest**; release berlabel
 
 | Teknologi | Untuk apa |
 |---|---|
-| **[Tauri 2](https://tauri.app)** (Rust) | Shell desktop ringan lintas-OS — installer kecil, bukan Electron |
-| **Rust** | Parser chatlog + seluruh pipeline export: cepat & teruji (`cargo test`) |
-| **TypeScript + Vite** | UI dan preview canvas dengan type-safety penuh |
+| **Rust** | Parser chatlog + seluruh pipeline export (crate `core`): cepat & teruji (`cargo test`) |
+| **Qt (CXX-Qt + QML)** | Shell desktop 2.0 — tanpa webview, jalan di laptop lama *(dalam pengerjaan)* |
 | **fontdb** | Baca font sistem — sekali scan, dipakai picker & exporter |
-| **image + ab_glyph** | Decode/crop/resize Lanczos, matematika filter sesuai spec CSS, rasterisasi teks + outline |
+| **image + ab_glyph** | Decode/crop/resize Lanczos, matematika filter sesuai spec CSS, blur/pixelate, rasterisasi teks + outline |
 | **arboard** | Copy PNG langsung ke clipboard |
 | **serde (+ TOML/JSON)** | Preset `.toml` & `settings.json` yang forward-compatible |
-| **GitHub Actions** | Build & release otomatis Windows/Linux tiap tag |
+
+> Shell lama 1.x (Tauri 2 + TypeScript/Vite) sudah dilepas dari branch ini;
+> lihat riwayatnya di branch `main` / tag `v1.*`.
 
 Arsitektur & panduan kontributor: **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)** ·
 Riwayat rilis: **[docs/CHANGELOG.md](docs/CHANGELOG.md)**

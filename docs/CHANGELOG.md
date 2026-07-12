@@ -1,5 +1,14 @@
 # Changelog (ringkas per rilis)
 
+- **2.0 (in progress) — Tauri → Qt migration.** Backend stays Rust
+  (`screenies-core`); the shell moves from Tauri (WebView2/WebKitGTK + a
+  TypeScript frontend) to **Qt (CXX-Qt + QML)**. This branch **removed the
+  entire Tauri stack** (`src-tauri/`, `src/ts/**`, `index.html`, `package.json`,
+  `vite.config.ts`, `tsconfig.json`, and the Tauri installer CI) — so there is
+  no runnable 2.0 build yet; stable 1.x lives on `main` / `v1.*` tags. New:
+  `blur`/`pixelate` effect filters, a chatlog-folder search index, and a
+  gallery lister — all as unit-tested logic in `core`, plus a QML landing-menu
+  scaffold. Plan: [2.0-MIGRATION.md](2.0-MIGRATION.md).
 - **Stable 1.1 fixes:** **undo no longer drops the chatlog** — block text is
   now synced to state synchronously on every keystroke, so a snapshot taken
   mid-edit (e.g. by a filter/drag commit) can never capture an empty chatlog
