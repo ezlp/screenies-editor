@@ -12,7 +12,10 @@
 name: Native preview (egui)
 
 on:
-  workflow_dispatch:
+  workflow_dispatch: # manual (only listed once this file reaches the default branch)
+  push:
+    tags:
+      - "native-preview-*" # push a tag like `native-preview-0.1` to build from any branch
 
 permissions:
   contents: write # create/update the pre-release
@@ -80,7 +83,7 @@ jobs:
       - name: Publish rolling pre-release
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: native-preview
+          tag_name: ${{ github.ref_type == 'tag' && github.ref_name || 'native-preview' }}
           name: ScreeniesEditor 2.0 — native preview (egui)
           prerelease: true
           body: |
