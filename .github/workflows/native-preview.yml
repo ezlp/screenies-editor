@@ -1,0 +1,96 @@
+# native-preview.yml — build the 2.0 native egui app and publish a downloadable
+# PRE-RELEASE for testing. Manual trigger: Actions tab → "Native preview (egui)"
+# → Run workflow.
+#
+# This also serves as build verification for native/ (the egui shell is excluded
+# from the default workspace, so normal CI doesn't compile it). If it fails to
+# compile, the failing step's log shows the exact error.
+#
+# Result: a rolling GitHub pre-release tagged `native-preview` with a Windows
+# .exe and a Linux binary. (Linux needs GTK3 + OpenGL present at runtime.)
+
+name: Native preview (egui)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write # create/update the pre-release
+
+jobs:
+  build:
+    name: Build (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-22.04
+            bin: screenies-native
+            asset: screenies-native-linux-x86_64
+          - os: windows-latest
+            bin: screenies-native.exe
+            asset: screenies-native-windows-x86_64.exe
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Linux GUI build deps (egui + rfd/GTK)
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgtk-3-dev libxkbcommon-dev libwayland-dev \
+            libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev \
+            libssl-dev
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: native
+
+      - name: Build (release)
+        working-directory: native
+        run: cargo build --release
+
+      - name: Stage binary
+        shell: bash
+        run: cp "native/target/release/${{ matrix.bin }}" "${{ matrix.asset }}"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset }}
+          path: ${{ matrix.asset }}
+
+  release:
+    name: Publish pre-release
+    needs: build
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Download built binaries
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Publish rolling pre-release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: native-preview
+          name: ScreeniesEditor 2.0 — native preview (egui)
+          prerelease: true
+          body: |
+            Automated **test build** of the native egui shell (2.0 preview).
+
+            ⚠️ Alpha: basic editor only (load photo · paste chatlog · font/size ·
+            filters + blur/pixelate · background/anchor · live preview · PNG export).
+            Not yet: crop editor, stickers, palette, undo, multi-block, i18n.
+
+            - **Windows:** `screenies-native-windows-x86_64.exe` — run directly.
+            - **Linux:** `screenies-native-linux-x86_64` — `chmod +x` then run;
+              needs GTK3 + OpenGL installed.
+          files: dist/**/*
