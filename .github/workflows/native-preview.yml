@@ -1,45 +1,35 @@
 # native-preview.yml — build the 2.0 native egui app and publish a downloadable
-# PRE-RELEASE for testing. Manual trigger: Actions tab → "Native preview (egui)"
-# → Run workflow.
+# PRE-RELEASE for testing. Trigger by pushing a `native-preview-*` tag (works
+# from any branch), or via workflow_dispatch once this file is on the default
+# branch.
 #
-# This also serves as build verification for native/ (the egui shell is excluded
-# from the default workspace, so normal CI doesn't compile it). If it fails to
-# compile, the failing step's log shows the exact error.
+# Also serves as build verification for native/ (excluded from the default
+# workspace, so normal CI doesn't compile it).
 #
-# Result: a rolling GitHub pre-release tagged `native-preview` with a Windows
-# .exe and a Linux binary. (Linux needs GTK3 + OpenGL present at runtime.)
+# Artifacts:
+#   • Windows: .exe
+#   • Linux:   .deb (cargo-deb), .rpm (cargo-generate-rpm), and the raw binary.
+#     The .deb declares real runtime deps (GTK3/OpenGL/…) via dpkg-shlibdeps.
 
 name: Native preview (egui)
 
 on:
-  workflow_dispatch: # manual (only listed once this file reaches the default branch)
+  workflow_dispatch:
   push:
     tags:
-      - "native-preview-*" # push a tag like `native-preview-0.1` to build from any branch
+      - "native-preview-*"
 
 permissions:
   contents: write # create/update the pre-release
 
 jobs:
-  build:
-    name: Build (${{ matrix.os }})
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: ubuntu-22.04
-            bin: screenies-native
-            asset: screenies-native-linux-x86_64
-          - os: windows-latest
-            bin: screenies-native.exe
-            asset: screenies-native-windows-x86_64.exe
-    runs-on: ${{ matrix.os }}
+  linux:
+    name: Build Linux (.deb / .rpm)
+    runs-on: ubuntu-22.04
     steps:
-      - name: Checkout
-        uses: actions/checkout@v5
+      - uses: actions/checkout@v5
 
-      - name: Linux GUI build deps (egui + rfd/GTK)
-        if: runner.os == 'Linux'
+      - name: GUI build deps (egui + rfd/GTK)
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -47,11 +37,48 @@ jobs:
             libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev \
             libssl-dev
 
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: native
 
-      - name: Cache
-        uses: Swatinem/rust-cache@v2
+      - name: Install packagers
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-deb,cargo-generate-rpm
+
+      - name: Build (release)
+        working-directory: native
+        run: cargo build --release
+
+      - name: Package .deb
+        working-directory: native
+        run: cargo deb --no-build
+
+      - name: Package .rpm
+        working-directory: native
+        run: cargo generate-rpm
+
+      - name: Stage artifacts
+        shell: bash
+        run: |
+          mkdir -p out
+          cp native/target/release/screenies-native out/screenies-native-linux-x86_64
+          cp native/target/debian/*.deb out/
+          cp native/target/generate-rpm/*.rpm out/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          path: out/
+
+  windows:
+    name: Build Windows (.exe)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
         with:
           workspaces: native
 
@@ -59,22 +86,23 @@ jobs:
         working-directory: native
         run: cargo build --release
 
-      - name: Stage binary
+      - name: Stage artifact
         shell: bash
-        run: cp "native/target/release/${{ matrix.bin }}" "${{ matrix.asset }}"
+        run: |
+          mkdir -p out
+          cp native/target/release/screenies-native.exe out/screenies-native-windows-x86_64.exe
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.asset }}
-          path: ${{ matrix.asset }}
+          name: windows
+          path: out/
 
   release:
     name: Publish pre-release
-    needs: build
+    needs: [linux, windows]
     runs-on: ubuntu-22.04
     steps:
-      - name: Download built binaries
+      - name: Download built artifacts
         uses: actions/download-artifact@v4
         with:
           path: dist
@@ -93,7 +121,10 @@ jobs:
             filters + blur/pixelate · background/anchor · live preview · PNG export).
             Not yet: crop editor, stickers, palette, undo, multi-block, i18n.
 
-            - **Windows:** `screenies-native-windows-x86_64.exe` — run directly.
-            - **Linux:** `screenies-native-linux-x86_64` — `chmod +x` then run;
-              needs GTK3 + OpenGL installed.
+            **Downloads**
+            - Windows: `screenies-native-windows-x86_64.exe` — run directly.
+            - Debian/Ubuntu: `*.deb` — `sudo apt install ./screenies-native_*.deb`.
+            - Fedora/RHEL: `*.rpm` — `sudo dnf install ./screenies-native-*.rpm`
+              (install GTK3 + Mesa/OpenGL yourself if missing).
+            - Or the raw `screenies-native-linux-x86_64` binary (`chmod +x`, needs GTK3 + OpenGL).
           files: dist/**/*

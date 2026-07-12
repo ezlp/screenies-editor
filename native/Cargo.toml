@@ -13,6 +13,26 @@ name = "screenies-native"
 version = "2.0.0-alpha.0"
 edition = "2021"
 rust-version = "1.77"
+description = "ScreeniesEditor — Screenshot Roleplay editor for the SA-MP community (native egui shell)"
+license = "MIT"
+
+# ── Linux packaging (cargo-deb) ──
+# `$auto` runs dpkg-shlibdeps so the .deb declares the real runtime libs
+# (GTK3, OpenGL, xkbcommon, …) the binary links against.
+[package.metadata.deb]
+section = "graphics"
+priority = "optional"
+depends = "$auto"
+assets = [["target/release/screenies-native", "usr/bin/", "755"]]
+
+# ── Linux packaging (cargo-generate-rpm) ──
+# auto-req disabled for the alpha (avoids cross-distro dep-name mismatch);
+# Fedora testers install GTK3/Mesa themselves. Re-enable when we ship for real.
+[package.metadata.generate-rpm]
+auto-req = "disabled"
+assets = [
+    { source = "target/release/screenies-native", dest = "/usr/bin/screenies-native", mode = "755" },
+]
 
 [dependencies]
 screenies-core = { path = "../core" }
