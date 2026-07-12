@@ -5,7 +5,7 @@
 # native/ (screenies-native, the 2.0 egui shell) is intentionally EXCLUDED: it
 # pulls egui's Linux GUI system-deps, so keeping it out of the default
 # workspace lets `cargo test --workspace` stay fast/green in CI. Build/run it
-# explicitly with `cargo run -p screenies-native`. See docs/2.0-MIGRATION.md.
+# explicitly with `cd native && cargo run`. See docs/2.0-MIGRATION.md.
 [workspace]
 resolver = "2"
 members = ["core", "src-tauri"]

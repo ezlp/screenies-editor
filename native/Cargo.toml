@@ -4,7 +4,7 @@
 #
 # Excluded from the default cargo workspace so `cargo test --workspace` stays
 # fast/green without egui's Linux GUI system-deps. Build/run explicitly:
-#   cargo run -p screenies-native
+#   cd native && cargo run
 #
 # ⚠️ Phase-0 scaffold: landing menu + stub pages. The editor/parser/gallery
 # screens are filled in phase by phase (see docs/2.0-MIGRATION.md).
@@ -16,8 +16,7 @@ rust-version = "1.77"
 
 [dependencies]
 screenies-core = { path = "../core" }
-eframe = "0.29"
-egui = "0.29"
+eframe = "0.29"       # brings egui (used via eframe::egui — no separate dep)
 rfd = "0.15"          # native file dialogs (open photo, open chatlog folder)
 image = "0.25"
 base64 = "0.22"
