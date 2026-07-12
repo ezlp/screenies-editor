@@ -56,6 +56,14 @@ pub struct FilterValues {
     pub sepia: f32,
     pub saturate: f32,
     pub contrast: f32,
+    // ── 2.0 effects (neighborhood passes, run after the per-pixel color ops).
+    //    serde(default) keeps old 1.x RenderJob payloads (5 fields) parsing. ──
+    /// Box-blur radius in output px. 0 = off.
+    #[serde(default)]
+    pub blur: f32,
+    /// Pixelate block size in output px. 0 or 1 = off.
+    #[serde(default)]
+    pub pixelate: f32,
 }
 
 #[derive(Debug, Clone, Deserialize)]

@@ -6,7 +6,9 @@
 //! lives here, tested once, reused everywhere (including WASM later).
 
 pub mod chatlog;
+pub mod chatlog_library;
 pub mod clipboard;
 pub mod error;
 pub mod fonts;
+pub mod gallery;
 pub mod render;

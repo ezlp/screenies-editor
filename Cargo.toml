@@ -1,6 +1,12 @@
 # Root workspace manifest. The actual crates live in the members below:
 #   core/      — screenies-core: shell-independent parser/render/export pipeline
-#   src-tauri/ — screenies-editor: the desktop app
+#   src-tauri/ — screenies-editor: the current desktop app (Tauri)
+#
+# qt/ (screenies-qt, the 2.0 Qt shell) is intentionally EXCLUDED: it needs a
+# Qt6 + C++ toolchain, so keeping it out of the default workspace lets
+# `cargo test --workspace` stay green on machines/CI without Qt. Build it
+# explicitly with `cargo run -p screenies-qt`. See docs/2.0-MIGRATION.md.
 [workspace]
 resolver = "2"
 members = ["core", "src-tauri"]
+exclude = ["qt"]
