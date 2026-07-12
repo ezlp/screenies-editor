@@ -157,6 +157,12 @@ impl EditorState {
                 self.filter_slider(ui, "Saturate", 0.0..=300.0, |f| &mut f.saturate);
             });
 
+            ui.collapsing("Efek (2.0)", |ui| {
+                // Neighborhood effects — new in 2.0 (core render::filters).
+                self.filter_slider(ui, "Blur (px)", 0.0..=20.0, |f| &mut f.blur);
+                self.filter_slider(ui, "Pixelate (blok px)", 0.0..=64.0, |f| &mut f.pixelate);
+            });
+
             ui.separator();
             if ui.button("💾  Export PNG").clicked() {
                 self.export();
