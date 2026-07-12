@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ScreeniesEditor</title>
+</head>
+<body>
+  <div id="app">
+
+    <!-- ══════════ TOP BAR ══════════ -->
+    <header class="topbar">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true"></span>
+        <h1>Screenies<em>Editor</em></h1>
+      </div>
+      <div class="topbar-right">
+        <button class="btn btn-ghost btn-small" id="btn-undo" title="Undo (Ctrl+Z)" disabled>⟲</button>
+        <button class="btn btn-ghost btn-small" id="btn-redo" title="Redo (Ctrl+Y)" disabled>⟳</button>
+        <button class="btn btn-ghost btn-small" id="lang-toggle" title="Bahasa / Language">EN</button>
+        <button class="btn btn-ghost btn-small" id="theme-toggle" aria-label="Ganti tema">☀</button>
+        <span class="badge" id="version-badge">v–.–.–</span>
+      </div>
+    </header>
+
+    <!-- ══════════ MAIN 3-PANEL GRID ══════════ -->
+    <main class="workspace">
+
+      <!-- ── LEFT PANEL: source & text ── -->
+      <aside class="panel panel-left">
+
+        <section class="panel-section">
+          <h2 class="section-title"><span class="step">1</span> Foto &amp; Latar</h2>
+          <div id="dropzone" class="dropzone" tabindex="0" role="button"
+               aria-label="Upload foto: klik atau drag and drop">
+            <div class="dropzone-inner">
+              <span class="dropzone-icon" aria-hidden="true">⇪</span>
+              <strong>Taruh foto di sini</strong>
+              <span class="hint">klik atau drag &amp; drop &middot; PNG / JPG / WEBP</span>
+            </div>
+          </div>
+          <input type="file" id="file-input" accept="image/png,image/jpeg,image/webp,image/bmp" hidden />
+          <div class="row" id="image-meta" hidden>
+            <span class="meta-chip" id="meta-name">—</span>
+            <span class="meta-chip mono" id="meta-res">—</span>
+            <button class="btn btn-ghost btn-small" id="btn-clear-image" title="Hapus foto">✕</button>
+          </div>
+
+          <label class="field-label">Resolusi output</label>
+          <div id="res-grid" class="res-grid"></div>
+
+          <div class="row">
+            <input type="number" id="custom-w" class="input input-num" placeholder="Lebar" min="50" max="8192" />
+            <span class="hint">×</span>
+            <input type="number" id="custom-h" class="input input-num" placeholder="Tinggi" min="50" max="8192" />
+            <button class="btn btn-small" id="btn-custom-apply">Set</button>
+          </div>
+
+          <div class="row">
+            <button class="btn btn-block" id="btn-crop-edit">Atur Area Crop</button>
+            <button class="btn btn-ghost btn-small" id="btn-crop-reset" title="Kembali ke foto penuh">Full</button>
+          </div>
+          <p class="hint">Pilih resolusi → kotak crop muncul — geser &amp; tarik sudutnya untuk membingkai karaktermu. Klik dua kali kotak untuk ke tengah lagi.</p>
+        </section>
+
+        <section class="panel-section">
+          <h2 class="section-title"><span class="step">2</span> Chatlog</h2>
+
+          <div class="row">
+            <label class="field-label" for="preset-select">Preset format</label>
+            <select id="preset-select" class="select"></select>
+          </div>
+
+          <div class="row">
+            <button class="btn btn-small" id="import-preset">Impor .toml</button>
+            <button class="btn btn-small" id="export-preset">Ekspor .toml</button>
+          </div>
+
+          <div id="preset-custom" class="preset-custom" hidden>
+            <label class="row checkline" for="ck-timestamps">
+              <input type="checkbox" id="ck-timestamps" /><span>Hapus timestamp [00:00:00]</span>
+            </label>
+            <label class="row checkline" for="ck-me">
+              <input type="checkbox" id="ck-me" /><span>Warna otomatis <b>*</b> (/me)</span>
+            </label>
+            <label class="row checkline" for="ck-ooc">
+              <input type="checkbox" id="ck-ooc" /><span>Warna otomatis <b>(( ))</b> (OOC)</span>
+            </label>
+            <label class="row checkline" for="ck-do">
+              <input type="checkbox" id="ck-do" /><span>Deteksi /do <b>((Nama))</b> di akhir</span>
+            </label>
+            <label class="row checkline" for="ck-systag">
+              <input type="checkbox" id="ck-systag" /><span>Tag sistem (SERVER:, dll) bold</span>
+            </label>
+            <div class="row">
+              <label class="field-label" for="color-me">Warna /me</label>
+              <input type="color" id="color-me" value="#C2A2DA" />
+              <label class="field-label" for="color-ooc">Warna OOC</label>
+              <input type="color" id="color-ooc" value="#9C9C9C" />
+            </div>
+            <div class="row">
+              <label class="field-label" for="radio-channels">Channel radio</label>
+              <input type="text" id="radio-channels" class="input" placeholder="phone, walkie" />
+            </div>
+          </div>
+
+          <div id="chatlog-list" class="chatlog-list"></div>
+
+          <button class="btn btn-block" id="btn-add-chatlog">+ Tambah Chatlog</button>
+
+
+          <div class="row">
+            <label class="field-label" for="font-select">Font</label>
+            <select id="font-select" class="select"></select>
+          </div>
+
+          <div class="row">
+            <label class="field-label" for="text-size">Ukuran teks</label>
+            <input type="range" id="text-size" class="slider-flex" min="8" max="60" value="27" />
+            <span class="meta-chip mono" id="text-size-val">27px</span>
+          </div>
+
+          <div class="row">
+            <label class="field-label" for="stroke-size">Outline</label>
+            <input type="range" id="stroke-size" class="slider-flex" min="0" max="10" value="3" />
+            <span class="meta-chip mono" id="stroke-val">auto</span>
+            <button class="btn btn-ghost btn-small" id="stroke-auto" title="Kembali ke otomatis">A</button>
+          </div>
+
+          <div class="row">
+            <label class="field-label" for="line-gap">Jarak baris</label>
+            <input type="range" id="line-gap" class="slider-flex" min="100" max="180" value="122" />
+            <span class="meta-chip mono" id="line-gap-val">122%</span>
+            <button class="btn btn-ghost btn-small" id="line-gap-reset" title="Reset">↺</button>
+          </div>
+
+          <div class="row">
+            <label class="field-label" for="bg-offset">Geser BG</label>
+            <input type="range" id="bg-offset" class="slider-flex" min="-10" max="10" value="0" />
+            <span class="meta-chip mono" id="bg-offset-val">0px</span>
+          </div>
+
+
+          <div class="row">
+            <label class="field-label" for="palette-color">Palet</label>
+            <input type="color" id="palette-color" value="#FF0000" />
+            <button class="btn btn-small" id="palette-apply">Terapkan ke seleksi</button>
+          </div>
+          <div class="row" id="palette-swatches"></div>
+          <p class="hint">Blok teks di kotak chatlog → pilih warna → Terapkan. Tanpa seleksi: kode warna disisipkan di kursor.</p>
+          <p class="hint">Ukuran otomatis mengikuti resolusi (minimal 16px) — slider manual bisa sampai 8px; outline otomatis menipis di ukuran kecil biar tetap terbaca. Font Verdana / Tahoma paling jelas di resolusi rendah. Posisi <em>Bebas</em> bisa diseret di preview (klik dua kali untuk reset); posisi sudut terkunci rapi.</p>
+        </section>
+
+
+      </aside>
+
+      <!-- ── CENTER: viewport ── -->
+      <section class="stage">
+        <div class="viewport" id="viewport">
+          <canvas id="image-canvas"></canvas>
+          <canvas id="preview-canvas"></canvas>
+          <div class="viewport-corner tl" aria-hidden="true"></div>
+          <div class="viewport-corner tr" aria-hidden="true"></div>
+          <div class="viewport-corner bl" aria-hidden="true"></div>
+          <div class="viewport-corner br" aria-hidden="true"></div>
+          <div class="viewport-empty" id="viewport-empty">
+            <p>PREVIEW</p>
+            <span class="hint">Upload foto untuk mulai &middot; Ctrl + Scroll zoom &middot; drag geser &middot; seret teks untuk memindahkan</span>
+          </div>
+        </div>
+        <footer class="hud mono">
+          <span id="hud-res">RES —</span>
+          <span class="hud-sep" aria-hidden="true">/</span>
+          <span id="hud-zoom">ZOOM —</span>
+          <span class="hud-spacer"></span>
+          <div class="zoom-controls">
+            <button class="btn btn-hud" id="btn-zoom-out" title="Zoom out">−</button>
+            <button class="btn btn-hud" id="btn-zoom-in" title="Zoom in">+</button>
+            <button class="btn btn-hud" id="btn-fit" title="Auto-fit">FIT</button>
+          </div>
+        </footer>
+      </section>
+
+      <!-- ── RIGHT PANEL: look & output ── -->
+      <aside class="panel panel-right">
+
+        <section class="panel-section">
+          <h2 class="section-title"><span class="step">3</span> Filter</h2>
+          <div class="filter-row" data-filter="brightness">
+            <label>Brightness</label>
+            <input type="range" min="0" max="300" value="100" />
+            <span class="filter-val mono">100%</span>
+            <button class="btn btn-ghost btn-small filter-reset" title="Reset Brightness">↺</button>
+          </div>
+          <div class="filter-row" data-filter="grayscale">
+            <label>Grayscale</label>
+            <input type="range" min="0" max="100" value="0" />
+            <span class="filter-val mono">0%</span>
+            <button class="btn btn-ghost btn-small filter-reset" title="Reset Grayscale">↺</button>
+          </div>
+          <div class="filter-row" data-filter="sepia">
+            <label>Sepia</label>
+            <input type="range" min="0" max="100" value="0" />
+            <span class="filter-val mono">0%</span>
+            <button class="btn btn-ghost btn-small filter-reset" title="Reset Sepia">↺</button>
+          </div>
+          <div class="filter-row" data-filter="saturate">
+            <label>Saturate</label>
+            <input type="range" min="0" max="200" value="100" />
+            <span class="filter-val mono">100%</span>
+            <button class="btn btn-ghost btn-small filter-reset" title="Reset Saturate">↺</button>
+          </div>
+          <div class="filter-row" data-filter="contrast">
+            <label>Contrast</label>
+            <input type="range" min="0" max="200" value="100" />
+            <span class="filter-val mono">100%</span>
+            <button class="btn btn-ghost btn-small filter-reset" title="Reset Contrast">↺</button>
+          </div>
+          <p class="hint">Live — hanya foto yang terfilter, teks chat tetap tajam. Hasil export akan sama persis.</p>
+        </section>
+
+        <section class="panel-section">
+          <h2 class="section-title"><span class="step">4</span> Stiker / PNG</h2>
+          <button class="btn btn-block" id="btn-add-sticker">+ Import Stiker (PNG)</button>
+          <input type="file" id="sticker-input" accept="image/png,image/webp" hidden />
+          <div id="sticker-list" class="sticker-list"></div>
+          <p class="hint">Seret stiker langsung di preview untuk memindahkan.</p>
+        </section>
+
+
+        <section class="panel-section panel-export">
+          <h2 class="section-title"><span class="step">5</span> Export</h2>
+          <label class="field-label" for="file-name-template">Nama file</label>
+          <input type="text" id="file-name-template" class="input mono" spellcheck="false"
+                 placeholder="screenie-{tanggal}-{jam}" />
+          <p class="hint">Placeholder: {tanggal} {jam} {res} {foto} — contoh: <code>rp-{foto}-{res}</code></p>
+
+          <button class="btn btn-primary btn-block" id="btn-save" disabled>Save Disk (.png)</button>
+          <button class="btn btn-block" id="btn-copy" disabled>Copy ke Clipboard</button>
+          <p class="hint">Render penuh oleh Rust — persis seperti preview, tajam sampai 4K. Tutup mode crop dulu sebelum export.</p>
+        </section>
+
+      </aside>
+
+    </main>
+  </div>
+
+  <script type="module" src="/src/ts/main.ts"></script>
+</body>
+</html>

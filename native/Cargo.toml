@@ -1,0 +1,23 @@
+# screenies-native — the 2.0 shell: a pure-Rust egui/eframe app that runs the
+# SAME screenies-core pipeline as the Tauri app, with NO webview. Targets old
+# laptops (wide compatibility) with a small static binary.
+#
+# Excluded from the default cargo workspace so `cargo test --workspace` stays
+# fast/green without egui's Linux GUI system-deps. Build/run explicitly:
+#   cargo run -p screenies-native
+#
+# ⚠️ Phase-0 scaffold: landing menu + stub pages. The editor/parser/gallery
+# screens are filled in phase by phase (see docs/2.0-MIGRATION.md).
+[package]
+name = "screenies-native"
+version = "2.0.0-alpha.0"
+edition = "2021"
+rust-version = "1.77"
+
+[dependencies]
+screenies-core = { path = "../core" }
+eframe = "0.29"
+egui = "0.29"
+rfd = "0.15"          # native file dialogs (open photo, open chatlog folder)
+image = "0.25"
+base64 = "0.22"

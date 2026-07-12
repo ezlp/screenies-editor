@@ -1,12 +1,12 @@
-# Root workspace manifest.
-#   core/ — screenies-core: shell-independent parser/render/export pipeline.
+# Root workspace manifest. The actual crates live in the members below:
+#   core/      — screenies-core: shell-independent parser/render/export pipeline
+#   src-tauri/ — screenies-editor: the CURRENT shipping desktop app (Tauri 1.x)
 #
-# The Tauri shell (src-tauri/) and its TypeScript frontend were removed in the
-# 2.0 cutover to Qt (see docs/2.0-MIGRATION.md). qt/ (screenies-qt, the Qt
-# shell) is intentionally EXCLUDED: it needs a Qt6 + C++ toolchain, so keeping
-# it out of the default workspace lets `cargo test --workspace` stay green on
-# machines/CI without Qt. Build it explicitly with `cargo run -p screenies-qt`.
+# native/ (screenies-native, the 2.0 egui shell) is intentionally EXCLUDED: it
+# pulls egui's Linux GUI system-deps, so keeping it out of the default
+# workspace lets `cargo test --workspace` stay fast/green in CI. Build/run it
+# explicitly with `cargo run -p screenies-native`. See docs/2.0-MIGRATION.md.
 [workspace]
 resolver = "2"
-members = ["core"]
-exclude = ["qt"]
+members = ["core", "src-tauri"]
+exclude = ["native"]

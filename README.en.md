@@ -13,15 +13,15 @@ Fully offline — nothing is uploaded anywhere.
 
 ---
 
-## 🚧 Status: 2.0 migration (Qt)
+## ⚠️ Windows note: WebView2 (Edge runtime) required
 
-We're **migrating from Tauri (WebView2/WebKitGTK) to a Qt shell**, keeping the
-same Rust backend, so the app runs on older laptops with no WebView2 at all.
-Full plan: [docs/2.0-MIGRATION.md](docs/2.0-MIGRATION.md).
+The current version runs on **Microsoft WebView2**. Windows 11 and
+up-to-date Windows 10 ship it; **older laptops** may not — the installer
+downloads it automatically during setup (needs internet once). If that
+fails, install "WebView2 Runtime (Evergreen)" from Microsoft manually.
 
-During the migration there is **no runnable 2.0 build yet**. The stable **1.x**
-(WebView2) app stays available via **[Releases](../../releases)** and the
-`main` branch.
+**Good news:** we are **migrating to a lighter technology** with no
+WebView2 at all — so older machines will be supported.
 
 ## ✨ Features
 
@@ -50,12 +50,9 @@ code-signed).
 
 ## 🔧 Tech & docs
 
-Rust `core` (parser & render pipeline, incl. blur/pixelate) + a Qt (CXX-Qt +
-QML) shell *(2.0, in progress)*. The old 1.x Tauri + TypeScript/Vite shell
-lives in branch `main` / `v1.*` tags.
+Tauri 2 + Rust core (parser & render pipeline) + TypeScript/Vite UI.
 Architecture: [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) ·
 Preset guide: [docs/PRESETS.md](docs/PRESETS.md) ·
-Migration: [docs/2.0-MIGRATION.md](docs/2.0-MIGRATION.md) ·
 Changelog: [docs/CHANGELOG.md](docs/CHANGELOG.md)
 
 <div align="center">Made with ❤️ for the SA-MP roleplay community</div>
