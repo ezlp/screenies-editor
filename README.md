@@ -36,9 +36,8 @@ terbaru sudah punya bawaan; **laptop lama** mungkin belum — installer akan
 mengunduhnya otomatis saat pemasangan (butuh internet sekali). Kalau
 gagal, pasang manual "WebView2 Runtime (Evergreen)" dari situs Microsoft.
 
-**Kabar baiknya:** kami sedang **migrasi ke teknologi lain** (shell native
-tanpa WebView2 sama sekali) supaya laptop lama tetap bisa jalan — progres
-& rencananya terbuka di [docs/NATIVE-MIGRATION.md](docs/NATIVE-MIGRATION.md).
+**Kabar baiknya:** kami sedang **migrasi ke teknologi lain** yang lebih
+ringan dan tanpa WebView2 sama sekali, supaya laptop lama tetap bisa jalan.
 
 ## 📥 Download & Install
 
@@ -69,12 +68,6 @@ Linux `.deb` / `.AppImage`. Pakai yang berlabel **Latest**; release berlabel
 
 Arsitektur & panduan kontributor: **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)** ·
 Riwayat rilis: **[docs/CHANGELOG.md](docs/CHANGELOG.md)**
-
-## 🧪 Eksperimen: shell native (egui)
-
-Folder `native/` berisi versi eksperimental **tanpa WebView2** (untuk
-laptop lama) dengan pipeline render yang sama persis — tidak pernah ikut
-release resmi. Rencana lengkap: [docs/NATIVE-MIGRATION.md](docs/NATIVE-MIGRATION.md).
 
 ## 🗺️ Setelah 1.0
 

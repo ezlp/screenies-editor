@@ -302,10 +302,13 @@ function buildCard(block: ChatBlock): HTMLElement {
   let timer: number | undefined;
   let requestSeq = 0;
   textarea.addEventListener("input", () => {
+    // Sync rawText SYNCHRONOUSLY so any snapshot captured during the debounce
+    // window (e.g. a filter/drag commit from another module) records the real
+    // text — otherwise undo can restore a phantom "empty chatlog" step.
+    block.rawText = textarea.value;
     window.clearTimeout(timer);
     timer = window.setTimeout(async () => {
       const seq = ++requestSeq;
-      block.rawText = textarea.value;
       try {
         const lines = await parseChatlog(textarea.value, state.preset);
         if (seq !== requestSeq) return; // a newer request finished later

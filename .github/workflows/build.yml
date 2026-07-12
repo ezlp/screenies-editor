@@ -49,7 +49,7 @@ jobs:
       - name: Cache Rust build
         uses: Swatinem/rust-cache@v2
 
-      # Workspace-wide: core (parser/render tests), the Tauri shell, and
-      # the experimental native shell all must keep compiling.
+      # Workspace-wide: core (parser/render tests) and the Tauri shell
+      # must keep compiling.
       - name: Rust tests (whole workspace)
         run: cargo test --workspace

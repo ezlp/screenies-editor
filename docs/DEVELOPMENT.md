@@ -2,10 +2,9 @@
 
 How the codebase works, for anyone (including future-us) touching the code.
 
-> **Workspace note:** the Rust side is now a Cargo workspace —
-> `core/` (screenies-core: parser + render, shell-free), `src-tauri/`
-> (the shipping app), `native/` (🧪 egui experiment; see
-> NATIVE-MIGRATION.md). `cargo test --workspace` covers all three.
+> **Workspace note:** the Rust side is a Cargo workspace —
+> `core/` (screenies-core: parser + render, shell-free) and `src-tauri/`
+> (the shipping app). `cargo test --workspace` covers both.
 
 ## Big picture
 

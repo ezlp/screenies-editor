@@ -1,7 +1,6 @@
 # Root workspace manifest. The actual crates live in the members below:
 #   core/      — screenies-core: shell-independent parser/render/export pipeline
-#   native/    — screenies-native: experimental egui shell (not shipped)
 #   src-tauri/ — screenies-editor: the desktop app
 [workspace]
 resolver = "2"
-members = ["core", "native", "src-tauri"]
+members = ["core", "src-tauri"]
