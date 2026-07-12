@@ -18,13 +18,13 @@ import { initExport } from "./export";
 import { initColorPalette } from "./colorpalette";
 import { initHistory } from "./history";
 import type { Snapshot } from "./history";
-import { loadPhotoFile, rebuildBlocksFrom } from "./chatlog";
+import { loadPhotoFile, loadPhotoFromPath, rebuildBlocksFrom } from "./chatlog";
 import { syncFiltersUI } from "./filters";
 import { syncTextStyleUI } from "./textstyle";
 import { initI18n, setLang, getLang } from "./i18n";
 import { state, notify } from "./state";
 import { initStickers, rebuildStickersFrom } from "./stickers";
-import { appVersion, isTauri } from "./tauri-bridge";
+import { appVersion, isTauri, onFileDrop } from "./tauri-bridge";
 
 
 window.addEventListener("DOMContentLoaded", () => {
@@ -92,7 +92,16 @@ async function restoreSnapshot(snap: Snapshot): Promise<void> {
 
 /** Photo can now arrive via Ctrl+V (clipboard image) or a drop anywhere
  *  on the preview — not just the dropzone. */
+const DROP_IMAGE_RE = /\.(png|jpe?g|webp|bmp)$/i;
+
 function initPastePhoto(): void {
+  // In the app, Tauri intercepts OS file drops (dragDropEnabled) and delivers
+  // real paths here — the HTML5 `drop` handlers below only fire in a browser.
+  void onFileDrop((paths) => {
+    const first = paths.find((p) => DROP_IMAGE_RE.test(p));
+    if (first) void loadPhotoFromPath(first);
+  });
+
   window.addEventListener("paste", (ev: ClipboardEvent) => {
     const items = ev.clipboardData?.items;
     if (!items) return;

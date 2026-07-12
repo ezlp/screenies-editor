@@ -8,7 +8,7 @@
  * timestamps, bolds system tags) → block.lines → canvas redraws.
  */
 
-import { parseChatlog } from "./tauri-bridge";
+import { parseChatlog, readDroppedImage } from "./tauri-bridge";
 import { DEFAULT_TEXT_X, DEFAULT_TEXT_Y, state, notify } from "./state";
 import type { Anchor, BgMode, ChatBlock } from "./state";
 import { fitImage, getBlockBounds } from "./canvas";
@@ -70,8 +70,43 @@ function relabelSelects(): void {
 /** Set by initChatlog; lets paste/drop handlers reuse the photo loader. */
 let imageLoader: ((file: File) => void) | null = null;
 
+/** Meta strip (name + resolution) — set in initUpload, reused by every loader. */
+let metaEl: HTMLElement | null = null;
+let metaNameEl: HTMLElement | null = null;
+let metaResEl: HTMLElement | null = null;
+
 export function loadPhotoFile(file: File): void {
   imageLoader?.(file);
+}
+
+/** Apply a decoded image from any source (File reader, clipboard, or a
+ *  Tauri-dropped path resolved to a data: URL). Single place that mutates
+ *  state.image so preview/crop/text-size all react identically. */
+function loadImageFromSrc(src: string, name: string): void {
+  const img = new Image();
+  img.onload = () => {
+    state.image = img;
+    state.imageName = name;
+    if (metaNameEl) metaNameEl.textContent = name;
+    if (metaResEl) metaResEl.textContent = `${img.width}×${img.height}`;
+    if (metaEl) metaEl.hidden = false;
+    onImageLoaded();         // new photo → crop back to full frame
+    autoTextSize(img.width); // low-res photo → smaller text, high-res → bigger
+    fitImage();
+  };
+  img.src = src;
+}
+
+/** OS drag-drop (Tauri) hands us a file PATH, not a File — read it via Rust. */
+export async function loadPhotoFromPath(path: string): Promise<void> {
+  try {
+    const dataUrl = await readDroppedImage(path);
+    if (!dataUrl) return;
+    const name = path.split(/[\\/]/).pop() ?? "dropped";
+    loadImageFromSrc(dataUrl, name);
+  } catch (err) {
+    console.error("[screenies-editor] read_dropped_image failed:", err);
+  }
 }
 
 /** Undo/redo: rebuild all block cards + state from plain snapshot data. */
@@ -106,8 +141,9 @@ export function initUpload(): void {
   const dropzone = mustGet<HTMLElement>("dropzone");
   const fileInput = mustGet<HTMLInputElement>("file-input");
   const meta = mustGet<HTMLElement>("image-meta");
-  const metaName = mustGet<HTMLElement>("meta-name");
-  const metaRes = mustGet<HTMLElement>("meta-res");
+  metaEl = meta;
+  metaNameEl = mustGet<HTMLElement>("meta-name");
+  metaResEl = mustGet<HTMLElement>("meta-res");
   const clearBtn = mustGet<HTMLButtonElement>("btn-clear-image");
 
   const openPicker = () => fileInput.click();
@@ -154,20 +190,7 @@ export function initUpload(): void {
       return;
     }
     const reader = new FileReader();
-    reader.onload = () => {
-      const img = new Image();
-      img.onload = () => {
-        state.image = img;
-        state.imageName = file.name;
-        metaName.textContent = file.name;
-        metaRes.textContent = `${img.width}×${img.height}`;
-        meta.hidden = false;
-        onImageLoaded();         // new photo → crop back to full frame
-        autoTextSize(img.width); // low-res photo → smaller text, high-res → bigger
-        fitImage();
-      };
-      img.src = String(reader.result);
-    };
+    reader.onload = () => loadImageFromSrc(String(reader.result), file.name);
     reader.readAsDataURL(file);
   }
 }

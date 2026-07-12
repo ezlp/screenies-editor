@@ -10,6 +10,7 @@
  */
 
 import { invoke } from "@tauri-apps/api/core";
+import { getCurrentWebview } from "@tauri-apps/api/webview";
 import type { ParsedLine, ParsePreset } from "./types";
 import type { RenderRow } from "./canvas";
 
@@ -98,6 +99,26 @@ export async function listFonts(): Promise<string[]> {
 export async function appVersion(): Promise<string> {
   if (!isTauri()) return "dev (browser)";
   return invoke<string>("app_version");
+}
+
+/** Rust: read an OS-dropped image path into a data: URL. Null in browser. */
+export async function readDroppedImage(path: string): Promise<string | null> {
+  if (!isTauri()) return null;
+  return invoke<string>("read_dropped_image", { path });
+}
+
+/**
+ * Subscribe to OS file drops via Tauri's native drag-drop event. This is the
+ * reliable path inside the app — WebKitGTK/WebView2 do NOT populate a plain
+ * HTML `drop` event's dataTransfer.files. No-op in a plain browser (there the
+ * HTML5 handlers do the job). Returns an unlisten function.
+ */
+export async function onFileDrop(cb: (paths: string[]) => void): Promise<() => void> {
+  if (!isTauri()) return () => {};
+  const unlisten = await getCurrentWebview().onDragDropEvent((event) => {
+    if (event.payload.type === "drop") cb(event.payload.paths);
+  });
+  return unlisten;
 }
 
 /* ── Browser-only fallback (never used inside the real app) ── */

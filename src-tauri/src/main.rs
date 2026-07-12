@@ -21,6 +21,7 @@ fn main() {
             commands::load_settings,
             commands::save_settings,
             commands::list_fonts,
+            commands::read_dropped_image,
             commands::app_version,
         ])
         .run(tauri::generate_context!())

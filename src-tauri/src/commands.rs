@@ -92,6 +92,13 @@ pub fn list_fonts() -> Vec<String> {
     screenies_core::fonts::families()
 }
 
+/// Read an OS-dropped image path into a `data:` URL (Tauri drag-drop hands
+/// the frontend a file path, not a browser File object).
+#[tauri::command]
+pub fn read_dropped_image(path: String) -> Result<String, AppError> {
+    crate::files::read_image_as_data_url(&path)
+}
+
 /// App version straight from Cargo.toml — shown in the top-bar badge and
 /// handy as a "is the bridge alive?" check.
 #[tauri::command]
