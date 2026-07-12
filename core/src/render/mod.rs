@@ -10,6 +10,7 @@
 pub mod compose;
 pub mod crop;
 pub mod filters;
+pub mod layout;
 pub mod sticker;
 pub mod text;
 
