@@ -1,7 +1,7 @@
 //! files.rs — file dialogs & disk I/O.
 //!
 //! ACTIVE: preset import/export as `.toml`, and PNG export via a native
-//! save dialog ("Save Disk"). Last-folder memory arrives with M4 config.
+//! save dialog ("Save Disk") with last-folder memory.
 
 use base64::Engine;
 use screenies_core::chatlog::preset::ParsePreset;

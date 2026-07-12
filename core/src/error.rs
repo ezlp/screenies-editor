@@ -13,8 +13,7 @@ pub enum AppError {
     Parse(String),
     /// File system problem (load/save).
     Io(String),
-    /// Image decode/encode/render problem. Used from Milestone 3.
-    #[allow(dead_code)]
+    /// Image decode/encode/render problem.
     Render(String),
 }
 

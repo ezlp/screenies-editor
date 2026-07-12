@@ -1,4 +1,4 @@
-//! config.rs — settings.json in the OS app-config directory (Milestone 4a).
+//! config.rs — settings.json in the OS app-config directory.
 //!
 //! Windows: %APPDATA%\com.screenies-editor.app\settings.json
 //! Linux:   ~/.config/com.screenies-editor.app/settings.json

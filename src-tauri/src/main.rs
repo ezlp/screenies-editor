@@ -2,9 +2,6 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod commands;
-
-
-// ── Later-milestone modules (compiled from day one so the structure is real) ──
 mod config;
 mod files;
 
