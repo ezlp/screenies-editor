@@ -8,7 +8,11 @@
   default. **Experimental egui `native/` shell removed** — the workspace is
   now just `core` + `src-tauri`; the WebView2-free migration continues but is
   no longer carried as dead code. Root `Cargo.toml` fixed to be a proper
-  workspace manifest (CI `cargo test --workspace` was failing).
+  workspace manifest (CI `cargo test --workspace` was failing). **Photo
+  drag-and-drop now works in the packaged app** — WebKitGTK/WebView2 never
+  populate a plain HTML `drop` event's files, so drops now go through Tauri's
+  native drag-drop event (`dragDropEnabled: true`) and a `read_dropped_image`
+  command that loads the dropped path; HTML5 drop stays for browser dev.
 - **Pre-1.0 fixes (v0.15.0):** **Luar redesigned** — fixed resolutions stay
   EXACTLY as chosen: the strip is carved from inside, the photo shrinks into
   the remaining area, the crop box re-locks to it automatically, and the

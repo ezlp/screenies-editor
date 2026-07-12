@@ -3,11 +3,34 @@
 //! ACTIVE: preset import/export as `.toml`, and PNG export via a native
 //! save dialog ("Save Disk"). Last-folder memory arrives with M4 config.
 
+use base64::Engine;
 use screenies_core::chatlog::preset::ParsePreset;
 use screenies_core::error::AppError;
 use std::fs;
 use tauri::AppHandle;
 use tauri_plugin_dialog::DialogExt;
+
+/// Read an OS-dropped image file (Tauri drag-drop gives us a path, not a
+/// browser File) into a `data:` URL the webview can assign to `img.src`.
+/// The accepted extensions mirror the frontend's ACCEPTED list.
+pub fn read_image_as_data_url(path: &str) -> Result<String, AppError> {
+    let p = std::path::Path::new(path);
+    let ext = p
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_lowercase();
+    let mime = match ext.as_str() {
+        "png" => "image/png",
+        "jpg" | "jpeg" => "image/jpeg",
+        "webp" => "image/webp",
+        "bmp" => "image/bmp",
+        _ => return Err(AppError::Parse(format!("Format tidak didukung: .{ext}"))),
+    };
+    let bytes = fs::read(p).map_err(|e| AppError::Io(e.to_string()))?;
+    let b64 = base64::engine::general_purpose::STANDARD.encode(&bytes);
+    Ok(format!("data:{mime};base64,{b64}"))
+}
 
 /// Open-file dialog → parse the chosen `.toml` into a preset.
 /// `Ok(None)` = the user cancelled the dialog.
