@@ -154,7 +154,7 @@ export const state: AppState = {
   strokeWidth: null,
   lineGap: 122,
   bgOffset: 0,
-  fontFamily: "Arial",
+  fontFamily: "Verdana", // crisper than Arial at small SSRP text sizes
   preset: structuredClone(DEFAULT_PRESET),
   fileNameTemplate: "screenie-{tanggal}-{jam}",
   zoom: 1,

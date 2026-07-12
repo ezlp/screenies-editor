@@ -1,5 +1,14 @@
 # Changelog (ringkas per rilis)
 
+- **Stable 1.1 fixes:** **undo no longer drops the chatlog** — block text is
+  now synced to state synchronously on every keystroke, so a snapshot taken
+  mid-edit (e.g. by a filter/drag commit) can never capture an empty chatlog
+  and make it vanish on undo. **Default font is now Verdana** (Tahoma/Arial
+  fallback) for crisper text at small SSRP sizes instead of the blurry Arial
+  default. **Experimental egui `native/` shell removed** — the workspace is
+  now just `core` + `src-tauri`; the WebView2-free migration continues but is
+  no longer carried as dead code. Root `Cargo.toml` fixed to be a proper
+  workspace manifest (CI `cargo test --workspace` was failing).
 - **Pre-1.0 fixes (v0.15.0):** **Luar redesigned** — fixed resolutions stay
   EXACTLY as chosen: the strip is carved from inside, the photo shrinks into
   the remaining area, the crop box re-locks to it automatically, and the

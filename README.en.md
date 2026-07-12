@@ -20,9 +20,8 @@ up-to-date Windows 10 ship it; **older laptops** may not — the installer
 downloads it automatically during setup (needs internet once). If that
 fails, install "WebView2 Runtime (Evergreen)" from Microsoft manually.
 
-**Good news:** we are **migrating to a different technology** — a native
-shell with no WebView2 at all — so older machines will be supported.
-The plan is public: [docs/NATIVE-MIGRATION.md](docs/NATIVE-MIGRATION.md).
+**Good news:** we are **migrating to a lighter technology** with no
+WebView2 at all — so older machines will be supported.
 
 ## ✨ Features
 

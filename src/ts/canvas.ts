@@ -498,7 +498,7 @@ function blockOrigin(
 
 function spanFont(span: ColorSpan, size: number): string {
   const weight = span.bold ? "900" : "bold";
-  return `${weight} ${size}px "${state.fontFamily}", Arial, sans-serif`;
+  return `${weight} ${size}px "${state.fontFamily}", Verdana, Tahoma, Arial, sans-serif`;
 }
 
 /* ── interactions ── */

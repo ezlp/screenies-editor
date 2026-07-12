@@ -24,9 +24,9 @@ const AUTO_DIVISOR = 30;
 
 /** Shown when Rust font enumeration is unavailable (browser dev mode). */
 const FALLBACK_FONTS = [
-  "Arial",
   "Verdana",
   "Tahoma",
+  "Arial",
   "Trebuchet MS",
   "Segoe UI",
   "Georgia",
@@ -164,9 +164,12 @@ async function populateFonts(): Promise<void> {
     fontSelect.appendChild(option);
   }
 
-  // Prefer the current choice, else Arial, else the first family.
+  // Prefer the current choice, else Verdana/Tahoma (crisp at small sizes),
+  // else Arial, else the first family.
   const preferred =
     families.find((f) => f === state.fontFamily) ??
+    families.find((f) => f.toLowerCase() === "verdana") ??
+    families.find((f) => f.toLowerCase() === "tahoma") ??
     families.find((f) => f.toLowerCase() === "arial") ??
     families[0];
   state.fontFamily = preferred;

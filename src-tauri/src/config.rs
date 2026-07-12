@@ -30,7 +30,7 @@ impl Default for AppSettings {
     fn default() -> Self {
         Self {
             theme: "dark".into(),
-            font_family: "Arial".into(),
+            font_family: "Verdana".into(),
             preset: preset::jgrp(),
             file_name_template: "screenie-{tanggal}-{jam}".into(),
             last_save_dir: String::new(),
@@ -79,7 +79,7 @@ mod tests {
     fn partial_or_old_settings_json_still_parses() {
         let s: AppSettings = serde_json::from_str(r#"{ "theme": "light" }"#).unwrap();
         assert_eq!(s.theme, "light");
-        assert_eq!(s.font_family, "Arial"); // defaulted
+        assert_eq!(s.font_family, "Verdana"); // defaulted
         assert!(s.preset.me_prefix); // defaulted
         assert_eq!(s.file_name_template, "screenie-{tanggal}-{jam}"); // defaulted to JGRP
     }
