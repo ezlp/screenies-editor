@@ -85,6 +85,11 @@ pub struct EditorState {
     blocks: Vec<ChatBlock>,
     selected_block: usize,
 
+    // Color palette: last non-empty text selection (block, start, end char),
+    // + the custom-picker color.
+    text_selection: Option<(usize, usize, usize)>,
+    custom_color: [u8; 3],
+
     // Text controls (shared across blocks).
     font_family: String,
     text_size: f32,
@@ -126,6 +131,8 @@ impl Default for EditorState {
             photo: None,
             blocks: vec![ChatBlock::new(0)],
             selected_block: 0,
+            text_selection: None,
+            custom_color: [255, 255, 255],
             font_family: "Verdana".into(),
             text_size: 27.0,
             line_gap: 122.0,
@@ -262,17 +269,26 @@ impl EditorState {
 
             let bi = self.selected_block.min(self.blocks.len() - 1);
             self.selected_block = bi;
-            if ui
-                .add(
-                    egui::TextEdit::multiline(&mut self.blocks[bi].text)
-                        .desired_rows(6)
-                        .desired_width(f32::INFINITY)
-                        .hint_text("[12:34:56] Budi_Santoso says: contoh chat"),
-                )
-                .changed()
-            {
+            let out = egui::TextEdit::multiline(&mut self.blocks[bi].text)
+                .desired_rows(6)
+                .desired_width(f32::INFINITY)
+                .hint_text("[12:34:56] Budi_Santoso says: contoh chat")
+                .show(ui);
+            if out.response.changed() {
                 self.dirty = true;
             }
+            // Remember the current selection so a swatch can wrap it, even
+            // after the click moves focus off the textarea.
+            if let Some(range) = out.cursor_range {
+                let a = range.primary.ccursor.index;
+                let b = range.secondary.ccursor.index;
+                let (s, e) = if a <= b { (a, b) } else { (b, a) };
+                if s != e {
+                    self.text_selection = Some((bi, s, e));
+                }
+            }
+
+            self.palette_ui(ui);
             self.combo_anchor(ui, bi);
             self.combo_bg(ui, bi);
             if self.blocks.len() > 1 && ui.button("🗑 Hapus chatlog ini").clicked() {
@@ -427,6 +443,56 @@ impl EditorState {
         if self.blocks[bi].bg_mode != prev {
             self.dirty = true;
         }
+    }
+
+    fn palette_ui(&mut self, ui: &mut egui::Ui) {
+        ui.collapsing("Palet warna", |ui| {
+            ui.small("Pilih teks di chatlog, klik warna untuk membungkus {RRGGBB}.");
+            ui.horizontal_wrapped(|ui| {
+                for &(name, hex) in PALETTE {
+                    let btn = egui::Button::new("   ").fill(hex_to_color32(hex));
+                    if ui.add(btn).on_hover_text(name).clicked() {
+                        self.apply_color(hex);
+                    }
+                }
+            });
+            ui.horizontal(|ui| {
+                ui.color_edit_button_srgb(&mut self.custom_color);
+                if ui.button("Terapkan kustom").clicked() {
+                    let hex = format!(
+                        "{:02X}{:02X}{:02X}",
+                        self.custom_color[0], self.custom_color[1], self.custom_color[2]
+                    );
+                    self.apply_color(&hex);
+                }
+            });
+            if self.text_selection.is_some() {
+                ui.small("✓ ada teks terpilih");
+            } else {
+                ui.small("(pilih teks di chatlog dulu)");
+            }
+        });
+    }
+
+    /// Wrap the remembered selection with `{RRGGBB}…{FFFFFF}` (char-indexed,
+    /// so multibyte text is safe).
+    fn apply_color(&mut self, hex: &str) {
+        let Some((bi, s, e)) = self.text_selection else {
+            return;
+        };
+        if bi >= self.blocks.len() {
+            return;
+        }
+        let chars: Vec<char> = self.blocks[bi].text.chars().collect();
+        if s >= e || e > chars.len() {
+            return;
+        }
+        let before: String = chars[..s].iter().collect();
+        let sel: String = chars[s..e].iter().collect();
+        let after: String = chars[e..].iter().collect();
+        self.blocks[bi].text = format!("{before}{{{hex}}}{sel}{{FFFFFF}}{after}");
+        self.text_selection = None;
+        self.dirty = true;
     }
 
     fn filter_slider(
@@ -952,6 +1018,25 @@ impl EditorState {
             Err(e) => self.error = Some(format!("Render gagal: {e}")),
         }
     }
+}
+
+/// Color swatches for the palette (name, RRGGBB).
+const PALETTE: &[(&str, &str)] = &[
+    ("Putih", "FFFFFF"),
+    ("Merah", "E74C3C"),
+    ("Hijau", "2ECC71"),
+    ("Biru", "3498DB"),
+    ("Kuning", "F1C40F"),
+    ("Oranye", "E67E22"),
+    ("Ungu", "9B59B6"),
+    ("Toska", "1ABC9C"),
+    ("Pink", "FF79C6"),
+    ("Abu", "95A5A6"),
+];
+
+fn hex_to_color32(hex: &str) -> egui::Color32 {
+    let v = u32::from_str_radix(hex, 16).unwrap_or(0xFF_FFFF);
+    egui::Color32::from_rgb((v >> 16) as u8, (v >> 8) as u8, v as u8)
 }
 
 /// Largest centered crop of the given ratio (None = whole photo), source px.
