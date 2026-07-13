@@ -18,10 +18,40 @@ use screenies_core::render::{
 };
 
 /// A loaded photo: base64 for the render pipeline + its pixel dimensions.
+#[derive(Clone)]
 struct Photo {
     base64: String,
     w: u32,
     h: u32,
+}
+
+/// One photo's full editable state (a "document"). Text controls (font, size,
+/// spacing) stay global; everything else is per-photo so tabs are independent.
+#[derive(Clone)]
+struct Doc {
+    photo: Option<Photo>,
+    blocks: Vec<ChatBlock>,
+    censors: Vec<CensorRegion>,
+    stickers: Vec<Sticker>,
+    crop: Option<CropRect>,
+    crop_ratio: Option<f32>,
+    output_override: Option<(u32, u32)>,
+    filters: FilterValues,
+}
+
+impl Default for Doc {
+    fn default() -> Self {
+        Self {
+            photo: None,
+            blocks: vec![ChatBlock::new(0)],
+            censors: Vec::new(),
+            stickers: Vec::new(),
+            crop: None,
+            crop_ratio: None,
+            output_override: None,
+            filters: identity_filters(),
+        }
+    }
 }
 
 /// A placed sticker: image data + output-space rect. `aspect` (w/h) keeps
@@ -80,6 +110,11 @@ pub struct EditorState {
     preset: ParsePreset,
     photo: Option<Photo>,
 
+    // Multiple photos as tabs. `docs[active]` is a stale mirror of the working
+    // fields below; they're synced on switch/add. Text controls stay global.
+    docs: Vec<Doc>,
+    active: usize,
+
     // Chatlog blocks (each: text + anchor + bg + position). One is selected
     // for editing at a time.
     blocks: Vec<ChatBlock>,
@@ -137,6 +172,8 @@ impl Default for EditorState {
         Self {
             preset: chatlog::preset::jgrp(),
             photo: None,
+            docs: vec![Doc::default()],
+            active: 0,
             blocks: vec![ChatBlock::new(0)],
             selected_block: 0,
             text_selection: None,
@@ -239,6 +276,24 @@ impl EditorState {
                     self.redo();
                 }
             });
+
+            // Photo tabs (multiple photos).
+            ui.horizontal_wrapped(|ui| {
+                for i in 0..self.docs.len() {
+                    if ui.selectable_label(self.active == i, format!("Foto {}", i + 1)).clicked() {
+                        self.switch_doc(i);
+                    }
+                }
+                if ui.button("➕").on_hover_text(self.t("Tambah foto")).clicked() {
+                    self.add_doc();
+                }
+                if self.docs.len() > 1
+                    && ui.button("✕").on_hover_text(self.t("Tutup foto ini")).clicked()
+                {
+                    self.close_doc(self.active);
+                }
+            });
+
             if ui.button(self.t("📂  Muat Foto")).clicked() {
                 self.pick_photo();
             }
@@ -825,6 +880,75 @@ impl EditorState {
         }
     }
 
+    fn capture_doc(&self) -> Doc {
+        Doc {
+            photo: self.photo.clone(),
+            blocks: self.blocks.clone(),
+            censors: self.censors.clone(),
+            stickers: self.stickers.clone(),
+            crop: self.crop,
+            crop_ratio: self.crop_ratio,
+            output_override: self.output_override,
+            filters: self.filters,
+        }
+    }
+
+    fn load_doc(&mut self, d: Doc) {
+        self.source_img = d.photo.as_ref().and_then(|p| decode_color_image(&p.base64));
+        self.source_tex = None;
+        self.photo = d.photo;
+        self.blocks = d.blocks;
+        self.censors = d.censors;
+        self.stickers = d.stickers;
+        self.crop = d.crop;
+        self.crop_ratio = d.crop_ratio;
+        self.output_override = d.output_override;
+        self.filters = d.filters;
+        self.selected_block = 0;
+        self.selected_censor = None;
+        self.selected_sticker = None;
+        self.crop_editing = false;
+        self.history.clear();
+        self.future.clear();
+        self.dirty = true;
+    }
+
+    fn switch_doc(&mut self, target: usize) {
+        if target == self.active || target >= self.docs.len() {
+            return;
+        }
+        self.docs[self.active] = self.capture_doc();
+        self.active = target;
+        let d = self.docs[target].clone();
+        self.load_doc(d);
+    }
+
+    fn add_doc(&mut self) {
+        self.docs[self.active] = self.capture_doc();
+        self.docs.push(Doc::default());
+        self.active = self.docs.len() - 1;
+        let d = self.docs[self.active].clone();
+        self.load_doc(d);
+    }
+
+    fn close_doc(&mut self, i: usize) {
+        if self.docs.len() <= 1 || i >= self.docs.len() {
+            return;
+        }
+        if i == self.active {
+            self.docs.remove(i);
+            self.active = self.active.min(self.docs.len() - 1);
+            let d = self.docs[self.active].clone();
+            self.load_doc(d);
+        } else {
+            self.docs[self.active] = self.capture_doc();
+            self.docs.remove(i);
+            if i < self.active {
+                self.active -= 1;
+            }
+        }
+    }
+
     /// Output-space dimensions (crop size if cropping, else the photo).
     fn output_dims(&self) -> (f32, f32) {
         if let Some(c) = self.crop {
@@ -1173,6 +1297,18 @@ fn clamp_crop(c: &mut CropRect, pw: u32, ph: u32, ratio: Option<f32>) {
     }
     c.x = c.x.clamp(0.0, (pw - c.w).max(0.0));
     c.y = c.y.clamp(0.0, (ph - c.h).max(0.0));
+}
+
+/// Decode a base64 image into an egui ColorImage (for the crop-edit view),
+/// used when switching photo tabs.
+fn decode_color_image(base64: &str) -> Option<egui::ColorImage> {
+    use base64::Engine;
+    let bytes = base64::engine::general_purpose::STANDARD.decode(base64).ok()?;
+    let img = image::load_from_memory(&bytes).ok()?.to_rgba8();
+    Some(egui::ColorImage::from_rgba_unmultiplied(
+        [img.width() as usize, img.height() as usize],
+        img.as_raw(),
+    ))
 }
 
 fn identity_filters() -> FilterValues {

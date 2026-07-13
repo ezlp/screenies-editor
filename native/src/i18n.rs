@@ -51,6 +51,8 @@ pub fn t(lang: Lang, id: &'static str) -> &'static str {
         "Chatlog:" => "Chatlog:",
         "Tambah chatlog" => "Add chatlog",
         "Chatlog dari folder" => "Chatlog from folder",
+        "Tambah foto" => "Add photo",
+        "Tutup foto ini" => "Close this photo",
         "🗑 Hapus chatlog ini" => "🗑 Delete this chatlog",
         // editor — text
         "Teks" => "Text",
