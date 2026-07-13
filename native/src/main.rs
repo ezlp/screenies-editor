@@ -9,12 +9,10 @@
 
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
-mod chatlog_parser;
 mod editor;
 mod gallery;
 mod i18n;
 
-use chatlog_parser::ChatlogParserState;
 use eframe::egui;
 use editor::EditorState;
 use gallery::GalleryState;
@@ -45,17 +43,17 @@ enum Screen {
     #[default]
     Menu,
     Editor,
-    ChatlogParser,
     Gallery,
+    Settings,
 }
 
 struct App {
     screen: Screen,
     editor: EditorState,
-    chatlog_parser: ChatlogParserState,
     gallery: GalleryState,
     dark: bool,
     lang: Lang,
+    ui_scale: f32,
 }
 
 impl Default for App {
@@ -63,10 +61,10 @@ impl Default for App {
         Self {
             screen: Screen::default(),
             editor: EditorState::default(),
-            chatlog_parser: ChatlogParserState::default(),
             gallery: GalleryState::default(),
             dark: true,
             lang: Lang::default(),
+            ui_scale: 1.0,
         }
     }
 }
@@ -81,6 +79,7 @@ struct Settings {
     text_size: f32,
     line_gap: f32,
     filters: FilterValues,
+    ui_scale: f32,
 }
 
 impl Default for Settings {
@@ -92,6 +91,7 @@ impl Default for Settings {
             text_size: 27.0,
             line_gap: 122.0,
             filters: default_filters(),
+            ui_scale: 1.0,
         }
     }
 }
@@ -115,6 +115,7 @@ impl App {
             if let Some(s) = eframe::get_value::<Settings>(storage, "settings") {
                 app.dark = s.dark;
                 app.lang = s.lang;
+                app.ui_scale = s.ui_scale.clamp(0.7, 1.6);
                 app.editor.set_font(s.font);
                 app.editor.apply_prefs(s.text_size, s.line_gap, s.filters);
             }
@@ -131,9 +132,11 @@ impl eframe::App for App {
             egui::Visuals::light()
         });
 
+        // "Resize the editing space" — scale the whole UI (persisted).
+        ctx.set_zoom_factor(self.ui_scale);
+
         // Propagate the current language to each screen before it draws.
         self.editor.lang = self.lang;
-        self.chatlog_parser.lang = self.lang;
         self.gallery.lang = self.lang;
 
         if self.screen != Screen::Menu {
@@ -159,8 +162,8 @@ impl eframe::App for App {
         egui::CentralPanel::default().show(ctx, |ui| match self.screen {
             Screen::Menu => self.menu(ui),
             Screen::Editor => self.editor.ui(ui),
-            Screen::ChatlogParser => self.chatlog_parser.ui(ui),
             Screen::Gallery => self.gallery.ui(ui),
+            Screen::Settings => self.settings_screen(ui),
         });
 
         // Gallery → "Buka di editor": load the photo and jump to the editor.
@@ -188,6 +191,7 @@ impl eframe::App for App {
             text_size,
             line_gap,
             filters,
+            ui_scale: self.ui_scale,
         };
         eframe::set_value(storage, "settings", &s);
     }
@@ -205,11 +209,11 @@ impl App {
             if menu_tile(ui, "🖼  SSRP Editor", t(lang, "Crop · chatlog · filter · export")) {
                 self.screen = Screen::Editor;
             }
-            if menu_tile(ui, "🔍  Chatlog Parser", t(lang, "Buka folder chatlog · cari di aplikasi")) {
-                self.screen = Screen::ChatlogParser;
-            }
-            if menu_tile(ui, "🗂  Gallery", t(lang, "Jelajahi foto SSRP hasil edit")) {
+            if menu_tile(ui, "🗂  Gallery (WIP)", t(lang, "Jelajahi foto SSRP hasil edit")) {
                 self.screen = Screen::Gallery;
+            }
+            if menu_tile(ui, "⚙  Settings", t(lang, "Bahasa · tema · ukuran ruang edit")) {
+                self.screen = Screen::Settings;
             }
 
             ui.add_space(16.0);
@@ -225,6 +229,26 @@ impl App {
 
             ui.add_space(16.0);
             ui.small(format!("v{} · native (egui) · preview", env!("CARGO_PKG_VERSION")));
+        });
+    }
+
+    fn settings_screen(&mut self, ui: &mut egui::Ui) {
+        let lang = self.lang;
+        ui.add_space(12.0);
+        ui.heading(t(lang, "Pengaturan"));
+        ui.add_space(12.0);
+        ui.label(t(lang, "Ukuran ruang edit"));
+        ui.add(egui::Slider::new(&mut self.ui_scale, 0.7..=1.6).text("×"));
+        ui.small(t(lang, "Perbesar/perkecil seluruh tampilan aplikasi."));
+        ui.add_space(16.0);
+        ui.horizontal(|ui| {
+            let theme = if self.dark { "☀  Mode terang" } else { "🌙  Mode gelap" };
+            if ui.button(t(lang, theme)).clicked() {
+                self.dark = !self.dark;
+            }
+            if ui.button(lang_label(lang)).on_hover_text("ID / EN").clicked() {
+                self.lang = self.lang.toggled();
+            }
         });
     }
 }
@@ -249,8 +273,8 @@ fn title_of(s: Screen) -> &'static str {
     match s {
         Screen::Menu => "ScreeniesEditor",
         Screen::Editor => "SSRP Editor",
-        Screen::ChatlogParser => "Chatlog Parser",
         Screen::Gallery => "Gallery",
+        Screen::Settings => "Settings",
     }
 }
 

@@ -29,6 +29,11 @@ pub fn t(lang: Lang, id: &'static str) -> &'static str {
         "Crop · chatlog · filter · export" => "Crop · chatlog · filters · export",
         "Buka folder chatlog · cari di aplikasi" => "Open a chatlog folder · search in-app",
         "Jelajahi foto SSRP hasil edit" => "Browse your edited SSRP photos",
+        "Bahasa · tema · ukuran ruang edit" => "Language · theme · editing space size",
+        // settings screen
+        "Pengaturan" => "Settings",
+        "Ukuran ruang edit" => "Editing space size",
+        "Perbesar/perkecil seluruh tampilan aplikasi." => "Scale the whole app UI up or down.",
         "☀  Mode terang" => "☀  Light mode",
         "🌙  Mode gelap" => "🌙  Dark mode",
         "Ganti tema" => "Toggle theme",
