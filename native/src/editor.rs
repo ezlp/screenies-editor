@@ -13,13 +13,26 @@ use screenies_core::chatlog::{self, preset::ParsePreset};
 use screenies_core::render::compose;
 use screenies_core::render::layout::{self, Anchor, BgMode, LayoutBlock, LayoutParams};
 use screenies_core::render::text::GlyphMeasure;
-use screenies_core::render::{CensorKind, CensorRegion, CropRect, FilterValues, RenderJob, Size};
+use screenies_core::render::{
+    CensorKind, CensorRegion, CropRect, FilterValues, RenderJob, Size, StickerJob,
+};
 
 /// A loaded photo: base64 for the render pipeline + its pixel dimensions.
 struct Photo {
     base64: String,
     w: u32,
     h: u32,
+}
+
+/// A placed sticker: image data + output-space rect. `aspect` (w/h) keeps
+/// resize proportional. The pixels are composited by core into the preview.
+struct Sticker {
+    base64: String,
+    x: f32,
+    y: f32,
+    w: f32,
+    h: f32,
+    aspect: f32,
 }
 
 pub struct EditorState {
@@ -45,6 +58,10 @@ pub struct EditorState {
     // Local censor boxes (blur/pixelate a region), placed + resized on the preview.
     censors: Vec<CensorRegion>,
     selected_censor: Option<usize>,
+
+    // Sticker overlays (PNG/WebP), placed + resized on the preview.
+    stickers: Vec<Sticker>,
+    selected_sticker: Option<usize>,
 
     // Crop / output. crop = None → whole photo. crop_ratio locks the aspect.
     crop: Option<CropRect>,
@@ -77,6 +94,8 @@ impl Default for EditorState {
             filters: identity_filters(),
             censors: Vec::new(),
             selected_censor: None,
+            stickers: Vec::new(),
+            selected_sticker: None,
             crop: None,
             crop_ratio: None,
             crop_editing: false,
@@ -249,6 +268,30 @@ impl EditorState {
                 ui.small(format!("{} area sensor", self.censors.len()));
             });
 
+            ui.collapsing("Stiker", |ui| {
+                if ui.button("+ Tambah stiker").clicked() {
+                    self.add_sticker();
+                }
+                ui.small("Klik stiker di preview untuk pilih · seret untuk geser · pojok untuk resize.");
+                if let Some(i) = self.selected_sticker {
+                    if i < self.stickers.len() {
+                        let (out_w, _) = self.output_dims();
+                        let mut w = self.stickers[i].w;
+                        if ui.add(egui::Slider::new(&mut w, 16.0..=out_w).text("Lebar (px)")).changed() {
+                            self.stickers[i].w = w;
+                            self.stickers[i].h = w / self.stickers[i].aspect;
+                            self.dirty = true;
+                        }
+                        if ui.button("🗑 Hapus stiker").clicked() {
+                            self.stickers.remove(i);
+                            self.selected_sticker = None;
+                            self.dirty = true;
+                        }
+                    }
+                }
+                ui.small(format!("{} stiker", self.stickers.len()));
+            });
+
             ui.separator();
             if ui.button("💾  Export PNG").clicked() {
                 self.export();
@@ -390,6 +433,46 @@ impl EditorState {
                 }
             }
         }
+
+        // Stickers: the image is composited by core into the texture; here we
+        // only outline the selected one + take move/resize (aspect-locked).
+        for i in 0..self.stickers.len() {
+            let (sx, sy, sw, sh) = {
+                let s = &self.stickers[i];
+                (s.x, s.y, s.w, s.h)
+            };
+            let min = egui::pos2(origin.x + sx * scale, origin.y + sy * scale);
+            let rect = egui::Rect::from_min_size(min, egui::vec2(sw * scale, sh * scale));
+            let selected = self.selected_sticker == Some(i);
+
+            let body = ui.interact(rect, egui::Id::new(("sticker", i)), egui::Sense::click_and_drag());
+            if body.clicked() {
+                self.selected_sticker = Some(i);
+                self.selected_censor = None;
+            }
+            if body.dragged() {
+                let d = body.drag_delta() / scale;
+                self.stickers[i].x += d.x;
+                self.stickers[i].y += d.y;
+                self.selected_sticker = Some(i);
+                self.dirty = true;
+            }
+
+            if selected {
+                let color = egui::Color32::from_rgb(255, 200, 120);
+                painter.rect_stroke(rect, 0.0, egui::Stroke::new(2.0, color));
+                let hrect = egui::Rect::from_min_size(rect.max - egui::vec2(HANDLE, HANDLE), egui::vec2(HANDLE, HANDLE));
+                painter.rect_filled(hrect, 0.0, color);
+                let hr = ui.interact(hrect, egui::Id::new(("sticker-resize", i)), egui::Sense::drag());
+                if hr.dragged() {
+                    let d = hr.drag_delta() / scale;
+                    let neww = (self.stickers[i].w + d.x).max(16.0);
+                    self.stickers[i].w = neww;
+                    self.stickers[i].h = neww / self.stickers[i].aspect;
+                    self.dirty = true;
+                }
+            }
+        }
     }
 
     /// Crop-edit view: the SOURCE photo with a draggable/resizable crop box
@@ -504,12 +587,59 @@ impl EditorState {
         }
     }
 
-    /// Add a censor box centered on the photo (sized relative to it).
-    fn add_censor(&mut self, kind: CensorKind) {
-        let (ow, oh) = match &self.photo {
-            Some(p) => (p.w as f32, p.h as f32),
-            None => (400.0, 300.0),
+    /// Output-space dimensions (crop size if cropping, else the photo).
+    fn output_dims(&self) -> (f32, f32) {
+        if let Some(c) = self.crop {
+            (c.w as f32, c.h as f32)
+        } else if let Some(p) = &self.photo {
+            (p.w as f32, p.h as f32)
+        } else {
+            (400.0, 300.0)
+        }
+    }
+
+    /// Add a sticker (PNG/WebP/…) centered, sized to ~30% of the output width.
+    fn add_sticker(&mut self) {
+        let Some(path) = rfd::FileDialog::new()
+            .add_filter("Gambar", &["png", "webp", "jpg", "jpeg", "bmp"])
+            .pick_file()
+        else {
+            return;
         };
+        let bytes = match std::fs::read(&path) {
+            Ok(b) => b,
+            Err(e) => {
+                self.error = Some(format!("Gagal baca stiker: {e}"));
+                return;
+            }
+        };
+        let (ow_px, oh_px) = match image::load_from_memory(&bytes) {
+            Ok(img) => (img.width().max(1), img.height().max(1)),
+            Err(e) => {
+                self.error = Some(format!("Gagal decode stiker: {e}"));
+                return;
+            }
+        };
+        let aspect = ow_px as f32 / oh_px as f32;
+        let (out_w, out_h) = self.output_dims();
+        let w = (out_w * 0.30).clamp(48.0, out_w);
+        let h = w / aspect;
+        self.stickers.push(Sticker {
+            base64: base64::engine::general_purpose::STANDARD.encode(&bytes),
+            x: (out_w - w) / 2.0,
+            y: (out_h - h) / 2.0,
+            w,
+            h,
+            aspect,
+        });
+        self.selected_sticker = Some(self.stickers.len() - 1);
+        self.error = None;
+        self.dirty = true;
+    }
+
+    /// Add a censor box centered on the output (sized relative to it).
+    fn add_censor(&mut self, kind: CensorKind) {
+        let (ow, oh) = self.output_dims();
         let w = (ow * 0.28).max(40.0);
         let h = (oh * 0.14).max(24.0);
         self.censors.push(CensorRegion {
@@ -596,11 +726,23 @@ impl EditorState {
             Vec::new()
         };
 
+        let stickers = self
+            .stickers
+            .iter()
+            .map(|s| StickerJob {
+                data_base64: s.base64.clone(),
+                x: s.x.round() as i64,
+                y: s.y.round() as i64,
+                w: (s.w.round() as u32).max(1),
+                h: (s.h.round() as u32).max(1),
+            })
+            .collect();
+
         Some(RenderJob {
             image_base64: photo.base64.clone(),
             crop,
             output,
-            stickers: Vec::new(),
+            stickers,
             filters: self.filters,
             censors: self.censors.clone(),
             font_family: self.font_family.clone(),
