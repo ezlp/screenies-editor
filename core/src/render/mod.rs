@@ -25,12 +25,38 @@ pub struct RenderJob {
     pub output: Size,
     pub stickers: Vec<StickerJob>,
     pub filters: FilterValues,
+    /// Local censor boxes (blur/pixelate a rectangle) — applied to the photo,
+    /// under stickers and text. Empty in old payloads via serde(default).
+    #[serde(default)]
+    pub censors: Vec<CensorRegion>,
     pub font_family: String,
     /// Text size in output px.
     pub text_size: f32,
     /// Outline thickness in output px (same formula as the preview).
     pub stroke_width: f32,
     pub blocks: Vec<ExportBlock>,
+}
+
+/// Which effect a censor box applies.
+#[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum CensorKind {
+    Blur,
+    Pixelate,
+}
+
+/// A rectangular blur/pixelate region in output px — like a sticker, but it
+/// censors the photo underneath instead of drawing an image.
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CensorRegion {
+    pub x: f32,
+    pub y: f32,
+    pub w: f32,
+    pub h: f32,
+    pub kind: CensorKind,
+    /// Blur radius (px) or pixelate block size (px), per `kind`.
+    pub strength: f32,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize)]

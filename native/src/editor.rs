@@ -13,7 +13,7 @@ use screenies_core::chatlog::{self, preset::ParsePreset};
 use screenies_core::render::compose;
 use screenies_core::render::layout::{self, Anchor, BgMode, LayoutBlock, LayoutParams};
 use screenies_core::render::text::GlyphMeasure;
-use screenies_core::render::{CropRect, FilterValues, RenderJob, Size};
+use screenies_core::render::{CensorKind, CensorRegion, CropRect, FilterValues, RenderJob, Size};
 
 /// A loaded photo: base64 for the render pipeline + its pixel dimensions.
 struct Photo {
@@ -42,6 +42,10 @@ pub struct EditorState {
 
     filters: FilterValues,
 
+    // Local censor boxes (blur/pixelate a region), placed + resized on the preview.
+    censors: Vec<CensorRegion>,
+    selected_censor: Option<usize>,
+
     // Live preview: re-rendered only when `dirty`.
     dirty: bool,
     texture: Option<egui::TextureHandle>,
@@ -64,6 +68,8 @@ impl Default for EditorState {
             block_x: 40.0,
             block_y: 40.0,
             filters: identity_filters(),
+            censors: Vec::new(),
+            selected_censor: None,
             dirty: false,
             texture: None,
             error: None,
@@ -158,9 +164,42 @@ impl EditorState {
             });
 
             ui.collapsing("Efek (2.0)", |ui| {
-                // Neighborhood effects — new in 2.0 (core render::filters).
+                // Global neighborhood effects — new in 2.0 (core render::filters).
                 self.filter_slider(ui, "Blur (px)", 0.0..=20.0, |f| &mut f.blur);
                 self.filter_slider(ui, "Pixelate (blok px)", 0.0..=64.0, |f| &mut f.pixelate);
+            });
+
+            ui.collapsing("Sensor area (blur/pixelate lokal)", |ui| {
+                ui.horizontal(|ui| {
+                    if ui.button("+ Blur").clicked() {
+                        self.add_censor(CensorKind::Blur);
+                    }
+                    if ui.button("+ Pixelate").clicked() {
+                        self.add_censor(CensorKind::Pixelate);
+                    }
+                });
+                ui.small("Klik kotak di preview untuk pilih · seret badan untuk geser · seret pojok untuk resize.");
+
+                if let Some(i) = self.selected_censor {
+                    if i < self.censors.len() {
+                        let kind = self.censors[i].kind;
+                        let label = match kind {
+                            CensorKind::Blur => "Blur radius (px)",
+                            CensorKind::Pixelate => "Blok (px)",
+                        };
+                        let mut strength = self.censors[i].strength;
+                        if ui.add(egui::Slider::new(&mut strength, 1.0..=64.0).text(label)).changed() {
+                            self.censors[i].strength = strength;
+                            self.dirty = true;
+                        }
+                        if ui.button("🗑 Hapus area").clicked() {
+                            self.censors.remove(i);
+                            self.selected_censor = None;
+                            self.dirty = true;
+                        }
+                    }
+                }
+                ui.small(format!("{} area sensor", self.censors.len()));
             });
 
             ui.separator();
@@ -224,19 +263,76 @@ impl EditorState {
     }
 
     fn preview(&mut self, ui: &mut egui::Ui) {
-        match &self.texture {
-            Some(tex) => {
-                let avail = ui.available_size();
-                let img = tex.size_vec2();
-                let scale = (avail.x / img.x).min(avail.y / img.y).min(1.0);
-                ui.centered_and_justified(|ui| {
-                    ui.image(egui::load::SizedTexture::new(tex.id(), img * scale));
-                });
+        let Some(tex) = self.texture.as_ref() else {
+            ui.centered_and_justified(|ui| {
+                ui.label("Muat foto untuk mulai mengedit.");
+            });
+            return;
+        };
+        let tex_id = tex.id();
+        let img_px = tex.size_vec2(); // output-space size
+        let avail = ui.available_size();
+        let scale = (avail.x / img_px.x).min(avail.y / img_px.y).min(1.0);
+        let disp = img_px * scale;
+
+        // Reserve the area, then draw the rendered image centered in it.
+        let (area, _) = ui.allocate_exact_size(avail, egui::Sense::hover());
+        let origin = area.min + (avail - disp) * 0.5; // image top-left, screen px
+        let img_rect = egui::Rect::from_min_size(origin, disp);
+        let painter = ui.painter_at(area);
+        let uv = egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0));
+        painter.image(tex_id, img_rect, uv, egui::Color32::WHITE);
+
+        // Censor boxes: output coords → screen via (origin + coord*scale).
+        // The blur/pixelate itself is already baked into the image by core;
+        // here we only draw the editable outline + handle and take the input.
+        const HANDLE: f32 = 12.0;
+        for i in 0..self.censors.len() {
+            let c = self.censors[i];
+            let min = egui::pos2(origin.x + c.x * scale, origin.y + c.y * scale);
+            let rect = egui::Rect::from_min_size(min, egui::vec2(c.w * scale, c.h * scale));
+            let selected = self.selected_censor == Some(i);
+
+            let body = ui.interact(rect, egui::Id::new(("censor", i)), egui::Sense::click_and_drag());
+            if body.clicked() {
+                self.selected_censor = Some(i);
             }
-            None => {
-                ui.centered_and_justified(|ui| {
-                    ui.label("Muat foto untuk mulai mengedit.");
-                });
+            if body.dragged() {
+                let d = body.drag_delta() / scale;
+                self.censors[i].x += d.x;
+                self.censors[i].y += d.y;
+                self.selected_censor = Some(i);
+                self.dirty = true;
+            }
+
+            let color = if selected {
+                egui::Color32::from_rgb(120, 200, 255)
+            } else {
+                egui::Color32::from_rgb(210, 210, 210)
+            };
+            painter.rect_stroke(rect, 0.0, egui::Stroke::new(if selected { 2.0 } else { 1.0 }, color));
+            let tag = match c.kind {
+                CensorKind::Blur => "blur",
+                CensorKind::Pixelate => "pixel",
+            };
+            painter.text(
+                rect.min + egui::vec2(3.0, 2.0),
+                egui::Align2::LEFT_TOP,
+                tag,
+                egui::FontId::monospace(11.0),
+                color,
+            );
+
+            if selected {
+                let hrect = egui::Rect::from_min_size(rect.max - egui::vec2(HANDLE, HANDLE), egui::vec2(HANDLE, HANDLE));
+                painter.rect_filled(hrect, 0.0, color);
+                let hr = ui.interact(hrect, egui::Id::new(("censor-resize", i)), egui::Sense::drag());
+                if hr.dragged() {
+                    let d = hr.drag_delta() / scale;
+                    self.censors[i].w = (self.censors[i].w + d.x).max(8.0);
+                    self.censors[i].h = (self.censors[i].h + d.y).max(8.0);
+                    self.dirty = true;
+                }
             }
         }
     }
@@ -262,6 +358,29 @@ impl EditorState {
                 Err(e) => self.error = Some(format!("Gagal baca file: {e}")),
             }
         }
+    }
+
+    /// Add a censor box centered on the photo (sized relative to it).
+    fn add_censor(&mut self, kind: CensorKind) {
+        let (ow, oh) = match &self.photo {
+            Some(p) => (p.w as f32, p.h as f32),
+            None => (400.0, 300.0),
+        };
+        let w = (ow * 0.28).max(40.0);
+        let h = (oh * 0.14).max(24.0);
+        self.censors.push(CensorRegion {
+            x: (ow - w) / 2.0,
+            y: (oh - h) / 2.0,
+            w,
+            h,
+            kind,
+            strength: match kind {
+                CensorKind::Blur => 10.0,
+                CensorKind::Pixelate => 14.0,
+            },
+        });
+        self.selected_censor = Some(self.censors.len() - 1);
+        self.dirty = true;
     }
 
     /// Auto outline thickness — matches the 1.x rule (size/9, floored).
@@ -312,6 +431,7 @@ impl EditorState {
             output,
             stickers: Vec::new(),
             filters: self.filters,
+            censors: self.censors.clone(),
             font_family: self.font_family.clone(),
             text_size: self.text_size,
             stroke_width: self.effective_stroke(),

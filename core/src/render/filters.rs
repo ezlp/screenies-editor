@@ -2,8 +2,46 @@
 //! implemented per the CSS Filter Effects spec so the export matches the
 //! live preview on every platform (independent of any webview).
 
-use super::FilterValues;
+use super::{CensorKind, CensorRegion, FilterValues};
 use image::RgbaImage;
+
+/// Apply each censor box to the image: copy the rectangle out, run the same
+/// blur/pixelate pass on it, and write it back. Rectangles are clamped to the
+/// image; degenerate/off-image boxes are skipped.
+pub fn apply_censors(img: &mut RgbaImage, regions: &[CensorRegion]) {
+    let (iw, ih) = img.dimensions();
+    for r in regions {
+        let x0 = r.x.max(0.0).min(iw as f32) as u32;
+        let y0 = r.y.max(0.0).min(ih as f32) as u32;
+        let x1 = (r.x + r.w).max(0.0).min(iw as f32) as u32;
+        let y1 = (r.y + r.h).max(0.0).min(ih as f32) as u32;
+        if x1 <= x0 || y1 <= y0 {
+            continue;
+        }
+        let (rw, rh) = (x1 - x0, y1 - y0);
+
+        // Extract the region into its own buffer.
+        let mut sub = RgbaImage::new(rw, rh);
+        for yy in 0..rh {
+            for xx in 0..rw {
+                sub.put_pixel(xx, yy, *img.get_pixel(x0 + xx, y0 + yy));
+            }
+        }
+
+        match r.kind {
+            CensorKind::Blur if r.strength >= 1.0 => box_blur(&mut sub, r.strength.round() as u32),
+            CensorKind::Pixelate if r.strength >= 2.0 => pixelate(&mut sub, r.strength.round() as u32),
+            _ => continue, // strength too low to have an effect
+        }
+
+        // Write the censored region back.
+        for yy in 0..rh {
+            for xx in 0..rw {
+                img.put_pixel(x0 + xx, y0 + yy, *sub.get_pixel(xx, yy));
+            }
+        }
+    }
+}
 
 pub fn apply(img: &mut RgbaImage, f: &FilterValues) {
     let b = f.brightness / 100.0;
@@ -234,6 +272,34 @@ mod tests {
         // Center is pulled down from 255; a neighbor is pulled up from 0.
         assert!(img.get_pixel(2, 2).0[0] < 255);
         assert!(img.get_pixel(2, 1).0[0] > 0);
+    }
+
+    #[test]
+    fn censor_region_only_touches_its_rectangle() {
+        // 6×2 image: left half black (cols 0–2), right half white (cols 3–5).
+        let mut img = RgbaImage::new(6, 2);
+        for y in 0..2 {
+            for x in 0..6 {
+                let v = if x < 3 { 0 } else { 255 };
+                img.put_pixel(x, y, Rgba([v, v, v, 255]));
+            }
+        }
+        // Pixelate a 2×2 box over cols 2–3 (straddles the black/white edge).
+        let region = CensorRegion {
+            x: 2.0,
+            y: 0.0,
+            w: 2.0,
+            h: 2.0,
+            kind: CensorKind::Pixelate,
+            strength: 2.0,
+        };
+        apply_censors(&mut img, &[region]);
+        // Inside the box: cols 2 (black) + 3 (white) average to mid-gray.
+        let inside = img.get_pixel(2, 0).0[0];
+        assert!(inside > 100 && inside < 160, "region should be averaged, got {inside}");
+        // Outside the box: untouched.
+        assert_eq!(img.get_pixel(0, 0).0[0], 0);
+        assert_eq!(img.get_pixel(5, 0).0[0], 255);
     }
 
     #[test]
