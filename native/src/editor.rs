@@ -721,6 +721,17 @@ impl EditorState {
         }
     }
 
+    /// Persisted settings accessors.
+    pub fn font(&self) -> &str {
+        &self.font_family
+    }
+    pub fn set_font(&mut self, f: String) {
+        if !f.is_empty() {
+            self.font_family = f;
+            self.dirty = true;
+        }
+    }
+
     /// Load a photo from a path (used by the file picker and the Gallery's
     /// "open in editor"). Resets the crop to the whole photo.
     pub fn load_photo_path(&mut self, path: &std::path::Path) {

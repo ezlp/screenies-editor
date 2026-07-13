@@ -28,7 +28,7 @@ fn main() -> eframe::Result {
     eframe::run_native(
         "ScreeniesEditor",
         options,
-        Box::new(|_cc| Ok(Box::<App>::default())),
+        Box::new(|cc| Ok(Box::new(App::new(cc)))),
     )
 }
 
@@ -58,6 +58,33 @@ impl Default for App {
             gallery: GalleryState::default(),
             dark: true,
         }
+    }
+}
+
+/// Persisted between launches via eframe storage.
+#[derive(serde::Serialize, serde::Deserialize)]
+#[serde(default)]
+struct Settings {
+    dark: bool,
+    font: String,
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        Self { dark: true, font: "Verdana".into() }
+    }
+}
+
+impl App {
+    fn new(cc: &eframe::CreationContext<'_>) -> Self {
+        let mut app = App::default();
+        if let Some(storage) = cc.storage {
+            if let Some(s) = eframe::get_value::<Settings>(storage, "settings") {
+                app.dark = s.dark;
+                app.editor.set_font(s.font);
+            }
+        }
+        app
     }
 }
 
@@ -107,6 +134,11 @@ impl eframe::App for App {
                 self.screen = Screen::Editor;
             }
         }
+    }
+
+    fn save(&mut self, storage: &mut dyn eframe::Storage) {
+        let s = Settings { dark: self.dark, font: self.editor.font().to_string() };
+        eframe::set_value(storage, "settings", &s);
     }
 }
 

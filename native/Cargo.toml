@@ -42,7 +42,8 @@ assets = [
 
 [dependencies]
 screenies-core = { path = "../core" }
-eframe = "0.29"       # brings egui (used via eframe::egui — no separate dep)
+eframe = { version = "0.29", features = ["persistence"] } # brings egui; persistence = settings storage
 rfd = "0.15"          # native file dialogs (open photo, open chatlog folder)
 image = "0.25"
 base64 = "0.22"
+serde = { version = "1", features = ["derive"] } # persisted settings
