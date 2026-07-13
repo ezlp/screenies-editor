@@ -28,8 +28,11 @@ assets = [["target/release/screenies-native", "usr/bin/", "755"]]
 # ── Linux packaging (cargo-generate-rpm) ──
 # auto-req disabled for the alpha (avoids cross-distro dep-name mismatch);
 # Fedora testers install GTK3/Mesa themselves. Re-enable when we ship for real.
+# RPM versions can't contain '-', so map the crate's "-alpha.0" to RPM's "~"
+# pre-release separator ("2.0.0~alpha.0" sorts before "2.0.0", as intended).
 [package.metadata.generate-rpm]
 auto-req = "disabled"
+version = "2.0.0~alpha.0"
 assets = [
     { source = "target/release/screenies-native", dest = "/usr/bin/screenies-native", mode = "755" },
 ]
