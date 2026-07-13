@@ -329,8 +329,9 @@ impl EditorState {
             if ui.add_enabled(self.photo.is_some(), egui::Button::new(crop_btn)).clicked() {
                 self.toggle_crop_edit();
             }
-            if let Some(c) = &self.crop {
-                ui.small(format!("Output: {}×{}", c.w.round() as u32, c.h.round() as u32));
+            if self.crop.is_some() || self.output_override.is_some() {
+                let (ow, oh) = self.output_dims();
+                ui.small(format!("Output: {}×{}", ow.round() as u32, oh.round() as u32));
             }
 
             ui.separator();
@@ -949,9 +950,14 @@ impl EditorState {
         }
     }
 
-    /// Output-space dimensions (crop size if cropping, else the photo).
+    /// Output-space dimensions — the coordinate space stickers, censor boxes and
+    /// text all live in, and the size the render actually produces. A fixed
+    /// resolution override (e.g. 800×600) wins; otherwise it's the crop size,
+    /// else the whole photo.
     fn output_dims(&self) -> (f32, f32) {
-        if let Some(c) = self.crop {
+        if let Some((w, h)) = self.output_override {
+            (w as f32, h as f32)
+        } else if let Some(c) = self.crop {
             (c.w as f32, c.h as f32)
         } else if let Some(p) = &self.photo {
             (p.w as f32, p.h as f32)
@@ -1031,15 +1037,18 @@ impl EditorState {
         }
     }
 
-    /// Fixed output resolution (e.g. 800×600) — crops to that aspect and scales
-    /// the result to exactly w×h.
+    /// Fixed output resolution (e.g. 800×600): use the WHOLE photo and scale it
+    /// to exactly w×h. Unlike the aspect-ratio presets this does NOT crop — a
+    /// 1920×1080 shot becomes a full-frame 800×600, so it's no longer just a
+    /// duplicate of the 4:3 crop. The frame is stretched to fit, so a 16:9
+    /// source is squished into 4:3; click "Edit crop" to reframe if you want to
+    /// keep proportions.
     fn set_resolution(&mut self, w: u32, h: u32) {
         if let Some(p) = &self.photo {
-            let ratio = w as f32 / h as f32;
-            self.crop_ratio = Some(ratio);
-            self.crop = Some(centered_crop(p.w, p.h, Some(ratio)));
+            self.crop_ratio = None;
+            self.crop = Some(centered_crop(p.w, p.h, None)); // whole photo
             self.output_override = Some((w, h));
-            self.crop_editing = true;
+            self.crop_editing = false;
             self.dirty = true;
         }
     }
