@@ -1,11 +1,10 @@
-# build.yml — runs on every push & PR.
-# 2.0 is a native Rust (egui) app, so this check is Rust-only: it builds and
-# tests `core` (the engine — parser, render incl. blur/pixelate + layout,
-# chatlog_library, gallery). No TypeScript/Node here.
-#
-# native/ (the 2.0 egui shell) is excluded from the default workspace and needs
-# GUI system-deps, so it isn't built here — it's compiled + packaged by
-# native-preview.yml (which also serves as its build verification).
+# build.yml — runs on every push & PR. Two fast checks:
+#   • core   — build + unit-test the engine (parser, render incl. blur/pixelate
+#              + layout, chatlog_library, gallery). No TypeScript/Node.
+#   • native — `cargo check` the egui shell so a compile error surfaces on
+#              every push (no tag / release build needed). This is the quick
+#              "does it build?" signal; native-preview.yml does the full
+#              release build + packaging on tags.
 
 name: Build Check
 
@@ -31,3 +30,29 @@ jobs:
 
       - name: Test the engine (core)
         run: cargo test -p screenies-core
+
+  native-check:
+    name: Native compile check (egui)
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: GUI system deps (egui + rfd/GTK)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgtk-3-dev libxkbcommon-dev libwayland-dev \
+            libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: native
+
+      - name: cargo check (native egui shell)
+        working-directory: native
+        run: cargo check
