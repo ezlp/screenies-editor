@@ -90,6 +90,9 @@ pub struct EditorState {
     text_selection: Option<(usize, usize, usize)>,
     custom_color: [u8; 3],
 
+    /// UI language, set by the App each frame.
+    pub lang: crate::i18n::Lang,
+
     // Text controls (shared across blocks).
     font_family: String,
     text_size: f32,
@@ -133,6 +136,7 @@ impl Default for EditorState {
             selected_block: 0,
             text_selection: None,
             custom_color: [255, 255, 255],
+            lang: crate::i18n::Lang::default(),
             font_family: "Verdana".into(),
             text_size: 27.0,
             line_gap: 122.0,
@@ -158,6 +162,10 @@ impl Default for EditorState {
 }
 
 impl EditorState {
+    fn t(&self, s: &'static str) -> &'static str {
+        crate::i18n::t(self.lang, s)
+    }
+
     pub fn ui(&mut self, ui: &mut egui::Ui) {
         // Keyboard undo/redo — skipped while a text field is focused so the
         // textarea's own editing keys win.
@@ -213,19 +221,19 @@ impl EditorState {
                     self.redo();
                 }
             });
-            if ui.button("📂  Muat Foto").clicked() {
+            if ui.button(self.t("📂  Muat Foto")).clicked() {
                 self.pick_photo();
             }
             if let Some(p) = &self.photo {
                 ui.small(format!("{}×{} px", p.w, p.h));
             } else {
-                ui.small("Belum ada foto.");
+                ui.small(self.t("Belum ada foto."));
             }
 
             ui.separator();
-            ui.label("Crop / Resolusi");
+            ui.label(self.t("Crop / Resolusi"));
             ui.horizontal_wrapped(|ui| {
-                if ui.button("Bebas").clicked() {
+                if ui.button(self.t("Bebas")).clicked() {
                     self.set_ratio(None);
                 }
                 if ui.button("1:1").clicked() {
@@ -241,7 +249,7 @@ impl EditorState {
                     self.set_ratio(Some(21.0 / 9.0));
                 }
             });
-            let crop_btn = if self.crop_editing { "✓ Selesai crop" } else { "✏ Edit crop" };
+            let crop_btn = self.t(if self.crop_editing { "✓ Selesai crop" } else { "✏ Edit crop" });
             if ui.add_enabled(self.photo.is_some(), egui::Button::new(crop_btn)).clicked() {
                 self.toggle_crop_edit();
             }
@@ -260,7 +268,7 @@ impl EditorState {
                         self.selected_block = i;
                     }
                 }
-                if ui.button("➕").on_hover_text("Tambah chatlog").clicked() {
+                if ui.button("➕").on_hover_text(self.t("Tambah chatlog")).clicked() {
                     self.blocks.push(ChatBlock::new(self.blocks.len()));
                     self.selected_block = self.blocks.len() - 1;
                     self.dirty = true;
@@ -291,45 +299,51 @@ impl EditorState {
             self.palette_ui(ui);
             self.combo_anchor(ui, bi);
             self.combo_bg(ui, bi);
-            if self.blocks.len() > 1 && ui.button("🗑 Hapus chatlog ini").clicked() {
+            let del_lbl = self.t("🗑 Hapus chatlog ini");
+            if self.blocks.len() > 1 && ui.button(del_lbl).clicked() {
                 self.blocks.remove(bi);
                 self.selected_block = 0;
                 self.dirty = true;
             }
 
             ui.separator();
-            ui.label("Teks");
+            ui.label(self.t("Teks"));
+            let font_lbl = self.t("Font");
             ui.horizontal(|ui| {
-                ui.label("Font");
+                ui.label(font_lbl);
                 if ui.text_edit_singleline(&mut self.font_family).changed() {
                     self.dirty = true;
                 }
             });
+            let size_lbl = self.t("Ukuran");
             if ui
-                .add(egui::Slider::new(&mut self.text_size, 8.0..=60.0).text("Ukuran"))
+                .add(egui::Slider::new(&mut self.text_size, 8.0..=60.0).text(size_lbl))
                 .changed()
             {
                 self.dirty = true;
             }
+            let gap_lbl = self.t("Jarak baris %");
             if ui
-                .add(egui::Slider::new(&mut self.line_gap, 80.0..=200.0).text("Jarak baris %"))
+                .add(egui::Slider::new(&mut self.line_gap, 80.0..=200.0).text(gap_lbl))
                 .changed()
             {
                 self.dirty = true;
             }
-            if ui.checkbox(&mut self.stroke_auto, "Outline otomatis").changed() {
+            let auto_lbl = self.t("Outline otomatis");
+            if ui.checkbox(&mut self.stroke_auto, auto_lbl).changed() {
                 self.dirty = true;
             }
+            let outline_lbl = self.t("Outline px");
             if !self.stroke_auto
                 && ui
-                    .add(egui::Slider::new(&mut self.stroke_width, 0.0..=10.0).text("Outline px"))
+                    .add(egui::Slider::new(&mut self.stroke_width, 0.0..=10.0).text(outline_lbl))
                     .changed()
             {
                 self.dirty = true;
             }
 
             ui.separator();
-            ui.collapsing("Filter", |ui| {
+            ui.collapsing(self.t("Filter"), |ui| {
                 self.filter_slider(ui, "Brightness", 0.0..=300.0, |f| &mut f.brightness);
                 self.filter_slider(ui, "Contrast", 0.0..=200.0, |f| &mut f.contrast);
                 self.filter_slider(ui, "Grayscale", 0.0..=100.0, |f| &mut f.grayscale);
@@ -337,13 +351,13 @@ impl EditorState {
                 self.filter_slider(ui, "Saturate", 0.0..=300.0, |f| &mut f.saturate);
             });
 
-            ui.collapsing("Efek (2.0)", |ui| {
+            ui.collapsing(self.t("Efek (2.0)"), |ui| {
                 // Global neighborhood effects — new in 2.0 (core render::filters).
                 self.filter_slider(ui, "Blur (px)", 0.0..=20.0, |f| &mut f.blur);
                 self.filter_slider(ui, "Pixelate (blok px)", 0.0..=64.0, |f| &mut f.pixelate);
             });
 
-            ui.collapsing("Sensor area (blur/pixelate lokal)", |ui| {
+            ui.collapsing(self.t("Sensor area (blur/pixelate lokal)"), |ui| {
                 ui.horizontal(|ui| {
                     if ui.button("+ Blur").clicked() {
                         self.add_censor(CensorKind::Blur);
@@ -352,21 +366,22 @@ impl EditorState {
                         self.add_censor(CensorKind::Pixelate);
                     }
                 });
-                ui.small("Klik kotak di preview untuk pilih · seret badan untuk geser · seret pojok untuk resize.");
+                ui.small(self.t("Klik kotak di preview untuk pilih · seret badan untuk geser · seret pojok untuk resize."));
 
                 if let Some(i) = self.selected_censor {
                     if i < self.censors.len() {
                         let kind = self.censors[i].kind;
-                        let label = match kind {
+                        let label = self.t(match kind {
                             CensorKind::Blur => "Blur radius (px)",
                             CensorKind::Pixelate => "Blok (px)",
-                        };
+                        });
                         let mut strength = self.censors[i].strength;
                         if ui.add(egui::Slider::new(&mut strength, 1.0..=64.0).text(label)).changed() {
                             self.censors[i].strength = strength;
                             self.dirty = true;
                         }
-                        if ui.button("🗑 Hapus area").clicked() {
+                        let del = self.t("🗑 Hapus area");
+                        if ui.button(del).clicked() {
                             self.censors.remove(i);
                             self.selected_censor = None;
                             self.dirty = true;
@@ -376,21 +391,23 @@ impl EditorState {
                 ui.small(format!("{} area sensor", self.censors.len()));
             });
 
-            ui.collapsing("Stiker", |ui| {
-                if ui.button("+ Tambah stiker").clicked() {
+            ui.collapsing(self.t("Stiker"), |ui| {
+                if ui.button(self.t("+ Tambah stiker")).clicked() {
                     self.add_sticker();
                 }
-                ui.small("Klik stiker di preview untuk pilih · seret untuk geser · pojok untuk resize.");
+                ui.small(self.t("Klik stiker di preview untuk pilih · seret untuk geser · pojok untuk resize."));
                 if let Some(i) = self.selected_sticker {
                     if i < self.stickers.len() {
                         let (out_w, _) = self.output_dims();
+                        let wl = self.t("Lebar (px)");
                         let mut w = self.stickers[i].w;
-                        if ui.add(egui::Slider::new(&mut w, 16.0..=out_w).text("Lebar (px)")).changed() {
+                        if ui.add(egui::Slider::new(&mut w, 16.0..=out_w).text(wl)).changed() {
                             self.stickers[i].w = w;
                             self.stickers[i].h = w / self.stickers[i].aspect;
                             self.dirty = true;
                         }
-                        if ui.button("🗑 Hapus stiker").clicked() {
+                        let del = self.t("🗑 Hapus stiker");
+                        if ui.button(del).clicked() {
                             self.stickers.remove(i);
                             self.selected_sticker = None;
                             self.dirty = true;
@@ -401,7 +418,7 @@ impl EditorState {
             });
 
             ui.separator();
-            if ui.button("💾  Export PNG").clicked() {
+            if ui.button(self.t("💾  Export PNG")).clicked() {
                 self.export();
             }
             if let Some(err) = &self.error {
@@ -412,12 +429,14 @@ impl EditorState {
 
     fn combo_anchor(&mut self, ui: &mut egui::Ui, bi: usize) {
         let prev = self.blocks[bi].anchor;
+        let sel = format!("{}: {}", self.t("Posisi"), self.t(anchor_label(prev)));
+        let (free, atas, bawah) = (self.t("Bebas"), self.t("Kiri Atas"), self.t("Kiri Bawah"));
         egui::ComboBox::from_id_salt(("anchor", bi))
-            .selected_text(format!("Posisi: {}", anchor_label(prev)))
+            .selected_text(sel)
             .show_ui(ui, |ui| {
-                ui.selectable_value(&mut self.blocks[bi].anchor, Anchor::Free, "Bebas");
-                ui.selectable_value(&mut self.blocks[bi].anchor, Anchor::KiriAtas, "Kiri Atas");
-                ui.selectable_value(&mut self.blocks[bi].anchor, Anchor::KiriBawah, "Kiri Bawah");
+                ui.selectable_value(&mut self.blocks[bi].anchor, Anchor::Free, free);
+                ui.selectable_value(&mut self.blocks[bi].anchor, Anchor::KiriAtas, atas);
+                ui.selectable_value(&mut self.blocks[bi].anchor, Anchor::KiriBawah, bawah);
             });
         if self.blocks[bi].anchor != prev {
             self.dirty = true;
@@ -433,12 +452,14 @@ impl EditorState {
 
     fn combo_bg(&mut self, ui: &mut egui::Ui, bi: usize) {
         let prev = self.blocks[bi].bg_mode;
+        let sel = format!("BG: {}", self.t(bg_label(prev)));
+        let (none, blok, mask) = (self.t("Tidak ada"), self.t("Blok"), self.t("Mask"));
         egui::ComboBox::from_id_salt(("bg", bi))
-            .selected_text(format!("BG: {}", bg_label(prev)))
+            .selected_text(sel)
             .show_ui(ui, |ui| {
-                ui.selectable_value(&mut self.blocks[bi].bg_mode, BgMode::None, "Tidak ada");
-                ui.selectable_value(&mut self.blocks[bi].bg_mode, BgMode::Block, "Blok");
-                ui.selectable_value(&mut self.blocks[bi].bg_mode, BgMode::Mask, "Mask");
+                ui.selectable_value(&mut self.blocks[bi].bg_mode, BgMode::None, none);
+                ui.selectable_value(&mut self.blocks[bi].bg_mode, BgMode::Block, blok);
+                ui.selectable_value(&mut self.blocks[bi].bg_mode, BgMode::Mask, mask);
             });
         if self.blocks[bi].bg_mode != prev {
             self.dirty = true;
@@ -446,19 +467,24 @@ impl EditorState {
     }
 
     fn palette_ui(&mut self, ui: &mut egui::Ui) {
-        ui.collapsing("Palet warna", |ui| {
-            ui.small("Pilih teks di chatlog, klik warna untuk membungkus {RRGGBB}.");
+        let header = self.t("Palet warna");
+        let hint = self.t("Pilih teks di chatlog, klik warna untuk membungkus {RRGGBB}.");
+        let apply_lbl = self.t("Terapkan kustom");
+        let sel_yes = self.t("✓ ada teks terpilih");
+        let sel_no = self.t("(pilih teks di chatlog dulu)");
+        ui.collapsing(header, |ui| {
+            ui.small(hint);
             ui.horizontal_wrapped(|ui| {
                 for &(name, hex) in PALETTE {
                     let btn = egui::Button::new("   ").fill(hex_to_color32(hex));
-                    if ui.add(btn).on_hover_text(name).clicked() {
+                    if ui.add(btn).on_hover_text(self.t(name)).clicked() {
                         self.apply_color(hex);
                     }
                 }
             });
             ui.horizontal(|ui| {
                 ui.color_edit_button_srgb(&mut self.custom_color);
-                if ui.button("Terapkan kustom").clicked() {
+                if ui.button(apply_lbl).clicked() {
                     let hex = format!(
                         "{:02X}{:02X}{:02X}",
                         self.custom_color[0], self.custom_color[1], self.custom_color[2]
@@ -466,11 +492,7 @@ impl EditorState {
                     self.apply_color(&hex);
                 }
             });
-            if self.text_selection.is_some() {
-                ui.small("✓ ada teks terpilih");
-            } else {
-                ui.small("(pilih teks di chatlog dulu)");
-            }
+            ui.small(if self.text_selection.is_some() { sel_yes } else { sel_no });
         });
     }
 
@@ -520,8 +542,9 @@ impl EditorState {
         }
 
         let Some(tex) = self.texture.as_ref() else {
+            let msg = self.t("Muat foto untuk mulai mengedit.");
             ui.centered_and_justified(|ui| {
-                ui.label("Muat foto untuk mulai mengedit.");
+                ui.label(msg);
             });
             return;
         };
@@ -642,9 +665,10 @@ impl EditorState {
                     Some(ui.ctx().load_texture("source", img, egui::TextureOptions::LINEAR));
             }
         }
+        let load_msg = self.t("Muat foto dulu.");
         let Some(tex) = self.source_tex.as_ref() else {
             ui.centered_and_justified(|ui| {
-                ui.label("Muat foto dulu.");
+                ui.label(load_msg);
             });
             return;
         };
@@ -703,10 +727,11 @@ impl EditorState {
             self.dirty = true;
         }
 
+        let crop_hint = self.t("Seret kotak untuk framing · pojok untuk resize · klik “✓ Selesai crop”");
         painter.text(
             img_rect.min + egui::vec2(6.0, 6.0),
             egui::Align2::LEFT_TOP,
-            "Seret kotak untuk framing · pojok untuk resize · klik “✓ Selesai crop”",
+            crop_hint,
             egui::FontId::proportional(12.0),
             egui::Color32::WHITE,
         );

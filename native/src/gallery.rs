@@ -16,19 +16,24 @@ pub struct GalleryState {
     /// Set when the user clicks "open in editor"; the App consumes it.
     pub open_request: Option<PathBuf>,
     error: Option<String>,
+    pub lang: crate::i18n::Lang,
 }
 
 impl GalleryState {
+    fn t(&self, s: &'static str) -> &'static str {
+        crate::i18n::t(self.lang, s)
+    }
+
     pub fn ui(&mut self, ui: &mut egui::Ui) {
         ui.add_space(6.0);
         ui.horizontal(|ui| {
-            if ui.button("📂  Buka folder").clicked() {
+            if ui.button(self.t("📂  Buka folder")).clicked() {
                 self.open_folder();
             }
             if let Some(f) = &self.folder {
                 ui.small(format!("{} · {} gambar", f.display(), self.items.len()));
             } else {
-                ui.small("Pilih folder berisi foto hasil edit.");
+                ui.small(self.t("Pilih folder berisi foto hasil edit."));
             }
         });
         if let Some(err) = &self.error {
@@ -52,9 +57,11 @@ impl GalleryState {
                 });
             });
 
+        let pick_msg = self.t("Pilih gambar dari daftar.");
+        let open_lbl = self.t("✏  Buka di editor");
         egui::CentralPanel::default().show_inside(ui, |ui| {
             let Some(i) = self.selected else {
-                ui.centered_and_justified(|ui| ui.label("Pilih gambar dari daftar."));
+                ui.centered_and_justified(|ui| ui.label(pick_msg));
                 return;
             };
             if i >= self.items.len() {
@@ -62,7 +69,7 @@ impl GalleryState {
             }
             ui.horizontal(|ui| {
                 ui.strong(self.items[i].name.clone());
-                if ui.button("✏  Buka di editor").clicked() {
+                if ui.button(open_lbl).clicked() {
                     self.open_request = Some(self.items[i].path.clone());
                 }
             });

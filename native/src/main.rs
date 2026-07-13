@@ -12,11 +12,13 @@
 mod chatlog_parser;
 mod editor;
 mod gallery;
+mod i18n;
 
 use chatlog_parser::ChatlogParserState;
 use eframe::egui;
 use editor::EditorState;
 use gallery::GalleryState;
+use i18n::{t, Lang};
 
 fn main() -> eframe::Result {
     let mut viewport = egui::ViewportBuilder::default()
@@ -52,6 +54,7 @@ struct App {
     chatlog_parser: ChatlogParserState,
     gallery: GalleryState,
     dark: bool,
+    lang: Lang,
 }
 
 impl Default for App {
@@ -62,6 +65,7 @@ impl Default for App {
             chatlog_parser: ChatlogParserState::default(),
             gallery: GalleryState::default(),
             dark: true,
+            lang: Lang::default(),
         }
     }
 }
@@ -72,11 +76,12 @@ impl Default for App {
 struct Settings {
     dark: bool,
     font: String,
+    lang: Lang,
 }
 
 impl Default for Settings {
     fn default() -> Self {
-        Self { dark: true, font: "Verdana".into() }
+        Self { dark: true, font: "Verdana".into(), lang: Lang::Id }
     }
 }
 
@@ -86,6 +91,7 @@ impl App {
         if let Some(storage) = cc.storage {
             if let Some(s) = eframe::get_value::<Settings>(storage, "settings") {
                 app.dark = s.dark;
+                app.lang = s.lang;
                 app.editor.set_font(s.font);
             }
         }
@@ -101,6 +107,11 @@ impl eframe::App for App {
             egui::Visuals::light()
         });
 
+        // Propagate the current language to each screen before it draws.
+        self.editor.lang = self.lang;
+        self.chatlog_parser.lang = self.lang;
+        self.gallery.lang = self.lang;
+
         if self.screen != Screen::Menu {
             egui::TopBottomPanel::top("nav").show(ctx, |ui| {
                 ui.horizontal(|ui| {
@@ -110,8 +121,11 @@ impl eframe::App for App {
                     ui.separator();
                     ui.heading(title_of(self.screen));
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if ui.button(if self.dark { "☀" } else { "🌙" }).on_hover_text("Ganti tema").clicked() {
+                        if ui.button(if self.dark { "☀" } else { "🌙" }).on_hover_text(t(self.lang, "Ganti tema")).clicked() {
                             self.dark = !self.dark;
+                        }
+                        if ui.button(lang_label(self.lang)).on_hover_text("ID / EN").clicked() {
+                            self.lang = self.lang.toggled();
                         }
                     });
                 });
@@ -142,40 +156,55 @@ impl eframe::App for App {
     }
 
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
-        let s = Settings { dark: self.dark, font: self.editor.font().to_string() };
+        let s = Settings {
+            dark: self.dark,
+            font: self.editor.font().to_string(),
+            lang: self.lang,
+        };
         eframe::set_value(storage, "settings", &s);
     }
 }
 
 impl App {
     fn menu(&mut self, ui: &mut egui::Ui) {
+        let lang = self.lang;
         ui.vertical_centered(|ui| {
             ui.add_space(48.0);
             ui.heading(egui::RichText::new("ScreeniesEditor").size(34.0).strong());
-            ui.label("Screenshot Roleplay toolkit — komunitas SA-MP");
+            ui.label(t(lang, "Screenshot Roleplay toolkit — komunitas SA-MP"));
             ui.add_space(28.0);
 
-            if menu_tile(ui, "🖼  SSRP Editor", "Crop · chatlog · filter · export") {
+            if menu_tile(ui, "🖼  SSRP Editor", t(lang, "Crop · chatlog · filter · export")) {
                 self.screen = Screen::Editor;
             }
-            if menu_tile(ui, "🔍  Chatlog Parser", "Buka folder chatlog · cari di aplikasi") {
+            if menu_tile(ui, "🔍  Chatlog Parser", t(lang, "Buka folder chatlog · cari di aplikasi")) {
                 self.screen = Screen::ChatlogParser;
             }
-            if menu_tile(ui, "🗂  Gallery", "Jelajahi foto SSRP hasil edit") {
+            if menu_tile(ui, "🗂  Gallery", t(lang, "Jelajahi foto SSRP hasil edit")) {
                 self.screen = Screen::Gallery;
             }
 
             ui.add_space(16.0);
-            if ui
-                .button(if self.dark { "☀  Mode terang" } else { "🌙  Mode gelap" })
-                .clicked()
-            {
-                self.dark = !self.dark;
-            }
+            ui.horizontal(|ui| {
+                let theme = if self.dark { "☀  Mode terang" } else { "🌙  Mode gelap" };
+                if ui.button(t(lang, theme)).clicked() {
+                    self.dark = !self.dark;
+                }
+                if ui.button(lang_label(lang)).on_hover_text("ID / EN").clicked() {
+                    self.lang = self.lang.toggled();
+                }
+            });
 
             ui.add_space(16.0);
             ui.small(format!("v{} · native (egui) · preview", env!("CARGO_PKG_VERSION")));
         });
+    }
+}
+
+fn lang_label(l: Lang) -> &'static str {
+    match l {
+        Lang::Id => "ID",
+        Lang::En => "EN",
     }
 }
 

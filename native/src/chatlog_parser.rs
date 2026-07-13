@@ -18,13 +18,20 @@ pub struct ChatlogParserState {
     query: String,
     results: Vec<Hit>,
     error: Option<String>,
+    pub lang: crate::i18n::Lang,
 }
 
 impl ChatlogParserState {
+    fn t(&self, s: &'static str) -> &'static str {
+        crate::i18n::t(self.lang, s)
+    }
+
     pub fn ui(&mut self, ui: &mut egui::Ui) {
         ui.add_space(6.0);
+        let open_lbl = self.t("📂  Buka folder chatlog");
+        let empty_lbl = self.t("Pilih folder berisi file .txt / .log");
         ui.horizontal(|ui| {
-            if ui.button("📂  Buka folder chatlog").clicked() {
+            if ui.button(open_lbl).clicked() {
                 self.open_folder();
             }
             if let Some(f) = &self.folder {
@@ -35,7 +42,7 @@ impl ChatlogParserState {
                     self.library.len()
                 ));
             } else {
-                ui.small("Pilih folder berisi file .txt / .log");
+                ui.small(empty_lbl);
             }
         });
 
@@ -44,11 +51,12 @@ impl ChatlogParserState {
         }
 
         ui.separator();
+        let search_hint = self.t("cari nama / kata di semua chatlog…");
         ui.horizontal(|ui| {
             ui.label("🔍");
             let resp = ui.add(
                 egui::TextEdit::singleline(&mut self.query)
-                    .hint_text("cari nama / kata di semua chatlog…")
+                    .hint_text(search_hint)
                     .desired_width(f32::INFINITY),
             );
             if resp.changed() {
@@ -64,11 +72,13 @@ impl ChatlogParserState {
         });
 
         ui.separator();
+        let copy_hint = self.t("klik untuk salin");
+        let type_hint = self.t("Ketik untuk mencari.");
         egui::ScrollArea::vertical().show(ui, |ui| {
             for hit in self.results.iter().take(shown) {
                 let resp = ui
                     .add(egui::Label::new(&hit.text).sense(egui::Sense::click()))
-                    .on_hover_text(format!("{}:{} — klik untuk salin", hit.file, hit.line_no));
+                    .on_hover_text(format!("{}:{} — {}", hit.file, hit.line_no, copy_hint));
                 if resp.clicked() {
                     ui.output_mut(|o| o.copied_text = hit.text.clone());
                 }
@@ -76,7 +86,7 @@ impl ChatlogParserState {
                 ui.separator();
             }
             if self.folder.is_some() && self.query.trim().is_empty() {
-                ui.weak("Ketik untuk mencari.");
+                ui.weak(type_hint);
             }
         });
     }
