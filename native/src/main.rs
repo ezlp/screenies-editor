@@ -9,8 +9,10 @@
 
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod chatlog_parser;
 mod editor;
 
+use chatlog_parser::ChatlogParserState;
 use eframe::egui;
 use editor::EditorState;
 
@@ -41,6 +43,7 @@ enum Screen {
 struct App {
     screen: Screen,
     editor: EditorState,
+    chatlog_parser: ChatlogParserState,
 }
 
 impl eframe::App for App {
@@ -60,9 +63,7 @@ impl eframe::App for App {
         egui::CentralPanel::default().show(ctx, |ui| match self.screen {
             Screen::Menu => self.menu(ui),
             Screen::Editor => self.editor.ui(ui),
-            Screen::ChatlogParser => {
-                stub(ui, "Chatlog Parser", "Fase 3 — buka folder chatlog, cari di aplikasi.")
-            }
+            Screen::ChatlogParser => self.chatlog_parser.ui(ui),
             Screen::Gallery => stub(ui, "Gallery", "Fase 4 — jelajahi foto SSRP hasil edit."),
         });
     }
