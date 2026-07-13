@@ -1,0 +1,58 @@
+# screenies-native — the 2.0 shell: a pure-Rust egui/eframe app that runs the
+# SAME screenies-core pipeline as the Tauri app, with NO webview. Targets old
+# laptops (wide compatibility) with a small static binary.
+#
+# Excluded from the default cargo workspace so `cargo test --workspace` stays
+# fast/green without egui's Linux GUI system-deps. Build/run explicitly:
+#   cd native && cargo run
+#
+# ⚠️ Phase-0 scaffold: landing menu + stub pages. The editor/parser/gallery
+# screens are filled in phase by phase (see docs/2.0-MIGRATION.md).
+[package]
+name = "screenies-native"
+version = "2.0.0-alpha.2"
+edition = "2021"
+rust-version = "1.77"
+description = "ScreeniesEditor — Screenshot Roleplay editor for the SA-MP community (native egui shell)"
+license = "MIT"
+authors = ["Isut Indraputra", "Claude (Anthropic)"]
+repository = "https://github.com/ezlp/screenies-editor"
+
+# ── Linux packaging (cargo-deb) ──
+# `$auto` runs dpkg-shlibdeps so the .deb declares the real runtime libs
+# (GTK3, OpenGL, xkbcommon, …) the binary links against.
+[package.metadata.deb]
+maintainer = "Isut Indraputra <isut@users.noreply.github.com>"
+section = "graphics"
+priority = "optional"
+depends = "$auto"
+assets = [
+    ["target/release/screenies-native", "usr/bin/", "755"],
+    ["assets/screenies-native.desktop", "usr/share/applications/", "644"],
+    ["assets/icon.png", "usr/share/icons/hicolor/128x128/apps/screenies-native.png", "644"],
+]
+
+# ── Linux packaging (cargo-generate-rpm) ──
+# auto-req disabled for the alpha (avoids cross-distro dep-name mismatch);
+# Fedora testers install GTK3/Mesa themselves. Re-enable when we ship for real.
+# RPM versions can't contain '-', so map the crate's "-alpha.0" to RPM's "~"
+# pre-release separator ("2.0.0~alpha.0" sorts before "2.0.0", as intended).
+[package.metadata.generate-rpm]
+auto-req = "disabled"
+version = "2.0.0~alpha.2"
+assets = [
+    { source = "target/release/screenies-native", dest = "/usr/bin/screenies-native", mode = "755" },
+    { source = "assets/screenies-native.desktop", dest = "/usr/share/applications/screenies-native.desktop", mode = "644" },
+    { source = "assets/icon.png", dest = "/usr/share/icons/hicolor/128x128/apps/screenies-native.png", mode = "644" },
+]
+
+[dependencies]
+screenies-core = { path = "../core" }
+eframe = { version = "0.29", features = ["persistence"] } # brings egui; persistence = settings storage
+rfd = "0.15"          # native file dialogs (open photo, open chatlog folder)
+image = "0.25"
+base64 = "0.22"
+serde = { version = "1", features = ["derive"] } # persisted settings
+
+[target.'cfg(windows)'.build-dependencies]
+winresource = "0.1" # embed the .exe icon on Windows

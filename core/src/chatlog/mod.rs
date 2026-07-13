@@ -241,7 +241,7 @@ mod tests {
     }
 
     #[test]
-    fn serializes_camel_case_for_typescript() {
+    fn serializes_camel_case() {
         let line = ParsedLine {
             spans: vec![ColorSpan {
                 text: "x".into(),

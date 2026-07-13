@@ -1,5 +1,16 @@
 # Changelog (ringkas per rilis)
 
+- **2.0 (preview, `2.0-migration` branch) — native egui, no webview.** The
+  shell moved from Tauri (WebView2/WebKitGTK + TypeScript) to a pure-Rust
+  **egui/eframe** app; the Rust engine (`screenies-core`) is unchanged. The
+  entire Tauri/TS stack was removed from this branch (it stays on `main` /
+  `v1.*` as the 1.x download). New in `core`: **blur/pixelate** effects, a
+  `render::layout` engine (text wrap+positioning moved out of the old JS
+  canvas), a chatlog-folder search index, and a gallery lister — all
+  unit-tested. The egui **preview** does photo → chatlog → filters/effects →
+  live preview → PNG export via the same `compose::render` as the exporter.
+  Preview builds (`.exe`/`.deb`/`.rpm`) ship via the `native-preview` workflow.
+  Plan: [2.0-MIGRATION.md](2.0-MIGRATION.md).
 - **Stable 1.1 fixes:** **undo no longer drops the chatlog** — block text is
   now synced to state synchronously on every keystroke, so a snapshot taken
   mid-edit (e.g. by a filter/drag commit) can never capture an empty chatlog

@@ -1,0 +1,150 @@
+# native-preview.yml — build the 2.0 native egui app and publish a downloadable
+# PRE-RELEASE for testing. Trigger by pushing a `native-preview-*` tag (works
+# from any branch), or via workflow_dispatch once this file is on the default
+# branch.
+#
+# Also serves as build verification for native/ (excluded from the default
+# workspace, so normal CI doesn't compile it).
+#
+# Artifacts:
+#   • Windows: .exe
+#   • Linux:   .deb (cargo-deb), .rpm (cargo-generate-rpm), and the raw binary.
+#     The .deb declares real runtime deps (GTK3/OpenGL/…) via dpkg-shlibdeps.
+
+name: Native preview (egui)
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "native-preview-*" # rolling preview builds
+      - "v2.*" # versioned 2.x releases (e.g. v2.0.0-alpha.1)
+
+permissions:
+  contents: write # create/update the pre-release
+
+jobs:
+  linux:
+    name: Build Linux (.deb / .rpm)
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: GUI build deps (egui + rfd/GTK)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libgtk-3-dev libxkbcommon-dev libwayland-dev \
+            libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev \
+            libssl-dev
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: native
+
+      # Build the app FIRST so an egui compile error surfaces before packaging.
+      - name: Build (release)
+        working-directory: native
+        run: cargo build --release
+
+      # Compile the packagers from source (the prebuilt binaries need a newer
+      # glibc than ubuntu-22.04 has; 22.04 is intentional for wide .deb compat).
+      - name: Install packagers
+        run: cargo install cargo-deb cargo-generate-rpm --locked
+
+      - name: Package .deb
+        working-directory: native
+        run: cargo deb --no-build
+
+      - name: Package .rpm
+        working-directory: native
+        run: cargo generate-rpm
+
+      - name: Build AppImage (best effort)
+        continue-on-error: true
+        working-directory: native
+        env:
+          APPIMAGE_EXTRACT_AND_RUN: "1"
+        run: |
+          set -eux
+          wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+          chmod +x linuxdeploy-x86_64.AppImage
+          ./linuxdeploy-x86_64.AppImage \
+            --appdir AppDir \
+            --executable target/release/screenies-native \
+            --desktop-file assets/screenies-native.desktop \
+            --icon-file assets/icon.png \
+            --output appimage
+
+      - name: Stage artifacts
+        shell: bash
+        run: |
+          mkdir -p out
+          cp native/target/release/screenies-native out/screenies-native-linux-x86_64
+          cp native/target/debian/*.deb out/
+          cp native/target/generate-rpm/*.rpm out/
+          cp native/*.AppImage out/ 2>/dev/null || echo "no AppImage (best-effort step may have failed)"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          path: out/
+
+  windows:
+    name: Build Windows (.exe)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: native
+
+      - name: Build (release)
+        working-directory: native
+        run: cargo build --release
+
+      - name: Stage artifact
+        shell: bash
+        run: |
+          mkdir -p out
+          cp native/target/release/screenies-native.exe out/screenies-native-windows-x86_64.exe
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: out/
+
+  release:
+    name: Publish pre-release
+    needs: [linux, windows]
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Download built artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Publish rolling pre-release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_type == 'tag' && github.ref_name || 'native-preview' }}
+          name: ScreeniesEditor ${{ github.ref_name }} (native egui)
+          prerelease: true
+          body: |
+            Automated **test build** of the native egui shell (2.0 preview).
+
+            ⚠️ Alpha: basic editor only (load photo · paste chatlog · font/size ·
+            filters + blur/pixelate · background/anchor · live preview · PNG export).
+            Not yet: crop editor, stickers, palette, undo, multi-block, i18n.
+
+            **Downloads**
+            - Windows: `screenies-native-windows-x86_64.exe` — run directly.
+            - Debian/Ubuntu: `*.deb` — `sudo apt install ./screenies-native_*.deb`.
+            - Fedora/RHEL: `*.rpm` — `sudo dnf install ./screenies-native-*.rpm`
+              (install GTK3 + Mesa/OpenGL yourself if missing).
+            - Portable: `*.AppImage` (best-effort) — `chmod +x` then run.
+            - Or the raw `screenies-native-linux-x86_64` binary (`chmod +x`, needs GTK3 + OpenGL).
+          files: dist/**/*

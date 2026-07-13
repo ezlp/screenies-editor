@@ -10,10 +10,11 @@
 pub mod compose;
 pub mod crop;
 pub mod filters;
+pub mod layout;
 pub mod sticker;
 pub mod text;
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -24,6 +25,10 @@ pub struct RenderJob {
     pub output: Size,
     pub stickers: Vec<StickerJob>,
     pub filters: FilterValues,
+    /// Local censor boxes (blur/pixelate a rectangle) — applied to the photo,
+    /// under stickers and text. Empty in old payloads via serde(default).
+    #[serde(default)]
+    pub censors: Vec<CensorRegion>,
     pub font_family: String,
     /// Text size in output px.
     pub text_size: f32,
@@ -32,7 +37,29 @@ pub struct RenderJob {
     pub blocks: Vec<ExportBlock>,
 }
 
-#[derive(Debug, Clone, Copy, Deserialize)]
+/// Which effect a censor box applies.
+#[derive(Debug, Clone, Copy, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum CensorKind {
+    Blur,
+    Pixelate,
+}
+
+/// A rectangular blur/pixelate region in output px — like a sticker, but it
+/// censors the photo underneath instead of drawing an image.
+#[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CensorRegion {
+    pub x: f32,
+    pub y: f32,
+    pub w: f32,
+    pub h: f32,
+    pub kind: CensorKind,
+    /// Blur radius (px) or pixelate block size (px), per `kind`.
+    pub strength: f32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CropRect {
     pub x: f64,
@@ -48,7 +75,7 @@ pub struct Size {
     pub h: u32,
 }
 
-#[derive(Debug, Clone, Copy, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FilterValues {
     pub brightness: f32, // percent, 100 = identity
@@ -56,6 +83,14 @@ pub struct FilterValues {
     pub sepia: f32,
     pub saturate: f32,
     pub contrast: f32,
+    // ── 2.0 effects (neighborhood passes, run after the per-pixel color ops).
+    //    serde(default) keeps old 1.x RenderJob payloads (5 fields) parsing. ──
+    /// Box-blur radius in output px. 0 = off.
+    #[serde(default)]
+    pub blur: f32,
+    /// Pixelate block size in output px. 0 or 1 = off.
+    #[serde(default)]
+    pub pixelate: f32,
 }
 
 #[derive(Debug, Clone, Deserialize)]

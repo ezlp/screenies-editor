@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=ScreeniesEditor
+GenericName=Screenshot Roleplay Editor
+Comment=Editor screenshot roleplay untuk komunitas SA-MP
+Exec=screenies-native
+Icon=screenies-native
+Terminal=false
+Categories=Graphics;Photography;2DGraphics;
+Keywords=ssrp;chatlog;samp;screenshot;roleplay;

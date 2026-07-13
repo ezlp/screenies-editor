@@ -1,10 +1,10 @@
 <div align="center">
 
-# 🖼️ ScreeniesEditor
+# 🖼️ ScreeniesEditor 2.0
 
 **A Screenshot Roleplay (SSRP) editor for the SA-MP community**
 
-Paste a chatlog → automatic colors → crop → filters → export a sharp PNG.
+Paste a chatlog → automatic colors → filters → export a sharp PNG.
 Fully offline — nothing is uploaded anywhere.
 
 *by Isut Indraputra & Claude (Anthropic)* · **Bahasa Indonesia:** [README.md](README.md)
@@ -13,46 +13,38 @@ Fully offline — nothing is uploaded anywhere.
 
 ---
 
-## ⚠️ Windows note: WebView2 (Edge runtime) required
+## 🚧 Status: 2.0 preview (native, no webview)
 
-The current version runs on **Microsoft WebView2**. Windows 11 and
-up-to-date Windows 10 ship it; **older laptops** may not — the installer
-downloads it automatically during setup (needs internet once). If that
-fails, install "WebView2 Runtime (Evergreen)" from Microsoft manually.
+2.0 is a **native Rust (egui)** app — **no WebView2/Edge**, so it runs on old
+laptops with a small binary. Same Rust engine (`core`) as before. Currently in
+**preview/alpha**.
 
-**Good news:** we are **migrating to a lighter technology** with no
-WebView2 at all — so older machines will be supported.
+- **Try the preview:** grab it from **[Releases](../../releases)**
+  (`native-preview-*`) — Windows `.exe`, Linux `.deb` / `.rpm` / raw binary.
+- The old **1.x** (Tauri/WebView2) build lives on branch `main` and `v1.*` tags.
 
-## ✨ Features
+## ✨ Features (preview)
 
-Chatlog parser with per-server presets (shareable `.toml` files) ·
-resolution presets + crop editor · live filters (photo only, text stays
-crisp) · text controls (font, size 8–60px, outline, spacing, color
-palette) · per-block backgrounds (block/mask) · PNG/WebP stickers ·
-Rust-rendered export (Save to Disk / Copy to Clipboard, up to 4K) ·
-undo/redo (Ctrl+Z / Ctrl+Y) · paste photo with Ctrl+V · Indonesian/English
-UI · dark & light themes · persistent settings and file-name templates.
+Chatlog parser with per-server presets (JGRP/Umum/Polos, `{RRGGBB}` colors,
+auto-color for `*`/`(( ))`/`/do`/system tags) · load photo · filters
+(brightness/contrast/grayscale/sepia/saturate) · **2.0 effects: blur & pixelate**
+(censor names/plates) · text controls (font, 8–60px, outline, spacing) ·
+per-block background (block/mask) · anchor (free/top-left/bottom-left) ·
+live preview + PNG export rendered by `core` (**preview == PNG**).
 
-## 📥 Download & Install
+Not yet in the preview (next phases): crop editor, stickers, color palette,
+undo/redo, multi-block, i18n, settings, **Chatlog Parser** (search a log
+folder), and the **Gallery** of edited shots.
 
-Grab it from **[Releases](../../releases)** — Windows `-setup.exe`
-(64/32-bit), Linux `.deb` / `.AppImage`. Use the release marked
-**Latest**; *Pre-release* / *nightly* builds are for testers.
-Windows SmartScreen: *More info → Run anyway* (the installer isn't
-code-signed).
+## 🔧 Tech
 
-## 🚀 30-second workflow
+Rust `core` (parser + render/export pipeline, unit-tested) + an **egui/eframe**
+native shell (pure Rust, no C++/webview) + `image`/`ab_glyph` for
+decode/crop/resize/filters (incl. blur/pixelate) and text rasterization.
 
-1. Drag a SA-MP screenshot into the app (or press **Ctrl+V**)
-2. Pick a resolution → frame the crop box → **✓ Done**
-3. Paste your chatlog → drag the text into place on the preview
-4. Filters/stickers to taste → **Save to Disk (.png)**
-
-## 🔧 Tech & docs
-
-Tauri 2 + Rust core (parser & render pipeline) + TypeScript/Vite UI.
 Architecture: [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md) ·
-Preset guide: [docs/PRESETS.md](docs/PRESETS.md) ·
+2.0 plan: [docs/2.0-MIGRATION.md](docs/2.0-MIGRATION.md) ·
+Presets: [docs/PRESETS.md](docs/PRESETS.md) ·
 Changelog: [docs/CHANGELOG.md](docs/CHANGELOG.md)
 
 <div align="center">Made with ❤️ for the SA-MP roleplay community</div>

@@ -16,9 +16,10 @@ pub fn render(job: &RenderJob) -> Result<RgbaImage, AppError> {
         .map_err(|e| AppError::Render(format!("decode foto: {e}")))?
         .to_rgba8();
 
-    // Photo: crop → resize to the output → filters (photo only).
+    // Photo: crop → resize to the output → filters (photo only) → local censors.
     let mut out = crop::crop_and_resize(&src, &job.crop, &job.output)?;
     filters::apply(&mut out, &job.filters);
+    filters::apply_censors(&mut out, &job.censors);
 
     // Stickers under the text, then text (with its bg strips).
     sticker::overlay_all(&mut out, &job.stickers)?;
@@ -50,7 +51,16 @@ mod tests {
             crop: CropRect { x: 0.0, y: 0.0, w: 4.0, h: 4.0 },
             output: Size { w: 8, h: 8 },
             stickers: vec![],
-            filters: FilterValues { brightness: 100.0, grayscale: 100.0, sepia: 0.0, saturate: 100.0, contrast: 100.0 },
+            filters: FilterValues {
+                brightness: 100.0,
+                grayscale: 100.0,
+                sepia: 0.0,
+                saturate: 100.0,
+                contrast: 100.0,
+                blur: 0.0,
+                pixelate: 0.0,
+            },
+            censors: vec![],
             font_family: "__none__".into(),
             text_size: 20.0,
             stroke_width: 3.0,

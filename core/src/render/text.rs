@@ -124,6 +124,47 @@ fn draw_token(img: &mut RgbaImage, font: &FontVec, scale: PxScale, x: f32, y: f3
     }
 }
 
+/// Advance width of `text` at `scale` for one face — the SAME per-glyph
+/// advance + kerning the draw passes pen with, so layout positions and
+/// rendered glyphs line up exactly (no measure/draw drift).
+fn advance_width(font: &FontVec, scale: PxScale, text: &str) -> f32 {
+    let scaled = font.as_scaled(scale);
+    let mut w = 0.0;
+    let mut prev = None;
+    for ch in text.chars() {
+        let id = scaled.glyph_id(ch);
+        if let Some(p) = prev {
+            w += scaled.kern(p, id);
+        }
+        w += scaled.h_advance(id);
+        prev = Some(id);
+    }
+    w
+}
+
+/// ab_glyph-backed `layout::Measure`: the real word-width provider that feeds
+/// `render::layout`. Build once per render pass (faces + text size), reuse for
+/// every word. Correctness depends on installed fonts, so it isn't unit-tested
+/// here — the layout math is tested against a deterministic mock instead.
+pub struct GlyphMeasure {
+    faces: Faces,
+    scale: PxScale,
+}
+
+impl GlyphMeasure {
+    /// Load the family's faces at `text_size`. Errors if the font is missing.
+    pub fn new(font_family: &str, text_size: f32) -> Result<Self, AppError> {
+        Ok(Self { faces: load_faces(font_family)?, scale: PxScale::from(text_size) })
+    }
+}
+
+impl crate::render::layout::Measure for GlyphMeasure {
+    fn width(&self, text: &str, bold: bool) -> f32 {
+        let face = if bold { &self.faces.heavy } else { &self.faces.bold };
+        advance_width(face, self.scale, text)
+    }
+}
+
 fn fill_rect_alpha(img: &mut RgbaImage, x: f32, y: f32, w: f32, h: f32, a: f32) {
     let x0 = x.max(0.0) as u32;
     let y0 = y.max(0.0) as u32;
