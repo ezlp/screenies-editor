@@ -9,6 +9,7 @@
 
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod chatlog_browser;
 mod editor;
 mod gallery;
 mod i18n;
@@ -80,6 +81,7 @@ struct Settings {
     line_gap: f32,
     filters: FilterValues,
     ui_scale: f32,
+    chatlog_folder: Option<String>,
 }
 
 impl Default for Settings {
@@ -92,6 +94,7 @@ impl Default for Settings {
             line_gap: 122.0,
             filters: default_filters(),
             ui_scale: 1.0,
+            chatlog_folder: None,
         }
     }
 }
@@ -118,6 +121,7 @@ impl App {
                 app.ui_scale = s.ui_scale.clamp(0.7, 1.6);
                 app.editor.set_font(s.font);
                 app.editor.apply_prefs(s.text_size, s.line_gap, s.filters);
+                app.editor.set_chatlog_folder(s.chatlog_folder);
             }
         }
         app
@@ -192,6 +196,7 @@ impl eframe::App for App {
             line_gap,
             filters,
             ui_scale: self.ui_scale,
+            chatlog_folder: self.editor.chatlog_folder(),
         };
         eframe::set_value(storage, "settings", &s);
     }

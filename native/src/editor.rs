@@ -93,6 +93,9 @@ pub struct EditorState {
     /// UI language, set by the App each frame.
     pub lang: crate::i18n::Lang,
 
+    /// Chatlog-folder browser popup (grab chatlog text to paste).
+    chatlog: crate::chatlog_browser::ChatlogBrowser,
+
     // Text controls (shared across blocks).
     font_family: String,
     text_size: f32,
@@ -139,6 +142,7 @@ impl Default for EditorState {
             text_selection: None,
             custom_color: [255, 255, 255],
             lang: crate::i18n::Lang::default(),
+            chatlog: crate::chatlog_browser::ChatlogBrowser::default(),
             font_family: "Verdana".into(),
             text_size: 27.0,
             line_gap: 122.0,
@@ -211,6 +215,9 @@ impl EditorState {
 
         // Record an undo step once the edit settles (pointer released).
         self.maybe_commit(ui.ctx());
+
+        // Chatlog-folder popup (overlay).
+        self.chatlog.window(ui.ctx());
     }
 
     fn controls(&mut self, ui: &mut egui::Ui) {
@@ -286,6 +293,9 @@ impl EditorState {
                     self.blocks.push(ChatBlock::new(self.blocks.len()));
                     self.selected_block = self.blocks.len() - 1;
                     self.dirty = true;
+                }
+                if ui.button("📂").on_hover_text(self.t("Chatlog dari folder")).clicked() {
+                    self.chatlog.open();
                 }
             });
 
@@ -763,6 +773,12 @@ impl EditorState {
             self.font_family = f;
             self.dirty = true;
         }
+    }
+    pub fn chatlog_folder(&self) -> Option<String> {
+        self.chatlog.folder_path()
+    }
+    pub fn set_chatlog_folder(&mut self, p: Option<String>) {
+        self.chatlog.set_folder_path(p);
     }
     pub fn prefs(&self) -> (f32, f32, FilterValues) {
         (self.text_size, self.line_gap, self.filters)
