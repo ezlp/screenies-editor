@@ -2,91 +2,68 @@
 
 How the codebase works, for anyone (including future-us) touching the code.
 
-> **Workspace note:** the Rust side is a Cargo workspace —
-> `core/` (screenies-core: parser + render, shell-free) and `src-tauri/`
-> (the shipping app). `cargo test --workspace` covers both.
+> **2.0 is a native egui app.** The old Tauri (WebView2) shell + its TypeScript
+> frontend were removed; they live on `main` / `v1.*` tags. See
+> [2.0-MIGRATION.md](2.0-MIGRATION.md).
 
-## Big picture
+## Layout
 
 ```
-┌────────────── Frontend (TypeScript + Vite) ──────────────┐
-│ index.html — all static UI                               │
-│ src/ts/                                                  │
-│   state.ts        single mutable AppState + onChange bus │
-│   canvas.ts       preview renderer + ALL text layout     │
-│   chatlog.ts      blocks UI, debounced parse calls       │
-│   crop.ts filters.ts textstyle.ts colorpalette.ts        │
-│   stickers.ts preset.ts theme.ts settings.ts export.ts   │
-│   tauri-bridge.ts THE ONLY file that talks to Rust       │
-└──────────────────────────┬────────────────────────────────┘
-                    invoke() over Tauri IPC
-┌──────────────────────────┴─── Backend (Rust) ─────────────┐
-│ main.rs      registers commands + plugins                 │
-│ commands.rs  thin #[tauri::command] wrappers (no logic)   │
-│ chatlog/     parser: timestamp → autocolor → systag       │
-│ render/      export: compose→crop→filters→sticker→text    │
-│ config.rs    settings.json   files.rs  dialogs & disk     │
-│ fonts.rs     shared fontdb (scanned once)  clipboard.rs   │
-└────────────────────────────────────────────────────────────┘
+core/   screenies-core — the shell-independent engine (all the real logic):
+        chatlog/   parser: timestamp → autocolor → systag
+        render/    compose → crop → filters (incl. blur/pixelate) →
+                   sticker → layout (wrap+positioning) → text
+        chatlog_library.rs   folder index + search   (2.0 feature)
+        gallery.rs           exported-photo listing   (2.0 feature)
+        fonts.rs   shared fontdb (scanned once)   clipboard.rs   error.rs
+native/ screenies-native — the egui/eframe shell (pure Rust). Consumes core.
+        Excluded from the default workspace (needs GUI system-deps):
+        `cd native && cargo run`.
+examples/presets/   community parsing presets (.toml) the parser accepts.
 ```
 
-## The three contracts (read before changing anything)
+`cargo test --workspace` builds/tests `core` (fast; no GUI/JS needed). CI runs
+that; `native/` is compiled + packaged by `.github/workflows/native-preview.yml`.
 
-1. **Layout is frontend-owned.** `canvas.ts::buildRenderBlocks()` computes
-   every text token's absolute x/y (plus BG strips) in output space. The
-   preview paints these AND the exporter receives these — Rust never
-   re-wraps or re-measures. This is why preview == PNG. If you change
-   layout, you change it in exactly one place.
-2. **Types are mirrored, field-for-field.** Every payload crossing IPC has
-   a TS interface (tauri-bridge.ts) and a Rust struct
-   (`serde(rename_all = "camelCase")`). New fields use `#[serde(default)]`
-   so old settings/preset files keep loading. CI-adjacent check: the parity
-   scripts in the project history compare both sides.
-3. **Slow or dialog-opening commands are `async`.** Sync commands run on
-   the main thread; a blocking dialog there deadlocks the app (learned in
-   v0.7.1). Renders are async for the same reason.
+## Enduring contracts
 
-## Rendering pipeline (export, render/compose.rs)
+1. **`core` is shell-independent.** No windowing, no dialogs, no I/O beyond what
+   it's handed. Anything that computes lives here, tested once, reused by any
+   shell (egui now, WASM later). The egui app is a thin view over it.
+2. **Layout drives export.** `render::layout` positions every text token/row
+   absolutely in output space; the preview and the PNG are the SAME
+   `compose::render` call, so preview == export by identity (not by two
+   implementations agreeing). The real measurer is `text::GlyphMeasure`, which
+   sums the same ab_glyph advances the renderer pens with.
+3. **Backward-compatible payloads.** Structs that get (de)serialized use
+   `#[serde(default)]` on new fields so old settings/preset files keep loading
+   (e.g. the 2.0 `blur`/`pixelate` filter fields).
 
-base64 photo → decode → crop (crop.rs) → Lanczos3 resize to the photo area
-→ CSS-spec filter math (filters.rs, unit-tested against the spec) → paste
-onto a canvas of `output` size filled with `luarColor` → sticker overlays
-(sticker.rs, alpha) → text (text.rs: BG strips, outline via radial stamps,
-fill; fonts from the shared fontdb).
+## Rendering pipeline (`core/src/render/compose.rs`)
 
-The preview mirrors this with two stacked canvases: `#image-canvas`
-(photo, CSS `filter` on the element — WebKitGTK has no ctx.filter) under
-`#preview-canvas` (strips, stickers, text, crop UI, pointer events).
+base64/loaded photo → decode → crop (crop.rs) → Lanczos3 resize → CSS-spec
+color filters + blur/pixelate passes (filters.rs, unit-tested) → sticker
+overlays (sticker.rs, alpha) → text (layout.rs positions; text.rs draws BG
+strips, outline, fill; fonts from the shared fontdb).
+
+## The egui shell (`native/`)
+
+`main.rs` — landing menu → Editor / Chatlog Parser / Gallery.
+`editor.rs` — editor state + UI. On any change it rebuilds a `RenderJob`
+(state → `layout::layout_blocks` with `GlyphMeasure` → `compose::render`) and
+shows the resulting image as an egui texture; export re-uses the same job +
+`encode_png`. That shared call is why the preview matches the saved PNG.
 
 ## Conventions
 
-- One module = one concern; `initX()` wires DOM once; state mutations call
-  `notify()`; `canvas.draw()` is the single onChange consumer that repaints.
-- No logic in commands.rs — it delegates to the owning module.
+- One module = one concern. No shell/I-O logic in `core`.
 - Indonesian for user-facing strings, English for code/comments.
-- Version lives in THREE files: package.json, tauri.conf.json, Cargo.toml.
+- Every render/effect/layout change ships with a unit test in the same file.
 
-## Build & release
+## Build
 
-- Local: `npm install && npm run tauri dev` (needs Rust + Node 22).
-- CI: every push → .github/workflows/build.yml (tsc + vite + cargo test).
-- **Release channels:**
-  - `vX.Y.Z` tag → **stable** release, becomes "Latest".
-  - `vX.Y.Z-beta.N` tag (anything with `-`) → **pre-release** badge,
-    never "Latest". Version files should carry the same string.
-  - Actions → *Nightly (dev snapshot)* → Run workflow → rolling
-    pre-release tagged `nightly`; each run replaces the last, installers
-    are stamped `X.Y.Z-nightly.<sha>` so bug reports pin the commit.
-    Manual-dispatch only (no cron) — press it when there's something
-    worth testing.
-- Rust tests: `cargo test` in src-tauri (parser pins real JGRP lines,
-  filter math, TOML round-trips, filename sanitizing, compose smoke test).
-
-## Adding a feature — worked example ("add a new filter")
-
-1. state.ts: add the field to `Filters` + default.
-2. filters.ts `DEFS`: add key + max → slider auto-wires.
-3. canvas.ts `cssFilterString()`: append the CSS function.
-4. render/filters.rs: implement the same math per the CSS spec + a test.
-5. index.html: copy a `.filter-row`. Done — export parity is automatic
-   because both sides read the same `Filters` payload.
+- Engine: `cargo test --workspace` (CI).
+- Native app: `cd native && cargo run` — needs egui GUI deps
+  (`libgtk-3-dev libxkbcommon-dev libwayland-dev` + OpenGL on Linux).
+- Preview releases (.exe/.deb/.rpm): push a `native-preview-*` tag →
+  `native-preview.yml` builds + publishes a GitHub pre-release.

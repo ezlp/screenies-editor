@@ -3,11 +3,9 @@
 # tests `core` (the engine — parser, render incl. blur/pixelate + layout,
 # chatlog_library, gallery). No TypeScript/Node here.
 #
-# NOT built by this check:
-#   • src-tauri/ — the frozen 1.x safety-net app. It needs the TS/Vite `dist`
-#     bundle to compile, so its installers are still cut by release.yml on tags.
-#   • native/   — the 2.0 egui shell (excluded from the workspace; needs GUI
-#     system-deps). Its own CI arrives in migration phase 6.
+# native/ (the 2.0 egui shell) is excluded from the default workspace and needs
+# GUI system-deps, so it isn't built here — it's compiled + packaged by
+# native-preview.yml (which also serves as its build verification).
 
 name: Build Check
 

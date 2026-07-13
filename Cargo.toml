@@ -1,12 +1,12 @@
-# Root workspace manifest. The actual crates live in the members below:
-#   core/      — screenies-core: shell-independent parser/render/export pipeline
-#   src-tauri/ — screenies-editor: the CURRENT shipping desktop app (Tauri 1.x)
+# Root workspace manifest.
+#   core/ — screenies-core: the shell-independent parser/render/export engine.
 #
-# native/ (screenies-native, the 2.0 egui shell) is intentionally EXCLUDED: it
-# pulls egui's Linux GUI system-deps, so keeping it out of the default
-# workspace lets `cargo test --workspace` stay fast/green in CI. Build/run it
-# explicitly with `cd native && cargo run`. See docs/2.0-MIGRATION.md.
+# The 1.x Tauri shell + its TypeScript frontend were removed on this branch —
+# 2.0 is the native egui app in native/ (the old app lives on `main` / `v1.*`).
+# native/ (screenies-native) is EXCLUDED from the default workspace: it pulls
+# egui's Linux GUI system-deps, so keeping it out lets `cargo test --workspace`
+# stay fast/green in CI. Build/run it with `cd native && cargo run`.
 [workspace]
 resolver = "2"
-members = ["core", "src-tauri"]
+members = ["core"]
 exclude = ["native"]

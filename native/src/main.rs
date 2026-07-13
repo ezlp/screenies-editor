@@ -2,7 +2,7 @@
 //
 // Landing menu → SSRP Editor (a working preview with the basic 1.x features),
 // plus Chatlog Parser / Gallery stubs for later phases. All real work lives in
-// screenies-core, the same engine the Tauri app uses.
+// screenies-core (the shell-independent engine).
 //
 // Not yet build-verified locally (needs egui's Linux GUI system-deps), but the
 // egui API used here is standard 0.29.
