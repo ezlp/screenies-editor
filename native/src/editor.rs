@@ -46,6 +46,13 @@ pub struct EditorState {
     censors: Vec<CensorRegion>,
     selected_censor: Option<usize>,
 
+    // Crop / output. crop = None → whole photo. crop_ratio locks the aspect.
+    crop: Option<CropRect>,
+    crop_ratio: Option<f32>,
+    crop_editing: bool,
+    source_img: Option<egui::ColorImage>, // decoded photo, for the crop-edit view
+    source_tex: Option<egui::TextureHandle>,
+
     // Live preview: re-rendered only when `dirty`.
     dirty: bool,
     texture: Option<egui::TextureHandle>,
@@ -70,6 +77,11 @@ impl Default for EditorState {
             filters: identity_filters(),
             censors: Vec::new(),
             selected_censor: None,
+            crop: None,
+            crop_ratio: None,
+            crop_editing: false,
+            source_img: None,
+            source_tex: None,
             dirty: false,
             texture: None,
             error: None,
@@ -84,11 +96,19 @@ impl EditorState {
             .default_width(320.0)
             .show_inside(ui, |ui| self.controls(ui));
 
+        // Refresh the output texture from control edits BEFORE drawing the
+        // preview. Skip while crop-editing — that view uses the source photo;
+        // the full output re-render happens once you click "Selesai crop".
+        if self.dirty && !self.crop_editing {
+            self.refresh(ui.ctx());
+        }
+
         egui::CentralPanel::default().show_inside(ui, |ui| self.preview(ui));
 
-        // Re-render after the UI ran, so this frame's edits are included.
-        if self.dirty {
-            self.refresh(ui.ctx());
+        // Preview drags (censor/crop) may have set dirty after the refresh
+        // above — ask for one more frame so the change shows up.
+        if self.dirty && !self.crop_editing {
+            ui.ctx().request_repaint();
         }
     }
 
@@ -102,6 +122,33 @@ impl EditorState {
                 ui.small(format!("{}×{} px", p.w, p.h));
             } else {
                 ui.small("Belum ada foto.");
+            }
+
+            ui.separator();
+            ui.label("Crop / Resolusi");
+            ui.horizontal_wrapped(|ui| {
+                if ui.button("Bebas").clicked() {
+                    self.set_ratio(None);
+                }
+                if ui.button("1:1").clicked() {
+                    self.set_ratio(Some(1.0));
+                }
+                if ui.button("4:3").clicked() {
+                    self.set_ratio(Some(4.0 / 3.0));
+                }
+                if ui.button("16:9").clicked() {
+                    self.set_ratio(Some(16.0 / 9.0));
+                }
+                if ui.button("21:9").clicked() {
+                    self.set_ratio(Some(21.0 / 9.0));
+                }
+            });
+            let crop_btn = if self.crop_editing { "✓ Selesai crop" } else { "✏ Edit crop" };
+            if ui.add_enabled(self.photo.is_some(), egui::Button::new(crop_btn)).clicked() {
+                self.toggle_crop_edit();
+            }
+            if let Some(c) = &self.crop {
+                ui.small(format!("Output: {}×{}", c.w.round() as u32, c.h.round() as u32));
             }
 
             ui.separator();
@@ -263,6 +310,14 @@ impl EditorState {
     }
 
     fn preview(&mut self, ui: &mut egui::Ui) {
+        // Crop-edit mode shows the SOURCE photo with an editable crop box.
+        if self.crop_editing {
+            if let Some((pw, ph)) = self.photo.as_ref().map(|p| (p.w, p.h)) {
+                self.preview_crop(ui, pw, ph);
+                return;
+            }
+        }
+
         let Some(tex) = self.texture.as_ref() else {
             ui.centered_and_justified(|ui| {
                 ui.label("Muat foto untuk mulai mengedit.");
@@ -337,6 +392,85 @@ impl EditorState {
         }
     }
 
+    /// Crop-edit view: the SOURCE photo with a draggable/resizable crop box
+    /// and the outside dimmed. Coordinates are source px; screen = origin + c*scale.
+    fn preview_crop(&mut self, ui: &mut egui::Ui, pw: u32, ph: u32) {
+        if self.source_tex.is_none() {
+            if let Some(img) = self.source_img.clone() {
+                self.source_tex =
+                    Some(ui.ctx().load_texture("source", img, egui::TextureOptions::LINEAR));
+            }
+        }
+        let Some(tex) = self.source_tex.as_ref() else {
+            ui.centered_and_justified(|ui| {
+                ui.label("Muat foto dulu.");
+            });
+            return;
+        };
+        let tex_id = tex.id();
+        let src = egui::vec2(pw as f32, ph as f32);
+        let avail = ui.available_size();
+        let scale = (avail.x / src.x).min(avail.y / src.y).min(1.0);
+        let disp = src * scale;
+        let (area, _) = ui.allocate_exact_size(avail, egui::Sense::hover());
+        let origin = area.min + (avail - disp) * 0.5;
+        let img_rect = egui::Rect::from_min_size(origin, disp);
+        let painter = ui.painter_at(area);
+        let uv = egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0));
+        painter.image(tex_id, img_rect, uv, egui::Color32::WHITE);
+
+        let mut crop = self
+            .crop
+            .unwrap_or(CropRect { x: 0.0, y: 0.0, w: pw as f64, h: ph as f64 });
+        let cr_min = egui::pos2(origin.x + crop.x as f32 * scale, origin.y + crop.y as f32 * scale);
+        let cr = egui::Rect::from_min_size(cr_min, egui::vec2(crop.w as f32 * scale, crop.h as f32 * scale));
+
+        // Dim the four strips outside the crop box.
+        let dim = egui::Color32::from_black_alpha(130);
+        let z = egui::Rounding::ZERO;
+        painter.rect_filled(egui::Rect::from_min_max(img_rect.min, egui::pos2(img_rect.max.x, cr.min.y)), z, dim);
+        painter.rect_filled(egui::Rect::from_min_max(egui::pos2(img_rect.min.x, cr.max.y), img_rect.max), z, dim);
+        painter.rect_filled(egui::Rect::from_min_max(egui::pos2(img_rect.min.x, cr.min.y), egui::pos2(cr.min.x, cr.max.y)), z, dim);
+        painter.rect_filled(egui::Rect::from_min_max(egui::pos2(cr.max.x, cr.min.y), egui::pos2(img_rect.max.x, cr.max.y)), z, dim);
+
+        let accent = egui::Color32::from_rgb(194, 162, 218);
+        painter.rect_stroke(cr, z, egui::Stroke::new(2.0, accent));
+
+        let body = ui.interact(cr, egui::Id::new("crop-body"), egui::Sense::drag());
+        if body.dragged() {
+            let d = body.drag_delta() / scale;
+            crop.x += d.x as f64;
+            crop.y += d.y as f64;
+        }
+        const H: f32 = 14.0;
+        let hrect = egui::Rect::from_min_size(cr.max - egui::vec2(H, H), egui::vec2(H, H));
+        painter.rect_filled(hrect, z, accent);
+        let hr = ui.interact(hrect, egui::Id::new("crop-resize"), egui::Sense::drag());
+        if hr.dragged() {
+            let d = hr.drag_delta() / scale;
+            crop.w += d.x as f64;
+            if let Some(r) = self.crop_ratio {
+                crop.h = crop.w / r as f64;
+            } else {
+                crop.h += d.y as f64;
+            }
+        }
+
+        if body.dragged() || hr.dragged() {
+            clamp_crop(&mut crop, pw, ph, self.crop_ratio);
+            self.crop = Some(crop);
+            self.dirty = true;
+        }
+
+        painter.text(
+            img_rect.min + egui::vec2(6.0, 6.0),
+            egui::Align2::LEFT_TOP,
+            "Seret kotak untuk framing · pojok untuk resize · klik “✓ Selesai crop”",
+            egui::FontId::proportional(12.0),
+            egui::Color32::WHITE,
+        );
+    }
+
     fn pick_photo(&mut self) {
         if let Some(path) = rfd::FileDialog::new()
             .add_filter("Gambar", &["png", "jpg", "jpeg", "webp", "bmp"])
@@ -345,11 +479,21 @@ impl EditorState {
             match std::fs::read(&path) {
                 Ok(bytes) => match image::load_from_memory(&bytes) {
                     Ok(img) => {
+                        let rgba = img.to_rgba8();
+                        let (w, h) = (rgba.width(), rgba.height());
+                        self.source_img = Some(egui::ColorImage::from_rgba_unmultiplied(
+                            [w as usize, h as usize],
+                            rgba.as_raw(),
+                        ));
+                        self.source_tex = None;
                         self.photo = Some(Photo {
                             base64: base64::engine::general_purpose::STANDARD.encode(&bytes),
-                            w: img.width(),
-                            h: img.height(),
+                            w,
+                            h,
                         });
+                        self.crop = None;
+                        self.crop_ratio = None;
+                        self.crop_editing = false;
                         self.error = None;
                         self.dirty = true;
                     }
@@ -383,6 +527,27 @@ impl EditorState {
         self.dirty = true;
     }
 
+    /// Pick an aspect ratio (None = free): reset the crop to the largest
+    /// centered box of that ratio and jump into crop-edit mode.
+    fn set_ratio(&mut self, ratio: Option<f32>) {
+        if let Some(p) = &self.photo {
+            self.crop_ratio = ratio;
+            self.crop = Some(centered_crop(p.w, p.h, ratio));
+            self.crop_editing = true;
+            self.dirty = true;
+        }
+    }
+
+    fn toggle_crop_edit(&mut self) {
+        self.crop_editing = !self.crop_editing;
+        if self.crop_editing && self.crop.is_none() {
+            if let Some(p) = &self.photo {
+                self.crop = Some(centered_crop(p.w, p.h, self.crop_ratio));
+            }
+        }
+        self.dirty = true;
+    }
+
     /// Auto outline thickness — matches the 1.x rule (size/9, floored).
     fn effective_stroke(&self) -> f32 {
         if self.stroke_auto {
@@ -398,7 +563,13 @@ impl EditorState {
     /// (the photo still renders) so the preview never goes blank on a typo.
     fn current_job(&self) -> Option<RenderJob> {
         let photo = self.photo.as_ref()?;
-        let output = Size { w: photo.w, h: photo.h };
+        let crop = self
+            .crop
+            .unwrap_or(CropRect { x: 0.0, y: 0.0, w: photo.w as f64, h: photo.h as f64 });
+        let output = Size {
+            w: (crop.w.round() as u32).max(1),
+            h: (crop.h.round() as u32).max(1),
+        };
 
         let blocks = if self.chatlog_text.trim().is_empty() {
             Vec::new()
@@ -407,8 +578,8 @@ impl EditorState {
                 text_size: self.text_size,
                 line_gap: self.line_gap,
                 bg_offset: 0.0,
-                output_w: photo.w as f32,
-                output_h: photo.h as f32,
+                output_w: output.w as f32,
+                output_h: output.h as f32,
             };
             let block = LayoutBlock {
                 lines: chatlog::parse(&self.chatlog_text, &self.preset),
@@ -427,7 +598,7 @@ impl EditorState {
 
         Some(RenderJob {
             image_base64: photo.base64.clone(),
-            crop: CropRect { x: 0.0, y: 0.0, w: photo.w as f64, h: photo.h as f64 },
+            crop,
             output,
             stickers: Vec::new(),
             filters: self.filters,
@@ -478,6 +649,45 @@ impl EditorState {
             Err(e) => self.error = Some(format!("Render gagal: {e}")),
         }
     }
+}
+
+/// Largest centered crop of the given ratio (None = whole photo), source px.
+fn centered_crop(pw: u32, ph: u32, ratio: Option<f32>) -> CropRect {
+    let (pw, ph) = (pw as f64, ph as f64);
+    match ratio {
+        None => CropRect { x: 0.0, y: 0.0, w: pw, h: ph },
+        Some(r) => {
+            let r = r as f64;
+            let mut w = pw;
+            let mut h = w / r;
+            if h > ph {
+                h = ph;
+                w = h * r;
+            }
+            CropRect { x: (pw - w) / 2.0, y: (ph - h) / 2.0, w, h }
+        }
+    }
+}
+
+/// Keep a crop box inside the photo, honoring the aspect ratio if locked.
+fn clamp_crop(c: &mut CropRect, pw: u32, ph: u32, ratio: Option<f32>) {
+    let (pw, ph) = (pw as f64, ph as f64);
+    c.w = c.w.clamp(16.0, pw);
+    c.h = c.h.clamp(16.0, ph);
+    if let Some(r) = ratio {
+        let r = r as f64;
+        c.h = c.w / r;
+        if c.h > ph {
+            c.h = ph;
+            c.w = c.h * r;
+        }
+        if c.w > pw {
+            c.w = pw;
+            c.h = c.w / r;
+        }
+    }
+    c.x = c.x.clamp(0.0, (pw - c.w).max(0.0));
+    c.y = c.y.clamp(0.0, (ph - c.h).max(0.0));
 }
 
 fn identity_filters() -> FilterValues {
