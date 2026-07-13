@@ -35,23 +35,44 @@ struct Sticker {
     aspect: f32,
 }
 
+/// One chatlog block: its raw text + placement. Multiple blocks let you put
+/// different chat at different positions (mirrors 1.x "+ Tambah Chatlog").
+struct ChatBlock {
+    text: String,
+    anchor: Anchor,
+    bg_mode: BgMode,
+    x: f32,
+    y: f32,
+}
+
+impl ChatBlock {
+    /// A fresh block, staggered by index so new ones don't stack exactly.
+    fn new(index: usize) -> Self {
+        Self {
+            text: String::new(),
+            anchor: Anchor::Free,
+            bg_mode: BgMode::None,
+            x: 40.0,
+            y: 40.0 + 70.0 * index as f32,
+        }
+    }
+}
+
 pub struct EditorState {
     preset: ParsePreset,
     photo: Option<Photo>,
-    chatlog_text: String,
 
-    // Text controls.
+    // Chatlog blocks (each: text + anchor + bg + position). One is selected
+    // for editing at a time.
+    blocks: Vec<ChatBlock>,
+    selected_block: usize,
+
+    // Text controls (shared across blocks).
     font_family: String,
     text_size: f32,
     line_gap: f32,
     stroke_auto: bool,
     stroke_width: f32,
-
-    // Placement + background.
-    anchor: Anchor,
-    bg_mode: BgMode,
-    block_x: f32,
-    block_y: f32,
 
     filters: FilterValues,
 
@@ -81,16 +102,13 @@ impl Default for EditorState {
         Self {
             preset: chatlog::preset::jgrp(),
             photo: None,
-            chatlog_text: String::new(),
+            blocks: vec![ChatBlock::new(0)],
+            selected_block: 0,
             font_family: "Verdana".into(),
             text_size: 27.0,
             line_gap: 122.0,
             stroke_auto: true,
             stroke_width: 3.0,
-            anchor: Anchor::KiriAtas,
-            bg_mode: BgMode::None,
-            block_x: 40.0,
-            block_y: 40.0,
             filters: identity_filters(),
             censors: Vec::new(),
             selected_censor: None,
@@ -171,16 +189,41 @@ impl EditorState {
             }
 
             ui.separator();
-            ui.label("Chatlog");
+            ui.horizontal_wrapped(|ui| {
+                ui.label("Chatlog:");
+                for i in 0..self.blocks.len() {
+                    if ui
+                        .selectable_label(self.selected_block == i, format!("#{}", i + 1))
+                        .clicked()
+                    {
+                        self.selected_block = i;
+                    }
+                }
+                if ui.button("➕").on_hover_text("Tambah chatlog").clicked() {
+                    self.blocks.push(ChatBlock::new(self.blocks.len()));
+                    self.selected_block = self.blocks.len() - 1;
+                    self.dirty = true;
+                }
+            });
+
+            let bi = self.selected_block.min(self.blocks.len() - 1);
+            self.selected_block = bi;
             if ui
                 .add(
-                    egui::TextEdit::multiline(&mut self.chatlog_text)
-                        .desired_rows(8)
+                    egui::TextEdit::multiline(&mut self.blocks[bi].text)
+                        .desired_rows(6)
                         .desired_width(f32::INFINITY)
                         .hint_text("[12:34:56] Budi_Santoso says: contoh chat"),
                 )
                 .changed()
             {
+                self.dirty = true;
+            }
+            self.combo_anchor(ui, bi);
+            self.combo_bg(ui, bi);
+            if self.blocks.len() > 1 && ui.button("🗑 Hapus chatlog ini").clicked() {
+                self.blocks.remove(bi);
+                self.selected_block = 0;
                 self.dirty = true;
             }
 
@@ -214,11 +257,6 @@ impl EditorState {
             {
                 self.dirty = true;
             }
-
-            ui.separator();
-            ui.label("Posisi & Background");
-            self.combo_anchor(ui);
-            self.combo_bg(ui);
 
             ui.separator();
             ui.collapsing("Filter", |ui| {
@@ -302,37 +340,37 @@ impl EditorState {
         });
     }
 
-    fn combo_anchor(&mut self, ui: &mut egui::Ui) {
-        let prev = self.anchor;
-        egui::ComboBox::from_label("Posisi")
-            .selected_text(anchor_label(self.anchor))
+    fn combo_anchor(&mut self, ui: &mut egui::Ui, bi: usize) {
+        let prev = self.blocks[bi].anchor;
+        egui::ComboBox::from_id_salt(("anchor", bi))
+            .selected_text(format!("Posisi: {}", anchor_label(prev)))
             .show_ui(ui, |ui| {
-                ui.selectable_value(&mut self.anchor, Anchor::Free, "Bebas");
-                ui.selectable_value(&mut self.anchor, Anchor::KiriAtas, "Kiri Atas");
-                ui.selectable_value(&mut self.anchor, Anchor::KiriBawah, "Kiri Bawah");
+                ui.selectable_value(&mut self.blocks[bi].anchor, Anchor::Free, "Bebas");
+                ui.selectable_value(&mut self.blocks[bi].anchor, Anchor::KiriAtas, "Kiri Atas");
+                ui.selectable_value(&mut self.blocks[bi].anchor, Anchor::KiriBawah, "Kiri Bawah");
             });
-        if self.anchor != prev {
+        if self.blocks[bi].anchor != prev {
             self.dirty = true;
         }
-        if self.anchor == Anchor::Free {
-            let a = ui.add(egui::Slider::new(&mut self.block_x, 0.0..=2000.0).text("X")).changed();
-            let b = ui.add(egui::Slider::new(&mut self.block_y, 0.0..=2000.0).text("Y")).changed();
+        if self.blocks[bi].anchor == Anchor::Free {
+            let a = ui.add(egui::Slider::new(&mut self.blocks[bi].x, 0.0..=4000.0).text("X")).changed();
+            let b = ui.add(egui::Slider::new(&mut self.blocks[bi].y, 0.0..=4000.0).text("Y")).changed();
             if a || b {
                 self.dirty = true;
             }
         }
     }
 
-    fn combo_bg(&mut self, ui: &mut egui::Ui) {
-        let prev = self.bg_mode;
-        egui::ComboBox::from_label("Background")
-            .selected_text(bg_label(self.bg_mode))
+    fn combo_bg(&mut self, ui: &mut egui::Ui, bi: usize) {
+        let prev = self.blocks[bi].bg_mode;
+        egui::ComboBox::from_id_salt(("bg", bi))
+            .selected_text(format!("BG: {}", bg_label(prev)))
             .show_ui(ui, |ui| {
-                ui.selectable_value(&mut self.bg_mode, BgMode::None, "Tidak ada");
-                ui.selectable_value(&mut self.bg_mode, BgMode::Block, "Blok");
-                ui.selectable_value(&mut self.bg_mode, BgMode::Mask, "Mask");
+                ui.selectable_value(&mut self.blocks[bi].bg_mode, BgMode::None, "Tidak ada");
+                ui.selectable_value(&mut self.blocks[bi].bg_mode, BgMode::Block, "Blok");
+                ui.selectable_value(&mut self.blocks[bi].bg_mode, BgMode::Mask, "Mask");
             });
-        if self.bg_mode != prev {
+        if self.blocks[bi].bg_mode != prev {
             self.dirty = true;
         }
     }
@@ -701,9 +739,7 @@ impl EditorState {
             h: (crop.h.round() as u32).max(1),
         };
 
-        let blocks = if self.chatlog_text.trim().is_empty() {
-            Vec::new()
-        } else if let Ok(measure) = GlyphMeasure::new(&self.font_family, self.text_size) {
+        let blocks = if let Ok(measure) = GlyphMeasure::new(&self.font_family, self.text_size) {
             let params = LayoutParams {
                 text_size: self.text_size,
                 line_gap: self.line_gap,
@@ -711,14 +747,19 @@ impl EditorState {
                 output_w: output.w as f32,
                 output_h: output.h as f32,
             };
-            let block = LayoutBlock {
-                lines: chatlog::parse(&self.chatlog_text, &self.preset),
-                anchor: self.anchor,
-                bg_mode: self.bg_mode,
-                x: self.block_x,
-                y: self.block_y,
-            };
-            layout::layout_blocks(&[block], &params, &measure)
+            let lblocks: Vec<LayoutBlock> = self
+                .blocks
+                .iter()
+                .filter(|b| !b.text.trim().is_empty())
+                .map(|b| LayoutBlock {
+                    lines: chatlog::parse(&b.text, &self.preset),
+                    anchor: b.anchor,
+                    bg_mode: b.bg_mode,
+                    x: b.x,
+                    y: b.y,
+                })
+                .collect();
+            layout::layout_blocks(&lblocks, &params, &measure)
                 .into_iter()
                 .map(|l| l.block)
                 .collect()
