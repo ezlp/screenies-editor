@@ -14,7 +14,7 @@ pub mod layout;
 pub mod sticker;
 pub mod text;
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -75,7 +75,7 @@ pub struct Size {
     pub h: u32,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FilterValues {
     pub brightness: f32, // percent, 100 = identity

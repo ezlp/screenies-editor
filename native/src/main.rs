@@ -19,6 +19,7 @@ use eframe::egui;
 use editor::EditorState;
 use gallery::GalleryState;
 use i18n::{t, Lang};
+use screenies_core::render::FilterValues;
 
 fn main() -> eframe::Result {
     let mut viewport = egui::ViewportBuilder::default()
@@ -77,11 +78,33 @@ struct Settings {
     dark: bool,
     font: String,
     lang: Lang,
+    text_size: f32,
+    line_gap: f32,
+    filters: FilterValues,
 }
 
 impl Default for Settings {
     fn default() -> Self {
-        Self { dark: true, font: "Verdana".into(), lang: Lang::Id }
+        Self {
+            dark: true,
+            font: "Verdana".into(),
+            lang: Lang::Id,
+            text_size: 27.0,
+            line_gap: 122.0,
+            filters: default_filters(),
+        }
+    }
+}
+
+fn default_filters() -> FilterValues {
+    FilterValues {
+        brightness: 100.0,
+        grayscale: 0.0,
+        sepia: 0.0,
+        saturate: 100.0,
+        contrast: 100.0,
+        blur: 0.0,
+        pixelate: 0.0,
     }
 }
 
@@ -93,6 +116,7 @@ impl App {
                 app.dark = s.dark;
                 app.lang = s.lang;
                 app.editor.set_font(s.font);
+                app.editor.apply_prefs(s.text_size, s.line_gap, s.filters);
             }
         }
         app
@@ -156,10 +180,14 @@ impl eframe::App for App {
     }
 
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
+        let (text_size, line_gap, filters) = self.editor.prefs();
         let s = Settings {
             dark: self.dark,
             font: self.editor.font().to_string(),
             lang: self.lang,
+            text_size,
+            line_gap,
+            filters,
         };
         eframe::set_value(storage, "settings", &s);
     }

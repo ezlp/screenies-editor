@@ -111,8 +111,10 @@ pub struct EditorState {
     selected_sticker: Option<usize>,
 
     // Crop / output. crop = None → whole photo. crop_ratio locks the aspect.
+    // output_override forces a fixed output resolution (e.g. 800×600).
     crop: Option<CropRect>,
     crop_ratio: Option<f32>,
+    output_override: Option<(u32, u32)>,
     crop_editing: bool,
     source_img: Option<egui::ColorImage>, // decoded photo, for the crop-edit view
     source_tex: Option<egui::TextureHandle>,
@@ -149,6 +151,7 @@ impl Default for EditorState {
             selected_sticker: None,
             crop: None,
             crop_ratio: None,
+            output_override: None,
             crop_editing: false,
             source_img: None,
             source_tex: None,
@@ -214,10 +217,18 @@ impl EditorState {
         egui::ScrollArea::vertical().show(ui, |ui| {
             ui.add_space(6.0);
             ui.horizontal(|ui| {
-                if ui.add_enabled(self.history.len() > 1, egui::Button::new("↶ Undo")).clicked() {
+                if ui
+                    .add_enabled(self.history.len() > 1, egui::Button::new("↩  Undo"))
+                    .on_hover_text("Ctrl+Z")
+                    .clicked()
+                {
                     self.undo();
                 }
-                if ui.add_enabled(!self.future.is_empty(), egui::Button::new("↷ Redo")).clicked() {
+                if ui
+                    .add_enabled(!self.future.is_empty(), egui::Button::new("↪  Redo"))
+                    .on_hover_text("Ctrl+Y")
+                    .clicked()
+                {
                     self.redo();
                 }
             });
@@ -247,6 +258,9 @@ impl EditorState {
                 }
                 if ui.button("21:9").clicked() {
                     self.set_ratio(Some(21.0 / 9.0));
+                }
+                if ui.button("800×600").clicked() {
+                    self.set_resolution(800, 600);
                 }
             });
             let crop_btn = self.t(if self.crop_editing { "✓ Selesai crop" } else { "✏ Edit crop" });
@@ -349,12 +363,6 @@ impl EditorState {
                 self.filter_slider(ui, "Grayscale", 0.0..=100.0, |f| &mut f.grayscale);
                 self.filter_slider(ui, "Sepia", 0.0..=100.0, |f| &mut f.sepia);
                 self.filter_slider(ui, "Saturate", 0.0..=300.0, |f| &mut f.saturate);
-            });
-
-            ui.collapsing(self.t("Efek (2.0)"), |ui| {
-                // Global neighborhood effects — new in 2.0 (core render::filters).
-                self.filter_slider(ui, "Blur (px)", 0.0..=20.0, |f| &mut f.blur);
-                self.filter_slider(ui, "Pixelate (blok px)", 0.0..=64.0, |f| &mut f.pixelate);
             });
 
             ui.collapsing(self.t("Sensor area (blur/pixelate lokal)"), |ui| {
@@ -756,6 +764,15 @@ impl EditorState {
             self.dirty = true;
         }
     }
+    pub fn prefs(&self) -> (f32, f32, FilterValues) {
+        (self.text_size, self.line_gap, self.filters)
+    }
+    pub fn apply_prefs(&mut self, size: f32, gap: f32, filters: FilterValues) {
+        self.text_size = size.clamp(8.0, 60.0);
+        self.line_gap = gap.clamp(80.0, 200.0);
+        self.filters = filters;
+        self.dirty = true;
+    }
 
     /// Load a photo from a path (used by the file picker and the Gallery's
     /// "open in editor"). Resets the crop to the whole photo.
@@ -783,6 +800,7 @@ impl EditorState {
                 });
                 self.crop = None;
                 self.crop_ratio = None;
+                self.output_override = None;
                 self.crop_editing = false;
                 self.error = None;
                 self.dirty = true;
@@ -867,6 +885,20 @@ impl EditorState {
         if let Some(p) = &self.photo {
             self.crop_ratio = ratio;
             self.crop = Some(centered_crop(p.w, p.h, ratio));
+            self.output_override = None;
+            self.crop_editing = true;
+            self.dirty = true;
+        }
+    }
+
+    /// Fixed output resolution (e.g. 800×600) — crops to that aspect and scales
+    /// the result to exactly w×h.
+    fn set_resolution(&mut self, w: u32, h: u32) {
+        if let Some(p) = &self.photo {
+            let ratio = w as f32 / h as f32;
+            self.crop_ratio = Some(ratio);
+            self.crop = Some(centered_crop(p.w, p.h, Some(ratio)));
+            self.output_override = Some((w, h));
             self.crop_editing = true;
             self.dirty = true;
         }
@@ -966,9 +998,12 @@ impl EditorState {
         let crop = self
             .crop
             .unwrap_or(CropRect { x: 0.0, y: 0.0, w: photo.w as f64, h: photo.h as f64 });
-        let output = Size {
-            w: (crop.w.round() as u32).max(1),
-            h: (crop.h.round() as u32).max(1),
+        let output = match self.output_override {
+            Some((w, h)) => Size { w, h },
+            None => Size {
+                w: (crop.w.round() as u32).max(1),
+                h: (crop.h.round() as u32).max(1),
+            },
         };
 
         let blocks = if let Ok(measure) = GlyphMeasure::new(&self.font_family, self.text_size) {

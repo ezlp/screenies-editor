@@ -26,6 +26,10 @@ impl GalleryState {
 
     pub fn ui(&mut self, ui: &mut egui::Ui) {
         ui.add_space(6.0);
+        ui.colored_label(
+            egui::Color32::from_rgb(230, 180, 60),
+            "⚠ WIP — Gallery masih dalam pengembangan",
+        );
         ui.horizontal(|ui| {
             if ui.button(self.t("📂  Buka folder")).clicked() {
                 self.open_folder();
