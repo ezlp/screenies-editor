@@ -26,7 +26,11 @@ maintainer = "Isut Indraputra <isut@users.noreply.github.com>"
 section = "graphics"
 priority = "optional"
 depends = "$auto"
-assets = [["target/release/screenies-native", "usr/bin/", "755"]]
+assets = [
+    ["target/release/screenies-native", "usr/bin/", "755"],
+    ["assets/screenies-native.desktop", "usr/share/applications/", "644"],
+    ["assets/icon.png", "usr/share/icons/hicolor/128x128/apps/screenies-native.png", "644"],
+]
 
 # ── Linux packaging (cargo-generate-rpm) ──
 # auto-req disabled for the alpha (avoids cross-distro dep-name mismatch);
@@ -38,6 +42,8 @@ auto-req = "disabled"
 version = "2.0.0~alpha.1"
 assets = [
     { source = "target/release/screenies-native", dest = "/usr/bin/screenies-native", mode = "755" },
+    { source = "assets/screenies-native.desktop", dest = "/usr/share/applications/screenies-native.desktop", mode = "644" },
+    { source = "assets/icon.png", dest = "/usr/share/icons/hicolor/128x128/apps/screenies-native.png", mode = "644" },
 ]
 
 [dependencies]

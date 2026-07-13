@@ -19,10 +19,15 @@ use editor::EditorState;
 use gallery::GalleryState;
 
 fn main() -> eframe::Result {
+    let mut viewport = egui::ViewportBuilder::default()
+        .with_inner_size([1180.0, 760.0])
+        .with_min_inner_size([880.0, 580.0])
+        .with_title("ScreeniesEditor");
+    if let Ok(icon) = eframe::icon_data::from_png_bytes(include_bytes!("../assets/icon.png")) {
+        viewport = viewport.with_icon(std::sync::Arc::new(icon));
+    }
     let options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default()
-            .with_inner_size([1180.0, 760.0])
-            .with_min_inner_size([880.0, 580.0]),
+        viewport,
         ..Default::default()
     };
     eframe::run_native(
