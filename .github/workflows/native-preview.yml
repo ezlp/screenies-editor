@@ -61,6 +61,22 @@ jobs:
         working-directory: native
         run: cargo generate-rpm
 
+      - name: Build AppImage (best effort)
+        continue-on-error: true
+        working-directory: native
+        env:
+          APPIMAGE_EXTRACT_AND_RUN: "1"
+        run: |
+          set -eux
+          wget -q https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-x86_64.AppImage
+          chmod +x linuxdeploy-x86_64.AppImage
+          ./linuxdeploy-x86_64.AppImage \
+            --appdir AppDir \
+            --executable target/release/screenies-native \
+            --desktop-file assets/screenies-native.desktop \
+            --icon-file assets/icon.png \
+            --output appimage
+
       - name: Stage artifacts
         shell: bash
         run: |
@@ -68,6 +84,7 @@ jobs:
           cp native/target/release/screenies-native out/screenies-native-linux-x86_64
           cp native/target/debian/*.deb out/
           cp native/target/generate-rpm/*.rpm out/
+          cp native/*.AppImage out/ 2>/dev/null || echo "no AppImage (best-effort step may have failed)"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -128,5 +145,6 @@ jobs:
             - Debian/Ubuntu: `*.deb` — `sudo apt install ./screenies-native_*.deb`.
             - Fedora/RHEL: `*.rpm` — `sudo dnf install ./screenies-native-*.rpm`
               (install GTK3 + Mesa/OpenGL yourself if missing).
+            - Portable: `*.AppImage` (best-effort) — `chmod +x` then run.
             - Or the raw `screenies-native-linux-x86_64` binary (`chmod +x`, needs GTK3 + OpenGL).
           files: dist/**/*
