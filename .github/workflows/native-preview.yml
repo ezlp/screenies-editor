@@ -127,24 +127,43 @@ jobs:
           path: dist
           merge-multiple: true
 
-      - name: Publish rolling pre-release
+      - name: Publish release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_type == 'tag' && github.ref_name || 'native-preview' }}
-          name: ScreeniesEditor ${{ github.ref_name }} (native egui)
-          prerelease: true
+          name: ScreeniesEditor ${{ github.ref_name }}
+          # Tags with a '-' (e.g. v2.0.0-alpha.2, native-preview-0.19) are
+          # pre-releases; clean tags (v2.0.0) publish as a stable release.
+          prerelease: ${{ contains(github.ref_name, '-') }}
           body: |
-            Automated **test build** of the native egui shell (2.0 preview).
+            ## ScreeniesEditor 2.0 — TL;DR
 
-            ⚠️ Alpha: basic editor only (load photo · paste chatlog · font/size ·
-            filters + blur/pixelate · background/anchor · live preview · PNG export).
-            Not yet: crop editor, stickers, palette, undo, multi-block, i18n.
+            **A complete rewrite from a webview app (Tauri) to a native Rust app
+            (egui).** No more WebView2/Edge dependency — it runs on old laptops as
+            a small native binary. Same fast Rust engine under the hood, brand-new
+            native UI.
 
-            **Downloads**
-            - Windows: `screenies-native-windows-x86_64.exe` — run directly.
-            - Debian/Ubuntu: `*.deb` — `sudo apt install ./screenies-native_*.deb`.
-            - Fedora/RHEL: `*.rpm` — `sudo dnf install ./screenies-native-*.rpm`
-              (install GTK3 + Mesa/OpenGL yourself if missing).
-            - Portable: `*.AppImage` (best-effort) — `chmod +x` then run.
-            - Or the raw `screenies-native-linux-x86_64` binary (`chmod +x`, needs GTK3 + OpenGL).
+            ### What's inside
+            - **SSRP Editor** — load **multiple photos** (tabs) · crop presets
+              (Free / 1:1 / 4:3 / 16:9 / 21:9 / **800×600**) · multi-block chatlog
+              with SA-MP auto-colors + `{RRGGBB}` + server presets · font / size /
+              spacing / outline · filters (brightness · contrast · grayscale ·
+              sepia · saturate) · **local blur / pixelate censor boxes** · stickers
+              · color palette · **undo / redo** · sharp PNG export.
+            - **Chatlog folder** — remembers a folder of `.log` files; open one to
+              preview the raw text (with `{RRGGBB}` codes) and copy it to paste.
+            - **Gallery** *(WIP)* — browse exported photos, open one back in the editor.
+            - **Settings** — dark / light theme · **Indonesian / English** · UI
+              scale (resize the editing space). Everything is remembered across launches.
+
+            ### Download
+            - **Windows:** `screenies-native-windows-x86_64.exe` — just run it.
+            - **Debian / Ubuntu:** `*.deb` → `sudo apt install ./screenies-native_*.deb`
+            - **Fedora / RHEL:** `*.rpm` → `sudo dnf install ./screenies-native-*.rpm`
+            - **Any Linux:** `*.AppImage` (`chmod +x` then run) or the raw binary
+              (needs GTK3 + OpenGL installed).
+
+            The old 1.x (Tauri / WebView2) build stays available under the `v1.*` tags.
+
+            Hit a bug? Please open an issue.
           files: dist/**/*
