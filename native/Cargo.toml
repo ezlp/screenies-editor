@@ -15,11 +15,14 @@ edition = "2021"
 rust-version = "1.77"
 description = "ScreeniesEditor — Screenshot Roleplay editor for the SA-MP community (native egui shell)"
 license = "MIT"
+authors = ["Isut Indraputra", "Claude (Anthropic)"]
+repository = "https://github.com/ezlp/screenies-editor"
 
 # ── Linux packaging (cargo-deb) ──
 # `$auto` runs dpkg-shlibdeps so the .deb declares the real runtime libs
 # (GTK3, OpenGL, xkbcommon, …) the binary links against.
 [package.metadata.deb]
+maintainer = "Isut Indraputra <isut@users.noreply.github.com>"
 section = "graphics"
 priority = "optional"
 depends = "$auto"
