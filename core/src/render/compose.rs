@@ -1,6 +1,6 @@
 //! compose.rs — the export pipeline, start to finish.
 
-use super::{crop, filters, sticker, text, RenderJob};
+use super::{crop, filters, sticker, text, RenderJob, Size};
 use crate::error::AppError;
 use base64::Engine;
 use image::RgbaImage;
@@ -16,9 +16,34 @@ pub fn render(job: &RenderJob) -> Result<RgbaImage, AppError> {
         .map_err(|e| AppError::Render(format!("decode foto: {e}")))?
         .to_rgba8();
 
-    // Photo: crop → resize to the output → filters (photo only).
-    let mut out = crop::crop_and_resize(&src, &job.crop, &job.output)?;
-    filters::apply(&mut out, &job.filters);
+    // Normal mode: the photo fills the output. Cinematic mode: a solid-color
+    // canvas with the photo placed in a centered sub-rect (bars around it).
+    // Filters apply to the photo only; the bars stay the pure canvas color.
+    let mut out = match &job.canvas {
+        None => {
+            let mut o = crop::crop_and_resize(&src, &job.crop, &job.output)?;
+            filters::apply(&mut o, &job.filters);
+            o
+        }
+        Some(cv) => {
+            let mut canvas = image::RgbaImage::from_pixel(
+                job.output.w.max(1),
+                job.output.h.max(1),
+                image::Rgba(cv.color),
+            );
+            let pw = (cv.photo_w.round() as u32).max(1);
+            let ph = (cv.photo_h.round() as u32).max(1);
+            let mut photo = crop::crop_and_resize(&src, &job.crop, &Size { w: pw, h: ph })?;
+            filters::apply(&mut photo, &job.filters);
+            image::imageops::overlay(
+                &mut canvas,
+                &photo,
+                cv.photo_x.round() as i64,
+                cv.photo_y.round() as i64,
+            );
+            canvas
+        }
+    };
 
     // Stickers under the text, then text (with its bg strips).
     sticker::overlay_all(&mut out, &job.stickers)?;
@@ -41,7 +66,7 @@ pub fn encode_png(img: &RgbaImage) -> Result<Vec<u8>, AppError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::render::{CropRect, FilterValues, Size};
+    use crate::render::{Canvas, CropRect, FilterValues, Size};
     use base64::Engine;
 
     fn tiny_job() -> RenderJob {
@@ -64,6 +89,7 @@ mod tests {
                 pixelate: 0.0,
             },
             censors: vec![],
+            canvas: None,
             font_family: "__none__".into(),
             text_size: 20.0,
             stroke_width: 3.0,
@@ -80,5 +106,26 @@ mod tests {
         assert_eq!(p[1], p[2]);
         let png = encode_png(&img).unwrap();
         assert_eq!(&png[..8], &[0x89, b'P', b'N', b'G', 0x0D, 0x0A, 0x1A, 0x0A]);
+    }
+
+    #[test]
+    fn cinematic_canvas_has_solid_bars_and_a_centered_photo() {
+        // 8×12 output: 2px black bars top & bottom, an 8×8 photo band centered.
+        let mut job = tiny_job();
+        job.output = Size { w: 8, h: 12 };
+        job.canvas = Some(Canvas {
+            color: [0, 0, 0, 255],
+            photo_x: 0.0,
+            photo_y: 2.0,
+            photo_w: 8.0,
+            photo_h: 8.0,
+        });
+        let img = render(&job).unwrap();
+        assert_eq!((img.width(), img.height()), (8, 12));
+        // Top and bottom rows are the pure canvas color (black).
+        assert_eq!(img.get_pixel(4, 0).0, [0, 0, 0, 255]);
+        assert_eq!(img.get_pixel(4, 11).0, [0, 0, 0, 255]);
+        // The photo band (red → grayscaled by tiny_job) is not black.
+        assert!(img.get_pixel(4, 6).0[0] > 0, "photo band should be visible");
     }
 }
