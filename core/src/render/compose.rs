@@ -16,14 +16,17 @@ pub fn render(job: &RenderJob) -> Result<RgbaImage, AppError> {
         .map_err(|e| AppError::Render(format!("decode foto: {e}")))?
         .to_rgba8();
 
-    // Photo: crop → resize to the output → filters (photo only) → local censors.
+    // Photo: crop → resize to the output → filters (photo only).
     let mut out = crop::crop_and_resize(&src, &job.crop, &job.output)?;
     filters::apply(&mut out, &job.filters);
-    filters::apply_censors(&mut out, &job.censors);
 
     // Stickers under the text, then text (with its bg strips).
     sticker::overlay_all(&mut out, &job.stickers)?;
     text::draw_blocks(&mut out, job)?;
+
+    // Censor boxes run LAST so blur/pixelate cover whatever sits under them —
+    // photo, stickers, AND text (so you can redact a name/plate over anything).
+    filters::apply_censors(&mut out, &job.censors);
     Ok(out)
 }
 

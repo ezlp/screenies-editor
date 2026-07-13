@@ -25,8 +25,9 @@ pub struct RenderJob {
     pub output: Size,
     pub stickers: Vec<StickerJob>,
     pub filters: FilterValues,
-    /// Local censor boxes (blur/pixelate a rectangle) — applied to the photo,
-    /// under stickers and text. Empty in old payloads via serde(default).
+    /// Local censor boxes (blur/pixelate a rectangle) — applied LAST, over the
+    /// photo, stickers, AND text, so they can redact anything. Empty in old
+    /// payloads via serde(default).
     #[serde(default)]
     pub censors: Vec<CensorRegion>,
     pub font_family: String,
