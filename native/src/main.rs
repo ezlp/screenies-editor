@@ -11,10 +11,12 @@
 
 mod chatlog_parser;
 mod editor;
+mod gallery;
 
 use chatlog_parser::ChatlogParserState;
 use eframe::egui;
 use editor::EditorState;
+use gallery::GalleryState;
 
 fn main() -> eframe::Result {
     let options = eframe::NativeOptions {
@@ -44,6 +46,7 @@ struct App {
     screen: Screen,
     editor: EditorState,
     chatlog_parser: ChatlogParserState,
+    gallery: GalleryState,
 }
 
 impl eframe::App for App {
@@ -64,8 +67,14 @@ impl eframe::App for App {
             Screen::Menu => self.menu(ui),
             Screen::Editor => self.editor.ui(ui),
             Screen::ChatlogParser => self.chatlog_parser.ui(ui),
-            Screen::Gallery => stub(ui, "Gallery", "Fase 4 — jelajahi foto SSRP hasil edit."),
+            Screen::Gallery => self.gallery.ui(ui),
         });
+
+        // Gallery → "Buka di editor": load the photo and jump to the editor.
+        if let Some(path) = self.gallery.open_request.take() {
+            self.editor.load_photo_path(&path);
+            self.screen = Screen::Editor;
+        }
     }
 }
 

@@ -717,31 +717,41 @@ impl EditorState {
             .add_filter("Gambar", &["png", "jpg", "jpeg", "webp", "bmp"])
             .pick_file()
         {
-            match std::fs::read(&path) {
-                Ok(bytes) => match image::load_from_memory(&bytes) {
-                    Ok(img) => {
-                        let rgba = img.to_rgba8();
-                        let (w, h) = (rgba.width(), rgba.height());
-                        self.source_img = Some(egui::ColorImage::from_rgba_unmultiplied(
-                            [w as usize, h as usize],
-                            rgba.as_raw(),
-                        ));
-                        self.source_tex = None;
-                        self.photo = Some(Photo {
-                            base64: base64::engine::general_purpose::STANDARD.encode(&bytes),
-                            w,
-                            h,
-                        });
-                        self.crop = None;
-                        self.crop_ratio = None;
-                        self.crop_editing = false;
-                        self.error = None;
-                        self.dirty = true;
-                    }
-                    Err(e) => self.error = Some(format!("Gagal decode gambar: {e}")),
-                },
-                Err(e) => self.error = Some(format!("Gagal baca file: {e}")),
+            self.load_photo_path(&path);
+        }
+    }
+
+    /// Load a photo from a path (used by the file picker and the Gallery's
+    /// "open in editor"). Resets the crop to the whole photo.
+    pub fn load_photo_path(&mut self, path: &std::path::Path) {
+        let bytes = match std::fs::read(path) {
+            Ok(b) => b,
+            Err(e) => {
+                self.error = Some(format!("Gagal baca file: {e}"));
+                return;
             }
+        };
+        match image::load_from_memory(&bytes) {
+            Ok(img) => {
+                let rgba = img.to_rgba8();
+                let (w, h) = (rgba.width(), rgba.height());
+                self.source_img = Some(egui::ColorImage::from_rgba_unmultiplied(
+                    [w as usize, h as usize],
+                    rgba.as_raw(),
+                ));
+                self.source_tex = None;
+                self.photo = Some(Photo {
+                    base64: base64::engine::general_purpose::STANDARD.encode(&bytes),
+                    w,
+                    h,
+                });
+                self.crop = None;
+                self.crop_ratio = None;
+                self.crop_editing = false;
+                self.error = None;
+                self.dirty = true;
+            }
+            Err(e) => self.error = Some(format!("Gagal decode gambar: {e}")),
         }
     }
 
