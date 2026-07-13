@@ -41,16 +41,34 @@ enum Screen {
     Gallery,
 }
 
-#[derive(Default)]
 struct App {
     screen: Screen,
     editor: EditorState,
     chatlog_parser: ChatlogParserState,
     gallery: GalleryState,
+    dark: bool,
+}
+
+impl Default for App {
+    fn default() -> Self {
+        Self {
+            screen: Screen::default(),
+            editor: EditorState::default(),
+            chatlog_parser: ChatlogParserState::default(),
+            gallery: GalleryState::default(),
+            dark: true,
+        }
+    }
 }
 
 impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        ctx.set_visuals(if self.dark {
+            egui::Visuals::dark()
+        } else {
+            egui::Visuals::light()
+        });
+
         if self.screen != Screen::Menu {
             egui::TopBottomPanel::top("nav").show(ctx, |ui| {
                 ui.horizontal(|ui| {
@@ -59,6 +77,11 @@ impl eframe::App for App {
                     }
                     ui.separator();
                     ui.heading(title_of(self.screen));
+                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                        if ui.button(if self.dark { "☀" } else { "🌙" }).on_hover_text("Ganti tema").clicked() {
+                            self.dark = !self.dark;
+                        }
+                    });
                 });
             });
         }
@@ -74,6 +97,15 @@ impl eframe::App for App {
         if let Some(path) = self.gallery.open_request.take() {
             self.editor.load_photo_path(&path);
             self.screen = Screen::Editor;
+        }
+
+        // Drag-and-drop a photo anywhere → load it into the editor.
+        let dropped = ctx.input(|i| i.raw.dropped_files.iter().find_map(|f| f.path.clone()));
+        if let Some(path) = dropped {
+            if screenies_core::gallery::is_image(&path) {
+                self.editor.load_photo_path(&path);
+                self.screen = Screen::Editor;
+            }
         }
     }
 }
@@ -96,7 +128,15 @@ impl App {
                 self.screen = Screen::Gallery;
             }
 
-            ui.add_space(24.0);
+            ui.add_space(16.0);
+            if ui
+                .button(if self.dark { "☀  Mode terang" } else { "🌙  Mode gelap" })
+                .clicked()
+            {
+                self.dark = !self.dark;
+            }
+
+            ui.add_space(16.0);
             ui.small(format!("v{} · native (egui) · preview", env!("CARGO_PKG_VERSION")));
         });
     }
