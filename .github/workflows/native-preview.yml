@@ -42,14 +42,15 @@ jobs:
         with:
           workspaces: native
 
-      - name: Install packagers
-        uses: taiki-e/install-action@v2
-        with:
-          tool: cargo-deb,cargo-generate-rpm
-
+      # Build the app FIRST so an egui compile error surfaces before packaging.
       - name: Build (release)
         working-directory: native
         run: cargo build --release
+
+      # Compile the packagers from source (the prebuilt binaries need a newer
+      # glibc than ubuntu-22.04 has; 22.04 is intentional for wide .deb compat).
+      - name: Install packagers
+        run: cargo install cargo-deb cargo-generate-rpm --locked
 
       - name: Package .deb
         working-directory: native
