@@ -47,7 +47,7 @@ pub enum CensorKind {
 
 /// A rectangular blur/pixelate region in output px — like a sticker, but it
 /// censors the photo underneath instead of drawing an image.
-#[derive(Debug, Clone, Copy, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CensorRegion {
     pub x: f32,
@@ -59,7 +59,7 @@ pub struct CensorRegion {
     pub strength: f32,
 }
 
-#[derive(Debug, Clone, Copy, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CropRect {
     pub x: f64,
@@ -75,7 +75,7 @@ pub struct Size {
     pub h: u32,
 }
 
-#[derive(Debug, Clone, Copy, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FilterValues {
     pub brightness: f32, // percent, 100 = identity

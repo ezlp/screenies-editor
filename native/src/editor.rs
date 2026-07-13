@@ -26,6 +26,7 @@ struct Photo {
 
 /// A placed sticker: image data + output-space rect. `aspect` (w/h) keeps
 /// resize proportional. The pixels are composited by core into the preview.
+#[derive(Clone, PartialEq)]
 struct Sticker {
     base64: String,
     x: f32,
@@ -37,6 +38,7 @@ struct Sticker {
 
 /// One chatlog block: its raw text + placement. Multiple blocks let you put
 /// different chat at different positions (mirrors 1.x "+ Tambah Chatlog").
+#[derive(Clone, PartialEq)]
 struct ChatBlock {
     text: String,
     anchor: Anchor,
@@ -56,6 +58,22 @@ impl ChatBlock {
             y: 40.0 + 70.0 * index as f32,
         }
     }
+}
+
+/// One undo step: the editable content (photo/textures/selection excluded).
+#[derive(Clone, PartialEq)]
+struct Snapshot {
+    blocks: Vec<ChatBlock>,
+    censors: Vec<CensorRegion>,
+    stickers: Vec<Sticker>,
+    crop: Option<CropRect>,
+    crop_ratio: Option<f32>,
+    filters: FilterValues,
+    font_family: String,
+    text_size: f32,
+    line_gap: f32,
+    stroke_auto: bool,
+    stroke_width: f32,
 }
 
 pub struct EditorState {
@@ -91,6 +109,10 @@ pub struct EditorState {
     source_img: Option<egui::ColorImage>, // decoded photo, for the crop-edit view
     source_tex: Option<egui::TextureHandle>,
 
+    // Undo/redo: snapshots of the editable content.
+    history: Vec<Snapshot>,
+    future: Vec<Snapshot>,
+
     // Live preview: re-rendered only when `dirty`.
     dirty: bool,
     texture: Option<egui::TextureHandle>,
@@ -119,6 +141,8 @@ impl Default for EditorState {
             crop_editing: false,
             source_img: None,
             source_tex: None,
+            history: Vec::new(),
+            future: Vec::new(),
             dirty: false,
             texture: None,
             error: None,
@@ -128,6 +152,25 @@ impl Default for EditorState {
 
 impl EditorState {
     pub fn ui(&mut self, ui: &mut egui::Ui) {
+        // Keyboard undo/redo — skipped while a text field is focused so the
+        // textarea's own editing keys win.
+        let typing = ui.ctx().memory(|m| m.focused().is_some());
+        if !typing {
+            let (do_undo, do_redo) = ui.ctx().input(|i| {
+                let cmd = i.modifiers.command;
+                let undo = cmd && !i.modifiers.shift && i.key_pressed(egui::Key::Z);
+                let redo = (cmd && i.key_pressed(egui::Key::Y))
+                    || (cmd && i.modifiers.shift && i.key_pressed(egui::Key::Z));
+                (undo, redo)
+            });
+            if do_undo {
+                self.undo();
+            }
+            if do_redo {
+                self.redo();
+            }
+        }
+
         egui::SidePanel::left("controls")
             .resizable(true)
             .default_width(320.0)
@@ -147,11 +190,22 @@ impl EditorState {
         if self.dirty && !self.crop_editing {
             ui.ctx().request_repaint();
         }
+
+        // Record an undo step once the edit settles (pointer released).
+        self.maybe_commit(ui.ctx());
     }
 
     fn controls(&mut self, ui: &mut egui::Ui) {
         egui::ScrollArea::vertical().show(ui, |ui| {
             ui.add_space(6.0);
+            ui.horizontal(|ui| {
+                if ui.add_enabled(self.history.len() > 1, egui::Button::new("↶ Undo")).clicked() {
+                    self.undo();
+                }
+                if ui.add_enabled(!self.future.is_empty(), egui::Button::new("↷ Redo")).clicked() {
+                    self.redo();
+                }
+            });
             if ui.button("📂  Muat Foto").clicked() {
                 self.pick_photo();
             }
@@ -714,6 +768,72 @@ impl EditorState {
             }
         }
         self.dirty = true;
+    }
+
+    fn snapshot(&self) -> Snapshot {
+        Snapshot {
+            blocks: self.blocks.clone(),
+            censors: self.censors.clone(),
+            stickers: self.stickers.clone(),
+            crop: self.crop,
+            crop_ratio: self.crop_ratio,
+            filters: self.filters,
+            font_family: self.font_family.clone(),
+            text_size: self.text_size,
+            line_gap: self.line_gap,
+            stroke_auto: self.stroke_auto,
+            stroke_width: self.stroke_width,
+        }
+    }
+
+    fn restore(&mut self, s: Snapshot) {
+        self.blocks = s.blocks;
+        self.censors = s.censors;
+        self.stickers = s.stickers;
+        self.crop = s.crop;
+        self.crop_ratio = s.crop_ratio;
+        self.filters = s.filters;
+        self.font_family = s.font_family;
+        self.text_size = s.text_size;
+        self.line_gap = s.line_gap;
+        self.stroke_auto = s.stroke_auto;
+        self.stroke_width = s.stroke_width;
+        self.selected_block = self.selected_block.min(self.blocks.len().saturating_sub(1));
+        self.selected_censor = None;
+        self.selected_sticker = None;
+        self.dirty = true;
+    }
+
+    /// Record an undo step once edits settle (pointer up), coalescing drags.
+    fn maybe_commit(&mut self, ctx: &egui::Context) {
+        if ctx.input(|i| i.pointer.any_down()) {
+            return; // mid-drag — wait for release
+        }
+        let snap = self.snapshot();
+        if self.history.last() != Some(&snap) {
+            self.history.push(snap);
+            if self.history.len() > 80 {
+                self.history.remove(0);
+            }
+            self.future.clear();
+        }
+    }
+
+    fn undo(&mut self) {
+        if self.history.len() < 2 {
+            return;
+        }
+        let cur = self.history.pop().unwrap();
+        self.future.push(cur);
+        let prev = self.history.last().unwrap().clone();
+        self.restore(prev);
+    }
+
+    fn redo(&mut self) {
+        if let Some(snap) = self.future.pop() {
+            self.history.push(snap.clone());
+            self.restore(snap);
+        }
     }
 
     /// Auto outline thickness — matches the 1.x rule (size/9, floored).
