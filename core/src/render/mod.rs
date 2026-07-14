@@ -30,6 +30,11 @@ pub struct RenderJob {
     /// payloads via serde(default).
     #[serde(default)]
     pub censors: Vec<CensorRegion>,
+    /// Cinematic framing: when set, the photo is placed in a centered sub-rect of
+    /// a solid-color canvas (bars around it) instead of filling the whole output.
+    /// None = normal mode (photo fills output). serde(default) keeps old payloads.
+    #[serde(default)]
+    pub canvas: Option<Canvas>,
     pub font_family: String,
     /// Text size in output px.
     pub text_size: f32,
@@ -58,6 +63,21 @@ pub struct CensorRegion {
     pub kind: CensorKind,
     /// Blur radius (px) or pixelate block size (px), per `kind`.
     pub strength: f32,
+}
+
+/// The "cinematic" letterbox: the photo fills a centered sub-rectangle of a
+/// solid-color output; the rest (bars above/below or around it) stays `color`.
+/// The photo is cropped/resized/filtered to the rect; text, stickers and censors
+/// still run over the whole output, so captions can sit on the bars. Output px.
+#[derive(Debug, Clone, Copy, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Canvas {
+    /// RGBA background filling the whole output before the photo is placed.
+    pub color: [u8; 4],
+    pub photo_x: f32,
+    pub photo_y: f32,
+    pub photo_w: f32,
+    pub photo_h: f32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Deserialize)]

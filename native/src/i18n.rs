@@ -47,6 +47,12 @@ pub fn t(lang: Lang, id: &'static str) -> &'static str {
         "Seret kotak untuk framing · pojok untuk resize · klik “✓ Selesai crop”" => "Drag the box to frame · corner to resize · click “✓ Finish crop”",
         "Muat foto dulu." => "Load a photo first.",
         "Muat foto untuk mulai mengedit." => "Load a photo to start editing.",
+        // editor — cinematic mode
+        "Mode" => "Mode",
+        "🎬 Sinema" => "🎬 Cinematic",
+        "Tinggi bar %" => "Bar height %",
+        "Warna bar" => "Bar color",
+        "Foto di tengah kanvas warna solid, bar di atas & bawah." => "Photo centered on a solid canvas, bars above & below.",
         // editor — chatlog
         "Chatlog:" => "Chatlog:",
         "Tambah chatlog" => "Add chatlog",

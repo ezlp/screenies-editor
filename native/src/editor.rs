@@ -14,7 +14,7 @@ use screenies_core::render::compose;
 use screenies_core::render::layout::{self, Anchor, BgMode, LayoutBlock, LayoutParams};
 use screenies_core::render::text::GlyphMeasure;
 use screenies_core::render::{
-    CensorKind, CensorRegion, CropRect, FilterValues, RenderJob, Size, StickerJob,
+    Canvas, CensorKind, CensorRegion, CropRect, FilterValues, RenderJob, Size, StickerJob,
 };
 
 /// A loaded photo: base64 for the render pipeline + its pixel dimensions.
@@ -99,6 +99,9 @@ struct Snapshot {
     crop: Option<CropRect>,
     crop_ratio: Option<f32>,
     filters: FilterValues,
+    cinematic: bool,
+    cinematic_bar: f32,
+    cinematic_color: [u8; 3],
     font_family: String,
     text_size: f32,
     line_gap: f32,
@@ -139,6 +142,12 @@ pub struct EditorState {
     stroke_width: f32,
 
     filters: FilterValues,
+
+    // Cinematic mode: photo centered on a solid-color canvas with bars above and
+    // below. Global (like the text controls) and captured in undo snapshots.
+    cinematic: bool,
+    cinematic_bar: f32,      // bar height as % of photo height (0 = no bars)
+    cinematic_color: [u8; 3],
 
     // Local censor boxes (blur/pixelate a region), placed + resized on the preview.
     censors: Vec<CensorRegion>,
@@ -186,6 +195,9 @@ impl Default for EditorState {
             stroke_auto: true,
             stroke_width: 3.0,
             filters: identity_filters(),
+            cinematic: false,
+            cinematic_bar: 12.0,
+            cinematic_color: [0, 0, 0],
             censors: Vec::new(),
             selected_censor: None,
             stickers: Vec::new(),
@@ -329,9 +341,38 @@ impl EditorState {
             if ui.add_enabled(self.photo.is_some(), egui::Button::new(crop_btn)).clicked() {
                 self.toggle_crop_edit();
             }
-            if self.crop.is_some() || self.output_override.is_some() {
+            if self.crop.is_some() || self.output_override.is_some() || self.cinematic {
                 let (ow, oh) = self.output_dims();
                 ui.small(format!("Output: {}×{}", ow.round() as u32, oh.round() as u32));
+            }
+
+            ui.separator();
+            ui.label(self.t("Mode"));
+            ui.horizontal(|ui| {
+                if ui.selectable_label(!self.cinematic, self.t("Normal")).clicked() {
+                    self.cinematic = false;
+                    self.dirty = true;
+                }
+                if ui.selectable_label(self.cinematic, self.t("🎬 Sinema")).clicked() {
+                    self.cinematic = true;
+                    self.dirty = true;
+                }
+            });
+            if self.cinematic {
+                let bar_lbl = self.t("Tinggi bar %");
+                if ui
+                    .add(egui::Slider::new(&mut self.cinematic_bar, 0.0..=40.0).text(bar_lbl))
+                    .changed()
+                {
+                    self.dirty = true;
+                }
+                ui.horizontal(|ui| {
+                    ui.label(self.t("Warna bar"));
+                    if ui.color_edit_button_srgb(&mut self.cinematic_color).changed() {
+                        self.dirty = true;
+                    }
+                });
+                ui.small(self.t("Foto di tengah kanvas warna solid, bar di atas & bawah."));
             }
 
             ui.separator();
@@ -950,11 +991,9 @@ impl EditorState {
         }
     }
 
-    /// Output-space dimensions — the coordinate space stickers, censor boxes and
-    /// text all live in, and the size the render actually produces. A fixed
-    /// resolution override (e.g. 800×600) wins; otherwise it's the crop size,
-    /// else the whole photo.
-    fn output_dims(&self) -> (f32, f32) {
+    /// The photo's own output size (before cinematic bars): a fixed-resolution
+    /// override wins, else the crop size, else the whole photo.
+    fn photo_output_dims(&self) -> (f32, f32) {
         if let Some((w, h)) = self.output_override {
             (w as f32, h as f32)
         } else if let Some(c) = self.crop {
@@ -964,6 +1003,23 @@ impl EditorState {
         } else {
             (400.0, 300.0)
         }
+    }
+
+    /// Cinematic bar height (px) added above AND below the photo (0 = off).
+    fn cinematic_bar_px(&self) -> f32 {
+        if self.cinematic {
+            let (_, ph) = self.photo_output_dims();
+            (ph * (self.cinematic_bar / 100.0)).round().max(0.0)
+        } else {
+            0.0
+        }
+    }
+
+    /// Full render/output size — the coordinate space stickers, censor boxes and
+    /// text all live in. Cinematic mode adds bars above and below the photo.
+    fn output_dims(&self) -> (f32, f32) {
+        let (w, h) = self.photo_output_dims();
+        (w, h + 2.0 * self.cinematic_bar_px())
     }
 
     /// Add a sticker (PNG/WebP/…) centered, sized to ~30% of the output width.
@@ -1071,6 +1127,9 @@ impl EditorState {
             crop: self.crop,
             crop_ratio: self.crop_ratio,
             filters: self.filters,
+            cinematic: self.cinematic,
+            cinematic_bar: self.cinematic_bar,
+            cinematic_color: self.cinematic_color,
             font_family: self.font_family.clone(),
             text_size: self.text_size,
             line_gap: self.line_gap,
@@ -1086,6 +1145,9 @@ impl EditorState {
         self.crop = s.crop;
         self.crop_ratio = s.crop_ratio;
         self.filters = s.filters;
+        self.cinematic = s.cinematic;
+        self.cinematic_bar = s.cinematic_bar;
+        self.cinematic_color = s.cinematic_color;
         self.font_family = s.font_family;
         self.text_size = s.text_size;
         self.line_gap = s.line_gap;
@@ -1147,12 +1209,38 @@ impl EditorState {
         let crop = self
             .crop
             .unwrap_or(CropRect { x: 0.0, y: 0.0, w: photo.w as f64, h: photo.h as f64 });
-        let output = match self.output_override {
+        // Photo output size (fixed-resolution override, else the crop).
+        let photo_size = match self.output_override {
             Some((w, h)) => Size { w, h },
             None => Size {
                 w: (crop.w.round() as u32).max(1),
                 h: (crop.h.round() as u32).max(1),
             },
+        };
+
+        // Cinematic mode: a taller solid-color canvas with the photo centered
+        // (equal bars above/below). Normal mode: the canvas IS the photo.
+        let bar = self.cinematic_bar_px() as u32;
+        let (output, canvas) = if self.cinematic {
+            let out = Size {
+                w: photo_size.w,
+                h: photo_size.h + 2 * bar,
+            };
+            let cv = Canvas {
+                color: [
+                    self.cinematic_color[0],
+                    self.cinematic_color[1],
+                    self.cinematic_color[2],
+                    255,
+                ],
+                photo_x: 0.0,
+                photo_y: bar as f32,
+                photo_w: photo_size.w as f32,
+                photo_h: photo_size.h as f32,
+            };
+            (out, Some(cv))
+        } else {
+            (photo_size, None)
         };
 
         let blocks = if let Ok(measure) = GlyphMeasure::new(&self.font_family, self.text_size) {
@@ -1202,6 +1290,7 @@ impl EditorState {
             stickers,
             filters: self.filters,
             censors: self.censors.clone(),
+            canvas,
             font_family: self.font_family.clone(),
             text_size: self.text_size,
             stroke_width: self.effective_stroke(),

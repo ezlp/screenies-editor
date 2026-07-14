@@ -1,17 +1,28 @@
-// gallery.rs — Phase 4 screen: browse exported SSRP photos in a folder and
-// open one back in the editor. Folder listing is core::gallery (unit-tested);
-// this decodes a preview of the selected image on demand.
+// gallery.rs — Phase 4 screen: browse exported SSRP photos as a thumbnail GRID.
+// Folder listing is core::gallery (unit-tested). Thumbnails are decoded lazily
+// (a few per frame) and cached; clicking a thumbnail opens a popup preview with
+// an "open in editor" action.
 
 use eframe::egui;
 use screenies_core::gallery::{self, Item};
+use std::collections::HashMap;
 use std::path::PathBuf;
+
+/// Thumbnails decoded per frame — keeps a big folder responsive while it fills.
+const THUMBS_PER_FRAME: usize = 6;
+/// Thumbnail cell box (px).
+const THUMB_W: f32 = 150.0;
+const THUMB_H: f32 = 112.0;
 
 #[derive(Default)]
 pub struct GalleryState {
     folder: Option<PathBuf>,
     items: Vec<Item>,
+    /// Cached grid thumbnails (None = decode failed, don't retry).
+    thumbs: HashMap<PathBuf, Option<egui::TextureHandle>>,
+    /// Item whose popup preview is open.
     selected: Option<usize>,
-    /// Cached preview (path it was decoded from + its texture).
+    /// Cached popup preview (path it was decoded from + its texture).
     preview: Option<(PathBuf, egui::TextureHandle)>,
     /// Set when the user clicks "open in editor"; the App consumes it.
     pub open_request: Option<PathBuf>,
@@ -26,10 +37,6 @@ impl GalleryState {
 
     pub fn ui(&mut self, ui: &mut egui::Ui) {
         ui.add_space(6.0);
-        ui.colored_label(
-            egui::Color32::from_rgb(230, 180, 60),
-            "⚠ WIP — Gallery masih dalam pengembangan",
-        );
         ui.horizontal(|ui| {
             if ui.button(self.t("📂  Buka folder")).clicked() {
                 self.open_folder();
@@ -45,48 +52,63 @@ impl GalleryState {
         }
         ui.separator();
 
-        egui::SidePanel::left("gallery-list")
-            .resizable(true)
-            .default_width(240.0)
-            .show_inside(ui, |ui| {
-                egui::ScrollArea::vertical().show(ui, |ui| {
+        if self.items.is_empty() {
+            let msg = self.t("Pilih folder berisi foto hasil edit.");
+            ui.centered_and_justified(|ui| {
+                ui.label(msg);
+            });
+        } else {
+            self.grid(ui);
+        }
+
+        // Popup preview overlay (open while an item is selected).
+        self.preview_window(ui.ctx());
+    }
+
+    /// The thumbnail grid: vertical scroll, wraps to fill the width.
+    fn grid(&mut self, ui: &mut egui::Ui) {
+        let mut decoded = 0usize;
+        let mut clicked: Option<usize> = None;
+        egui::ScrollArea::vertical()
+            .auto_shrink([false, false])
+            .show(ui, |ui| {
+                ui.horizontal_wrapped(|ui| {
                     for i in 0..self.items.len() {
-                        if ui
-                            .selectable_label(self.selected == Some(i), &self.items[i].name)
-                            .clicked()
-                        {
-                            self.selected = Some(i);
+                        let path = self.items[i].path.clone();
+                        // Decode a few uncached thumbnails per frame.
+                        if !self.thumbs.contains_key(&path) && decoded < THUMBS_PER_FRAME {
+                            self.load_thumb(ui.ctx(), &path);
+                            decoded += 1;
+                        }
+                        if self.thumb_cell(ui, i, &path) {
+                            clicked = Some(i);
                         }
                     }
                 });
             });
+        // Still decoding? Ask for another frame so the grid keeps filling.
+        if decoded == THUMBS_PER_FRAME {
+            ui.ctx().request_repaint();
+        }
+        if let Some(i) = clicked {
+            self.selected = Some(i);
+        }
+    }
 
-        let pick_msg = self.t("Pilih gambar dari daftar.");
-        let open_lbl = self.t("✏  Buka di editor");
-        egui::CentralPanel::default().show_inside(ui, |ui| {
-            let Some(i) = self.selected else {
-                ui.centered_and_justified(|ui| ui.label(pick_msg));
-                return;
-            };
-            if i >= self.items.len() {
-                return;
+    /// One grid cell: a clickable thumbnail (or a placeholder while it decodes),
+    /// with the filename as a tooltip. Returns true when clicked.
+    fn thumb_cell(&self, ui: &mut egui::Ui, i: usize, path: &PathBuf) -> bool {
+        let name = self.items[i].name.clone();
+        let resp = match self.thumbs.get(path) {
+            Some(Some(tex)) => {
+                let s = tex.size_vec2();
+                let scale = (THUMB_W / s.x).min(THUMB_H / s.y).min(1.0);
+                let img = egui::Image::new(egui::load::SizedTexture::new(tex.id(), s * scale));
+                ui.add(egui::ImageButton::new(img))
             }
-            ui.horizontal(|ui| {
-                ui.strong(self.items[i].name.clone());
-                if ui.button(open_lbl).clicked() {
-                    self.open_request = Some(self.items[i].path.clone());
-                }
-            });
-            self.ensure_preview(ui.ctx(), i);
-            if let Some((_, tex)) = &self.preview {
-                let avail = ui.available_size();
-                let sz = tex.size_vec2();
-                let scale = (avail.x / sz.x).min(avail.y / sz.y).min(1.0);
-                ui.centered_and_justified(|ui| {
-                    ui.image(egui::load::SizedTexture::new(tex.id(), sz * scale));
-                });
-            }
-        });
+            _ => ui.add_sized([THUMB_W, THUMB_H], egui::Button::new("…")),
+        };
+        resp.on_hover_text(name).clicked()
     }
 
     fn open_folder(&mut self) {
@@ -97,6 +119,7 @@ impl GalleryState {
             Ok(items) => {
                 self.items = items;
                 self.folder = Some(dir);
+                self.thumbs.clear();
                 self.selected = None;
                 self.preview = None;
                 self.error = None;
@@ -105,21 +128,81 @@ impl GalleryState {
         }
     }
 
-    /// Decode a (downscaled) preview of item `i`, unless already cached.
-    fn ensure_preview(&mut self, ctx: &egui::Context, i: usize) {
-        let path = self.items[i].path.clone();
-        if self.preview.as_ref().map(|(p, _)| p) == Some(&path) {
+    /// Decode + cache a small grid thumbnail for `path`.
+    fn load_thumb(&mut self, ctx: &egui::Context, path: &PathBuf) {
+        let tex = match image::open(path) {
+            Ok(img) => {
+                let rgba = img.thumbnail(256, 256).to_rgba8();
+                let ci = egui::ColorImage::from_rgba_unmultiplied(
+                    [rgba.width() as usize, rgba.height() as usize],
+                    rgba.as_raw(),
+                );
+                Some(ctx.load_texture(
+                    format!("thumb:{}", path.display()),
+                    ci,
+                    egui::TextureOptions::LINEAR,
+                ))
+            }
+            Err(_) => None,
+        };
+        self.thumbs.insert(path.clone(), tex);
+    }
+
+    /// Popup preview window for the selected item (no-op when none selected).
+    fn preview_window(&mut self, ctx: &egui::Context) {
+        let Some(i) = self.selected else {
+            return;
+        };
+        if i >= self.items.len() {
+            self.selected = None;
             return;
         }
-        match image::open(&path) {
+        let name = self.items[i].name.clone();
+        let path = self.items[i].path.clone();
+        let open_lbl = self.t("✏  Buka di editor");
+        let mut open = true;
+        egui::Window::new(format!("🖼 {name}"))
+            .open(&mut open)
+            .collapsible(false)
+            .default_width(760.0)
+            .default_height(560.0)
+            .show(ctx, |ui| {
+                if ui.button(open_lbl).clicked() {
+                    self.open_request = Some(path.clone());
+                }
+                ui.separator();
+                self.ensure_preview(ctx, &path);
+                if let Some((_, tex)) = &self.preview {
+                    let avail = ui.available_size();
+                    let s = tex.size_vec2();
+                    let scale = (avail.x / s.x).min(avail.y / s.y).min(1.0);
+                    ui.centered_and_justified(|ui| {
+                        ui.image(egui::load::SizedTexture::new(tex.id(), s * scale));
+                    });
+                } else if let Some(err) = &self.error {
+                    ui.colored_label(egui::Color32::from_rgb(220, 90, 90), err);
+                }
+            });
+        // Close on the window ✕, or after jumping to the editor.
+        if !open || self.open_request.is_some() {
+            self.selected = None;
+        }
+    }
+
+    /// Decode a larger preview of `path` for the popup, unless already cached.
+    fn ensure_preview(&mut self, ctx: &egui::Context, path: &PathBuf) {
+        if self.preview.as_ref().map(|(p, _)| p) == Some(path) {
+            return;
+        }
+        match image::open(path) {
             Ok(img) => {
-                let rgba = img.thumbnail(1400, 1400).to_rgba8();
+                let rgba = img.thumbnail(1600, 1600).to_rgba8();
                 let ci = egui::ColorImage::from_rgba_unmultiplied(
                     [rgba.width() as usize, rgba.height() as usize],
                     rgba.as_raw(),
                 );
                 let tex = ctx.load_texture("gallery-preview", ci, egui::TextureOptions::LINEAR);
-                self.preview = Some((path, tex));
+                self.preview = Some((path.clone(), tex));
                 self.error = None;
             }
             Err(e) => {
