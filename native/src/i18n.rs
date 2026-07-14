@@ -52,7 +52,7 @@ pub fn t(lang: Lang, id: &'static str) -> &'static str {
         "🎬 Sinema" => "🎬 Cinematic",
         "Tinggi bar %" => "Bar height %",
         "Warna bar" => "Bar color",
-        "Foto di tengah kanvas warna solid, bar di atas & bawah." => "Photo centered on a solid canvas, bars above & below.",
+        "Bar warna menutup atas & bawah foto (efek sinema)." => "Color bars cover the photo's top & bottom (cinematic).",
         // editor — chatlog
         "Chatlog:" => "Chatlog:",
         "Tambah chatlog" => "Add chatlog",
