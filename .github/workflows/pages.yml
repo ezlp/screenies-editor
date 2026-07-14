@@ -1,9 +1,11 @@
 name: Deploy website (GitHub Pages)
 
 # Publishes the static site in site/ to GitHub Pages.
-# The configure-pages step self-enables Pages (enablement: true), so no manual
-# setup is needed. If org policy blocks that, set repo Settings → Pages →
-# Build and deployment → Source: "GitHub Actions" once, then re-run.
+#
+# ONE-TIME SETUP (required, owner-only): the Actions token can deploy to Pages
+# but cannot create the Pages site itself (that needs repo admin). So enable it
+# once: repo Settings → Pages → Build and deployment → Source: "GitHub Actions".
+# After that, every push to main touching site/ redeploys automatically.
 
 on:
   push:
@@ -32,10 +34,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/configure-pages@v5
-        with:
-          # Create/enable the Pages site (build_type: workflow) on first run,
-          # so no manual repo Settings → Pages toggle is needed.
-          enablement: true
       - uses: actions/upload-pages-artifact@v3
         with:
           path: site
