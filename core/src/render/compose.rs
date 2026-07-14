@@ -16,10 +16,16 @@ pub fn render(job: &RenderJob) -> Result<RgbaImage, AppError> {
         .map_err(|e| AppError::Render(format!("decode foto: {e}")))?
         .to_rgba8();
 
-    // Photo: crop → resize to the output → filters. Cinematic mode then paints
-    // solid bars over the top & bottom (they grow inward, so the output size is
-    // unchanged); the bars sit under the stickers/text drawn next.
-    let mut out = crop::crop_and_resize(&src, &job.crop, &job.output)?;
+    // Photo: crop → resize/fit to the output → filters. Fit mode scales the whole
+    // crop inside the output with black padding (keeps everything) instead of
+    // cropping to fill. Cinematic mode then paints solid bars over the top and/or
+    // bottom (they grow inward, output size unchanged); bars sit under the
+    // stickers/text drawn next.
+    let mut out = if job.fit {
+        crop::crop_and_fit(&src, &job.crop, &job.output, [0, 0, 0, 255])?
+    } else {
+        crop::crop_and_resize(&src, &job.crop, &job.output)?
+    };
     filters::apply(&mut out, &job.filters);
     if let Some(cv) = &job.canvas {
         draw_letterbox(&mut out, cv);
@@ -38,16 +44,23 @@ pub fn render(job: &RenderJob) -> Result<RgbaImage, AppError> {
 /// Cinematic letterbox: paint solid top & bottom bars over the image. The bars
 /// grow inward (output size unchanged) and are clamped so they never overlap.
 fn draw_letterbox(img: &mut RgbaImage, cv: &super::Canvas) {
+    use super::BarPos;
     let (w, h) = img.dimensions();
     let bar = cv.bar.min(h / 2);
     if bar == 0 {
         return;
     }
+    let top = matches!(cv.bars, BarPos::Both | BarPos::Top);
+    let bottom = matches!(cv.bars, BarPos::Both | BarPos::Bottom);
     let color = image::Rgba(cv.color);
     for y in 0..bar {
         for x in 0..w {
-            img.put_pixel(x, y, color);
-            img.put_pixel(x, h - 1 - y, color);
+            if top {
+                img.put_pixel(x, y, color);
+            }
+            if bottom {
+                img.put_pixel(x, h - 1 - y, color);
+            }
         }
     }
 }
@@ -63,7 +76,7 @@ pub fn encode_png(img: &RgbaImage) -> Result<Vec<u8>, AppError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::render::{Canvas, CropRect, FilterValues, Size};
+    use crate::render::{BarPos, Canvas, CropRect, FilterValues, Size};
     use base64::Engine;
 
     fn tiny_job() -> RenderJob {
@@ -87,6 +100,7 @@ mod tests {
             },
             censors: vec![],
             canvas: None,
+            fit: false,
             font_family: "__none__".into(),
             text_size: 20.0,
             stroke_width: 3.0,
@@ -111,7 +125,7 @@ mod tests {
         // photo shows through the middle band.
         let mut job = tiny_job();
         job.output = Size { w: 8, h: 12 };
-        job.canvas = Some(Canvas { color: [0, 0, 0, 255], bar: 3 });
+        job.canvas = Some(Canvas { color: [0, 0, 0, 255], bar: 3, bars: BarPos::Both });
         let img = render(&job).unwrap();
         assert_eq!((img.width(), img.height()), (8, 12)); // size unchanged by bars
         // Top 3 and bottom 3 rows are the bar color (black).
@@ -121,5 +135,32 @@ mod tests {
         assert_eq!(img.get_pixel(4, 11).0, [0, 0, 0, 255]);
         // The middle band shows the photo (red → grayscaled), not black.
         assert!(img.get_pixel(4, 6).0[0] > 0, "photo band should show through");
+    }
+
+    #[test]
+    fn cinematic_bottom_only_leaves_the_top_untouched() {
+        let mut job = tiny_job();
+        job.output = Size { w: 8, h: 12 };
+        job.canvas = Some(Canvas { color: [0, 0, 0, 255], bar: 3, bars: BarPos::Bottom });
+        let img = render(&job).unwrap();
+        // Bottom rows are the bar; top row still shows the photo (not black).
+        assert_eq!(img.get_pixel(4, 11).0, [0, 0, 0, 255]);
+        assert!(img.get_pixel(4, 0).0[0] > 0, "top must be untouched when bottom-only");
+    }
+
+    #[test]
+    fn fit_keeps_the_whole_image_with_padding() {
+        // 4×4 (square) crop fit into an 8×4 output → a 4×4 image centered, with
+        // black side-padding (nothing cropped).
+        let mut job = tiny_job();
+        job.output = Size { w: 8, h: 4 };
+        job.fit = true;
+        let img = render(&job).unwrap();
+        assert_eq!((img.width(), img.height()), (8, 4));
+        // Left & right columns are black padding.
+        assert_eq!(img.get_pixel(0, 2).0, [0, 0, 0, 255]);
+        assert_eq!(img.get_pixel(7, 2).0, [0, 0, 0, 255]);
+        // The centered photo shows through (grayscaled red, not pure black).
+        assert!(img.get_pixel(4, 2).0[0] > 0, "fitted photo should be centered");
     }
 }

@@ -14,7 +14,7 @@ use screenies_core::render::compose;
 use screenies_core::render::layout::{self, Anchor, BgMode, LayoutBlock, LayoutParams};
 use screenies_core::render::text::GlyphMeasure;
 use screenies_core::render::{
-    Canvas, CensorKind, CensorRegion, CropRect, FilterValues, RenderJob, Size, StickerJob,
+    BarPos, Canvas, CensorKind, CensorRegion, CropRect, FilterValues, RenderJob, Size, StickerJob,
 };
 
 /// A loaded photo: base64 for the render pipeline + its pixel dimensions.
@@ -98,9 +98,11 @@ struct Snapshot {
     stickers: Vec<Sticker>,
     crop: Option<CropRect>,
     crop_ratio: Option<f32>,
+    crop_fit: bool,
     filters: FilterValues,
     cinematic: bool,
     cinematic_bar: f32,
+    cinematic_bar_pos: BarPos,
     cinematic_color: [u8; 3],
     font_family: String,
     text_size: f32,
@@ -145,10 +147,11 @@ pub struct EditorState {
 
     filters: FilterValues,
 
-    // Cinematic mode: photo centered on a solid-color canvas with bars above and
-    // below. Global (like the text controls) and captured in undo snapshots.
+    // Cinematic mode: solid bars painted over the photo's top/bottom (global,
+    // like the text controls; captured in undo snapshots).
     cinematic: bool,
-    cinematic_bar: f32,      // bar height as % of photo height (0 = no bars)
+    cinematic_bar: f32,      // bar height as % of output height (0 = no bars)
+    cinematic_bar_pos: BarPos,
     cinematic_color: [u8; 3],
 
     // Local censor boxes (blur/pixelate a region), placed + resized on the preview.
@@ -164,6 +167,9 @@ pub struct EditorState {
     crop: Option<CropRect>,
     crop_ratio: Option<f32>,
     output_override: Option<(u32, u32)>,
+    /// Fit (global): keep the whole image (pad with bars) for fixed sizes instead
+    /// of cropping to fill. Applies when output_override is set.
+    crop_fit: bool,
     crop_editing: bool,
     source_img: Option<egui::ColorImage>, // decoded photo, for the crop-edit view
     source_tex: Option<egui::TextureHandle>,
@@ -200,6 +206,7 @@ impl Default for EditorState {
             filters: identity_filters(),
             cinematic: false,
             cinematic_bar: 12.0,
+            cinematic_bar_pos: BarPos::Both,
             cinematic_color: [0, 0, 0],
             censors: Vec::new(),
             selected_censor: None,
@@ -208,6 +215,7 @@ impl Default for EditorState {
             crop: None,
             crop_ratio: None,
             output_override: None,
+            crop_fit: false,
             crop_editing: false,
             source_img: None,
             source_tex: None,
@@ -340,6 +348,21 @@ impl EditorState {
                     self.set_resolution(800, 600);
                 }
             });
+            ui.horizontal(|ui| {
+                let (potong, muat) = (self.t("Potong"), self.t("Muat penuh"));
+                let prev = self.crop_fit;
+                ui.selectable_value(&mut self.crop_fit, false, potong);
+                ui.selectable_value(&mut self.crop_fit, true, muat);
+                if self.crop_fit != prev {
+                    if self.crop_fit {
+                        self.crop_editing = false; // fit needs no crop step
+                    }
+                    self.dirty = true;
+                }
+            });
+            if self.crop_fit {
+                ui.small(self.t("Muat: simpan seluruh gambar + bar (ukuran tetap)."));
+            }
             let crop_btn = self.t(if self.crop_editing { "✓ Selesai crop" } else { "✏ Edit crop" });
             if ui.add_enabled(self.photo.is_some(), egui::Button::new(crop_btn)).clicked() {
                 self.toggle_crop_edit();
@@ -370,12 +393,24 @@ impl EditorState {
                     self.dirty = true;
                 }
                 ui.horizontal(|ui| {
+                    ui.label(self.t("Posisi bar"));
+                    let (both, atas, bawah) =
+                        (self.t("Keduanya"), self.t("Atas"), self.t("Bawah"));
+                    let prev = self.cinematic_bar_pos;
+                    ui.selectable_value(&mut self.cinematic_bar_pos, BarPos::Both, both);
+                    ui.selectable_value(&mut self.cinematic_bar_pos, BarPos::Top, atas);
+                    ui.selectable_value(&mut self.cinematic_bar_pos, BarPos::Bottom, bawah);
+                    if self.cinematic_bar_pos != prev {
+                        self.dirty = true;
+                    }
+                });
+                ui.horizontal(|ui| {
                     ui.label(self.t("Warna bar"));
                     if ui.color_edit_button_srgb(&mut self.cinematic_color).changed() {
                         self.dirty = true;
                     }
                 });
-                ui.small(self.t("Bar warna menutup atas & bawah foto (efek sinema)."));
+                ui.small(self.t("Bar sinema digambar di dalam foto (pilih posisi)."));
             }
 
             ui.separator();
@@ -1118,7 +1153,7 @@ impl EditorState {
             self.crop_ratio = Some(ratio);
             self.crop = Some(centered_crop(p.w, p.h, Some(ratio)));
             self.output_override = Some((w, h));
-            self.crop_editing = true;
+            self.crop_editing = !self.crop_fit; // fit keeps the whole image — no crop step
             self.dirty = true;
         }
     }
@@ -1140,9 +1175,11 @@ impl EditorState {
             stickers: self.stickers.clone(),
             crop: self.crop,
             crop_ratio: self.crop_ratio,
+            crop_fit: self.crop_fit,
             filters: self.filters,
             cinematic: self.cinematic,
             cinematic_bar: self.cinematic_bar,
+            cinematic_bar_pos: self.cinematic_bar_pos,
             cinematic_color: self.cinematic_color,
             font_family: self.font_family.clone(),
             text_size: self.text_size,
@@ -1158,9 +1195,11 @@ impl EditorState {
         self.stickers = s.stickers;
         self.crop = s.crop;
         self.crop_ratio = s.crop_ratio;
+        self.crop_fit = s.crop_fit;
         self.filters = s.filters;
         self.cinematic = s.cinematic;
         self.cinematic_bar = s.cinematic_bar;
+        self.cinematic_bar_pos = s.cinematic_bar_pos;
         self.cinematic_color = s.cinematic_color;
         self.font_family = s.font_family;
         self.text_size = s.text_size;
@@ -1220,9 +1259,11 @@ impl EditorState {
     /// (the photo still renders) so the preview never goes blank on a typo.
     fn current_job(&self) -> Option<RenderJob> {
         let photo = self.photo.as_ref()?;
-        let crop = self
-            .crop
-            .unwrap_or(CropRect { x: 0.0, y: 0.0, w: photo.w as f64, h: photo.h as f64 });
+        let full = CropRect { x: 0.0, y: 0.0, w: photo.w as f64, h: photo.h as f64 };
+        // Fit mode (fixed sizes): keep the WHOLE image — the crop region is the
+        // full photo, and compose pads it with bars instead of cropping to fill.
+        let use_fit = self.crop_fit && self.output_override.is_some();
+        let crop = if use_fit { full } else { self.crop.unwrap_or(full) };
         // Output size (fixed-resolution override, else the crop). Cinematic mode
         // keeps this size — its bars are painted INSIDE the photo, not added.
         let output = match self.output_override {
@@ -1243,6 +1284,7 @@ impl EditorState {
                     255,
                 ],
                 bar: self.cinematic_bar_px() as u32,
+                bars: self.cinematic_bar_pos,
             })
         } else {
             None
@@ -1296,6 +1338,7 @@ impl EditorState {
             filters: self.filters,
             censors: self.censors.clone(),
             canvas,
+            fit: use_fit,
             font_family: self.font_family.clone(),
             text_size: self.text_size,
             stroke_width: self.effective_stroke(),
