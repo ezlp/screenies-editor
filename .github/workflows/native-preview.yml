@@ -75,6 +75,7 @@ jobs:
             --executable target/release/screenies-native \
             --desktop-file assets/screenies-native.desktop \
             --icon-file assets/icon.png \
+            --icon-filename screenies-native \
             --output appimage
 
       - name: Stage artifacts
