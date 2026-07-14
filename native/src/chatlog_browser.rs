@@ -60,7 +60,18 @@ impl ChatlogBrowser {
                     self.files.push(p);
                 }
             }
-            self.files.sort();
+            // Newest first by the dd_mm_yyyy_hh_mm_ss filename; names that don't
+            // match that format sink to the bottom (then ordered by name).
+            self.files.sort_by(|a, b| {
+                let ka = a.file_stem().and_then(|s| s.to_str()).and_then(parse_dt_key);
+                let kb = b.file_stem().and_then(|s| s.to_str()).and_then(parse_dt_key);
+                match (ka, kb) {
+                    (Some(x), Some(y)) => y.cmp(&x), // larger key = newer → first
+                    (Some(_), None) => std::cmp::Ordering::Less, // dated above undated
+                    (None, Some(_)) => std::cmp::Ordering::Greater,
+                    (None, None) => a.file_name().cmp(&b.file_name()),
+                }
+            });
         }
     }
 
@@ -150,6 +161,25 @@ impl ChatlogBrowser {
             });
         self.open = open;
     }
+}
+
+/// Parse a `dd_mm_yyyy_hh_mm_ss` filename stem into a chronological sort key
+/// (larger = newer). Returns None when the stem isn't in that exact format, so
+/// those files sort to the bottom of the list.
+fn parse_dt_key(stem: &str) -> Option<u64> {
+    let p: Vec<&str> = stem.split('_').collect();
+    if p.len() != 6 {
+        return None;
+    }
+    let n: Vec<u64> = p
+        .iter()
+        .map(|x| x.parse::<u64>().ok())
+        .collect::<Option<Vec<_>>>()?;
+    let (d, mo, y, h, mi, s) = (n[0], n[1], n[2], n[3], n[4], n[5]);
+    if !(1..=31).contains(&d) || !(1..=12).contains(&mo) || h > 23 || mi > 59 || s > 59 {
+        return None;
+    }
+    Some(y * 10_000_000_000 + mo * 100_000_000 + d * 1_000_000 + h * 10_000 + mi * 100 + s)
 }
 
 /// Build a colored preview of a chatlog: `{RRGGBB}` codes become real colors and

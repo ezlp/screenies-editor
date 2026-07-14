@@ -870,33 +870,67 @@ impl EditorState {
         let accent = egui::Color32::from_rgb(194, 162, 218);
         painter.rect_stroke(cr, z, egui::Stroke::new(2.0_f32, accent));
 
-        let body = ui.interact(cr, egui::Id::new("crop-body"), egui::Sense::drag());
+        // Move the whole box: the inner area (inset so it doesn't fight the edge
+        // handles) drags with a "grab" cursor.
+        const H: f32 = 12.0;
+        let body = ui
+            .interact(cr.shrink(H), egui::Id::new("crop-body"), egui::Sense::drag())
+            .on_hover_cursor(egui::CursorIcon::Grab);
         if body.dragged() {
             let d = body.drag_delta() / scale;
             crop.x += d.x as f64;
             crop.y += d.y as f64;
         }
-        const H: f32 = 14.0;
-        let hrect = egui::Rect::from_min_size(cr.max - egui::vec2(H, H), egui::vec2(H, H));
-        painter.rect_filled(hrect, z, accent);
-        let hr = ui.interact(hrect, egui::Id::new("crop-resize"), egui::Sense::drag());
-        if hr.dragged() {
-            let d = hr.drag_delta() / scale;
-            crop.w += d.x as f64;
-            if let Some(r) = self.crop_ratio {
-                crop.h = crop.w / r as f64;
-            } else {
-                crop.h += d.y as f64;
+
+        // Eight resize handles (4 corners + 4 edges) — drag any side like a
+        // window, each with a matching resize cursor. Fields per handle:
+        // (fraction x, fraction y, left, right, top, bottom, cursor).
+        let handles: [(f32, f32, bool, bool, bool, bool, egui::CursorIcon); 8] = [
+            (0.0, 0.0, true, false, true, false, egui::CursorIcon::ResizeNwSe), // NW
+            (0.5, 0.0, false, false, true, false, egui::CursorIcon::ResizeVertical), // N
+            (1.0, 0.0, false, true, true, false, egui::CursorIcon::ResizeNeSw), // NE
+            (1.0, 0.5, false, true, false, false, egui::CursorIcon::ResizeHorizontal), // E
+            (1.0, 1.0, false, true, false, true, egui::CursorIcon::ResizeNwSe), // SE
+            (0.5, 1.0, false, false, false, true, egui::CursorIcon::ResizeVertical), // S
+            (0.0, 1.0, true, false, false, true, egui::CursorIcon::ResizeNeSw), // SW
+            (0.0, 0.5, true, false, false, false, egui::CursorIcon::ResizeHorizontal), // W
+        ];
+        let mut resized = false;
+        for (i, &(fx, fy, left, right, top, bottom, cursor)) in handles.iter().enumerate() {
+            let center = egui::pos2(cr.min.x + fx * cr.width(), cr.min.y + fy * cr.height());
+            let hrect = egui::Rect::from_center_size(center, egui::vec2(H, H));
+            painter.rect_filled(hrect, z, accent);
+            let hr = ui
+                .interact(hrect, egui::Id::new(("crop-h", i)), egui::Sense::drag())
+                .on_hover_cursor(cursor);
+            if hr.dragged() {
+                let d = hr.drag_delta() / scale;
+                let (dx, dy) = (d.x as f64, d.y as f64);
+                if left {
+                    crop.x += dx;
+                    crop.w -= dx;
+                }
+                if right {
+                    crop.w += dx;
+                }
+                if top {
+                    crop.y += dy;
+                    crop.h -= dy;
+                }
+                if bottom {
+                    crop.h += dy;
+                }
+                resized = true;
             }
         }
 
-        if body.dragged() || hr.dragged() {
+        if body.dragged() || resized {
             clamp_crop(&mut crop, pw, ph, self.crop_ratio);
             self.crop = Some(crop);
             self.dirty = true;
         }
 
-        let crop_hint = self.t("Seret kotak untuk framing · pojok untuk resize · klik “✓ Selesai crop”");
+        let crop_hint = self.t("Seret kotak untuk framing · sisi/pojok untuk resize · klik “✓ Selesai crop”");
         painter.text(
             img_rect.min + egui::vec2(6.0, 6.0),
             egui::Align2::LEFT_TOP,

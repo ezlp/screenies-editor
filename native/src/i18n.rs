@@ -44,7 +44,7 @@ pub fn t(lang: Lang, id: &'static str) -> &'static str {
         "Bebas" => "Free",
         "✏ Edit crop" => "✏ Edit crop",
         "✓ Selesai crop" => "✓ Finish crop",
-        "Seret kotak untuk framing · pojok untuk resize · klik “✓ Selesai crop”" => "Drag the box to frame · corner to resize · click “✓ Finish crop”",
+        "Seret kotak untuk framing · sisi/pojok untuk resize · klik “✓ Selesai crop”" => "Drag the box to frame · any side/corner to resize · click “✓ Finish crop”",
         "Muat foto dulu." => "Load a photo first.",
         "Muat foto untuk mulai mengedit." => "Load a photo to start editing.",
         // editor — cinematic mode
