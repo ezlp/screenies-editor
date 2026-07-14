@@ -154,47 +154,64 @@ fn pixelate(img: &mut RgbaImage, block: u32) {
 }
 
 /// Separable box blur of the given radius (edges clamped). Two passes
-/// (horizontal then vertical) approximate a Gaussian cheaply; alpha kept.
+/// (horizontal then vertical) approximate a Gaussian cheaply; alpha kept. Uses a
+/// running window sum, so cost is O(pixels) — independent of the radius.
 fn box_blur(img: &mut RgbaImage, radius: u32) {
     let (w, h) = img.dimensions();
     if radius == 0 || w == 0 || h == 0 {
         return;
     }
     let r = radius as i64;
-    let win = (2 * r + 1) as u32;
+    let win = (2 * r + 1) as i64;
 
-    // Horizontal pass into a scratch buffer, then vertical pass back.
+    // Each pass slides a window sum: at every step drop the pixel leaving on one
+    // edge and add the one entering on the other (both edge-clamped) — the same
+    // clamped average as the naive version, without the per-radius inner loop.
     let mut scratch = img.clone();
     for y in 0..h {
+        let (mut sr, mut sg, mut sb) = (0i64, 0i64, 0i64);
+        for dx in -r..=r {
+            let sx = dx.clamp(0, w as i64 - 1) as u32;
+            let p = img.get_pixel(sx, y).0;
+            sr += p[0] as i64;
+            sg += p[1] as i64;
+            sb += p[2] as i64;
+        }
         for x in 0..w {
-            let (mut sr, mut sg, mut sb) = (0u32, 0u32, 0u32);
-            for dx in -r..=r {
-                let sx = (x as i64 + dx).clamp(0, w as i64 - 1) as u32;
-                let p = img.get_pixel(sx, y).0;
-                sr += p[0] as u32;
-                sg += p[1] as u32;
-                sb += p[2] as u32;
-            }
             let p = scratch.get_pixel_mut(x, y);
             p[0] = (sr / win) as u8;
             p[1] = (sg / win) as u8;
             p[2] = (sb / win) as u8;
+            let x_out = (x as i64 - r).clamp(0, w as i64 - 1) as u32;
+            let x_in = (x as i64 + r + 1).clamp(0, w as i64 - 1) as u32;
+            let pin = img.get_pixel(x_in, y).0;
+            let pout = img.get_pixel(x_out, y).0;
+            sr += pin[0] as i64 - pout[0] as i64;
+            sg += pin[1] as i64 - pout[1] as i64;
+            sb += pin[2] as i64 - pout[2] as i64;
         }
     }
-    for y in 0..h {
-        for x in 0..w {
-            let (mut sr, mut sg, mut sb) = (0u32, 0u32, 0u32);
-            for dy in -r..=r {
-                let sy = (y as i64 + dy).clamp(0, h as i64 - 1) as u32;
-                let p = scratch.get_pixel(x, sy).0;
-                sr += p[0] as u32;
-                sg += p[1] as u32;
-                sb += p[2] as u32;
-            }
+    for x in 0..w {
+        let (mut sr, mut sg, mut sb) = (0i64, 0i64, 0i64);
+        for dy in -r..=r {
+            let sy = dy.clamp(0, h as i64 - 1) as u32;
+            let p = scratch.get_pixel(x, sy).0;
+            sr += p[0] as i64;
+            sg += p[1] as i64;
+            sb += p[2] as i64;
+        }
+        for y in 0..h {
             let p = img.get_pixel_mut(x, y);
             p[0] = (sr / win) as u8;
             p[1] = (sg / win) as u8;
             p[2] = (sb / win) as u8;
+            let y_out = (y as i64 - r).clamp(0, h as i64 - 1) as u32;
+            let y_in = (y as i64 + r + 1).clamp(0, h as i64 - 1) as u32;
+            let pin = scratch.get_pixel(x, y_in).0;
+            let pout = scratch.get_pixel(x, y_out).0;
+            sr += pin[0] as i64 - pout[0] as i64;
+            sg += pin[1] as i64 - pout[1] as i64;
+            sb += pin[2] as i64 - pout[2] as i64;
         }
     }
 }

@@ -6,39 +6,42 @@ use base64::Engine;
 use image::RgbaImage;
 use std::io::Cursor;
 
-/// Full render: base64 photo → cropped, resized, filtered, text-stamped RGBA.
-pub fn render(job: &RenderJob) -> Result<RgbaImage, AppError> {
+/// Decode + crop/resize/fit the photo into the output-sized BASE image (no
+/// filters, effects or text yet). This is the expensive part; a shell can cache
+/// it and call `render_onto` when only filter/effect/text params change. Fit mode
+/// scales the whole crop inside the output with black padding (keeps everything);
+/// otherwise it crops to fill.
+pub fn prepare_base(job: &RenderJob) -> Result<RgbaImage, AppError> {
     let bytes = base64::engine::general_purpose::STANDARD
         .decode(&job.image_base64)
         .map_err(|e| AppError::Parse(format!("base64: {e}")))?;
-
     let src = image::load_from_memory(&bytes)
         .map_err(|e| AppError::Render(format!("decode foto: {e}")))?
         .to_rgba8();
-
-    // Photo: crop → resize/fit to the output → filters. Fit mode scales the whole
-    // crop inside the output with black padding (keeps everything) instead of
-    // cropping to fill. Cinematic mode then paints solid bars over the top and/or
-    // bottom (they grow inward, output size unchanged); bars sit under the
-    // stickers/text drawn next.
-    let mut out = if job.fit {
-        crop::crop_and_fit(&src, &job.crop, &job.output, [0, 0, 0, 255])?
+    if job.fit {
+        crop::crop_and_fit(&src, &job.crop, &job.output, [0, 0, 0, 255])
     } else {
-        crop::crop_and_resize(&src, &job.crop, &job.output)?
-    };
+        crop::crop_and_resize(&src, &job.crop, &job.output)
+    }
+}
+
+/// Apply everything on top of a prepared base: filters, cinematic bars, stickers,
+/// text, then censor boxes LAST (so blur/pixelate cover whatever sits under them
+/// — photo, stickers, AND text). Takes the base by value.
+pub fn render_onto(mut out: RgbaImage, job: &RenderJob) -> Result<RgbaImage, AppError> {
     filters::apply(&mut out, &job.filters);
     if let Some(cv) = &job.canvas {
         draw_letterbox(&mut out, cv);
     }
-
-    // Stickers under the text, then text (with its bg strips).
     sticker::overlay_all(&mut out, &job.stickers)?;
     text::draw_blocks(&mut out, job)?;
-
-    // Censor boxes run LAST so blur/pixelate cover whatever sits under them —
-    // photo, stickers, AND text (so you can redact a name/plate over anything).
     filters::apply_censors(&mut out, &job.censors);
     Ok(out)
+}
+
+/// Full render: base64 photo → cropped/resized/fitted → filtered, text-stamped.
+pub fn render(job: &RenderJob) -> Result<RgbaImage, AppError> {
+    render_onto(prepare_base(job)?, job)
 }
 
 /// Cinematic letterbox: paint solid top & bottom bars over the image. The bars

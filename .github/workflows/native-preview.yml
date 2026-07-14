@@ -78,14 +78,15 @@ jobs:
             --icon-filename screenies-native \
             --output appimage
 
-      - name: Stage artifacts
+      - name: Stage artifacts (bundle every Linux download into one zip)
         shell: bash
         run: |
-          mkdir -p out
-          cp native/target/release/screenies-native out/screenies-native-linux-x86_64
-          cp native/target/debian/*.deb out/
-          cp native/target/generate-rpm/*.rpm out/
-          cp native/*.AppImage out/ 2>/dev/null || echo "no AppImage (best-effort step may have failed)"
+          mkdir -p out staged
+          cp native/target/release/screenies-native staged/screenies-native-linux-x86_64
+          cp native/target/debian/*.deb staged/
+          cp native/target/generate-rpm/*.rpm staged/
+          cp native/*.AppImage staged/ 2>/dev/null || echo "no AppImage (best-effort step may have failed)"
+          (cd staged && zip -r ../out/screenies-native-linux-x86_64.zip .)
 
       - uses: actions/upload-artifact@v7
         with:

@@ -111,6 +111,17 @@ struct Snapshot {
     stroke_width: f32,
 }
 
+/// A cached preview base: the decoded/cropped/resized photo before any filters,
+/// effects or text. Reused while only those params change; keyed on the inputs
+/// that affect it (crop, output size, fit mode) and cleared when the photo changes.
+struct BaseCache {
+    crop: CropRect,
+    out_w: u32,
+    out_h: u32,
+    fit: bool,
+    img: image::RgbaImage,
+}
+
 pub struct EditorState {
     preset: ParsePreset,
     photo: Option<Photo>,
@@ -182,6 +193,9 @@ pub struct EditorState {
     dirty: bool,
     texture: Option<egui::TextureHandle>,
     error: Option<String>,
+    /// Cached decoded/cropped/resized photo (before filters/text), reused across
+    /// filter/effect/text changes so sliders don't re-decode + re-resize.
+    base_cache: Option<BaseCache>,
 }
 
 impl Default for EditorState {
@@ -224,6 +238,7 @@ impl Default for EditorState {
             dirty: false,
             texture: None,
             error: None,
+            base_cache: None,
         }
     }
 }
@@ -1004,6 +1019,7 @@ impl EditorState {
                 self.output_override = None;
                 self.crop_editing = false;
                 self.error = None;
+                self.base_cache = None; // new photo → invalidate the preview base
                 self.dirty = true;
             }
             Err(e) => self.error = Some(format!("Gagal decode gambar: {e}")),
@@ -1040,6 +1056,7 @@ impl EditorState {
         self.crop_editing = false;
         self.history.clear();
         self.future.clear();
+        self.base_cache = None; // switched document/photo → invalidate the base
         self.dirty = true;
     }
 
@@ -1386,7 +1403,38 @@ impl EditorState {
             self.texture = None;
             return;
         };
-        match compose::render(&job) {
+        // Reuse the cached base (decoded/cropped/resized photo) when only
+        // filter/effect/text params changed — skips re-decoding and re-resizing
+        // the photo on every slider tick. Keyed on the inputs that affect the
+        // base; cleared when the photo changes.
+        let hit = self.base_cache.as_ref().map_or(false, |c| {
+            c.crop == job.crop
+                && c.out_w == job.output.w
+                && c.out_h == job.output.h
+                && c.fit == job.fit
+        });
+        let base = if hit {
+            self.base_cache.as_ref().unwrap().img.clone()
+        } else {
+            match compose::prepare_base(&job) {
+                Ok(b) => {
+                    self.base_cache = Some(BaseCache {
+                        crop: job.crop,
+                        out_w: job.output.w,
+                        out_h: job.output.h,
+                        fit: job.fit,
+                        img: b.clone(),
+                    });
+                    b
+                }
+                Err(e) => {
+                    self.error = Some(format!("Render gagal: {e}"));
+                    return;
+                }
+            }
+        };
+
+        match compose::render_onto(base, &job) {
             Ok(img) => {
                 let size = [img.width() as usize, img.height() as usize];
                 let color = egui::ColorImage::from_rgba_unmultiplied(size, img.as_raw());
