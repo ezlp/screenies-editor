@@ -1,0 +1,862 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ScreeniesEditor — native SA-MP screenshot &amp; chatlog editor</title>
+<meta name="description" content="A lightweight, native screenshot and chatlog editor for the SA-MP roleplay community. Version 3 makes it yours with a full theme engine — and stays featherweight.">
+<link rel="canonical" href="https://ezlp.github.io/screenies-editor/">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<meta name="color-scheme" content="dark light">
+<meta name="theme-color" content="#131118" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f3f1f8" media="(prefers-color-scheme: light)">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://ezlp.github.io/screenies-editor/">
+<meta property="og:title" content="ScreeniesEditor 3.0 — the theme update">
+<meta property="og:description" content="A lightweight, native screenshot + chatlog editor for the SA-MP roleplay scene. Version 3 makes it yours with a full theme engine — near-zero weight.">
+<meta property="og:image" content="https://ezlp.github.io/screenies-editor/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="ScreeniesEditor 3.0 — the theme update">
+<meta name="twitter:description" content="A lightweight, native screenshot + chatlog editor for SA-MP. V3 makes it yours with a full theme engine.">
+<meta name="twitter:image" content="https://ezlp.github.io/screenies-editor/og.png">
+<style>
+/* ============================================================
+   ScreeniesEditor 3.0 concept
+   Two independent token layers:
+   (1) PAGE tokens  --bg/--ink/...  — follow the VIEWER's light/dark
+   (2) MOCK tokens  --m-*           — the 7 proposed app themes,
+                                       switched by the in-page picker
+   ============================================================ */
+
+:root{
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --mono: ui-monospace, "SF Mono", "SFMono-Regular", Menlo, Consolas, "Liberation Mono", monospace;
+
+  /* PAGE — dark first (the app's own identity) */
+  --bg:#131118;
+  --surface:#1b1922;
+  --surface-2:#231f2e;
+  --ink:#ecebf3;
+  --ink-2:#b8b2c6;
+  --dim:#7d7691;
+  --border:#2c2839;
+  --border-soft:#221f2c;
+  --accent:#c2a2da;          /* the lavender that already lives in the crop painter */
+  --accent-2:#d6bdeb;
+  --accent-ink:#1a1122;
+  --good:#6fcf97;
+  --warn:#e8b15a;
+  --bad:#dc5a5a;
+  --radius:12px;
+  --maxw:1180px;
+  --shadow:0 18px 50px -24px rgba(0,0,0,.75);
+}
+@media (prefers-color-scheme: light){
+  :root{
+    --bg:#f3f1f8; --surface:#ffffff; --surface-2:#ece9f4;
+    --ink:#211d2a; --ink-2:#514b60; --dim:#8b8598;
+    --border:#e3dfee; --border-soft:#eeebf5;
+    --accent:#7a4fd0; --accent-2:#663ec0; --accent-ink:#ffffff;
+    --good:#2e9e63; --warn:#b9791f; --bad:#c4443f;
+    --shadow:0 18px 50px -30px rgba(60,40,90,.35);
+  }
+}
+:root[data-theme="light"]{
+  --bg:#f3f1f8; --surface:#ffffff; --surface-2:#ece9f4;
+  --ink:#211d2a; --ink-2:#514b60; --dim:#8b8598;
+  --border:#e3dfee; --border-soft:#eeebf5;
+  --accent:#7a4fd0; --accent-2:#663ec0; --accent-ink:#ffffff;
+  --good:#2e9e63; --warn:#b9791f; --bad:#c4443f;
+  --shadow:0 18px 50px -30px rgba(60,40,90,.35);
+}
+:root[data-theme="dark"]{
+  --bg:#131118; --surface:#1b1922; --surface-2:#231f2e;
+  --ink:#ecebf3; --ink-2:#b8b2c6; --dim:#7d7691;
+  --border:#2c2839; --border-soft:#221f2c;
+  --accent:#c2a2da; --accent-2:#d6bdeb; --accent-ink:#1a1122;
+  --good:#6fcf97; --warn:#e8b15a; --bad:#dc5a5a;
+  --shadow:0 18px 50px -24px rgba(0,0,0,.75);
+}
+
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0; background:var(--bg); color:var(--ink);
+  font-family:var(--sans); line-height:1.6;
+  font-size:16.5px; letter-spacing:-.005em;
+  overflow-x:hidden;
+}
+.wrap{max-width:var(--maxw); margin:0 auto; padding:0 24px}
+a{color:var(--accent-2); text-decoration:none}
+a:hover{text-decoration:underline}
+:focus-visible{outline:2px solid var(--accent); outline-offset:2px; border-radius:3px}
+
+/* type */
+h1,h2,h3{margin:0; text-wrap:balance; letter-spacing:-.02em; line-height:1.08}
+h1{font-size:clamp(2.3rem,6vw,4rem); font-weight:800}
+h2{font-size:clamp(1.6rem,3.6vw,2.5rem); font-weight:800}
+h3{font-size:1.12rem; font-weight:700; letter-spacing:-.01em}
+p{margin:0}
+code,.mono{font-family:var(--mono)}
+.kicker{
+  font-family:var(--mono); font-size:.72rem; font-weight:600;
+  letter-spacing:.22em; text-transform:uppercase; color:var(--accent);
+}
+.lede{font-size:1.12rem; color:var(--ink-2); max-width:62ch}
+.dim{color:var(--dim)}
+.tabnums{font-variant-numeric:tabular-nums}
+
+/* top bar */
+.topbar{
+  position:sticky; top:0; z-index:50;
+  background:color-mix(in srgb, var(--bg) 82%, transparent);
+  backdrop-filter:blur(10px);
+  border-bottom:1px solid var(--border-soft);
+}
+.topbar .wrap{display:flex; align-items:center; gap:14px; height:58px}
+.brand{display:flex; align-items:center; gap:10px; font-weight:800; letter-spacing:-.02em}
+.brand .glyph{width:22px; height:22px; border-radius:7px;
+  background:conic-gradient(from 210deg, var(--accent), #79d0c4, #e6a23c, var(--accent));
+  box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.14)}
+.pill{
+  font-family:var(--mono); font-size:.66rem; letter-spacing:.12em; text-transform:uppercase;
+  color:var(--accent-ink); background:var(--accent);
+  padding:3px 8px; border-radius:999px; font-weight:700;
+}
+.spacer{flex:1}
+.tglr{
+  display:inline-flex; align-items:center; gap:6px; cursor:pointer;
+  font-family:var(--mono); font-size:.72rem; letter-spacing:.06em;
+  background:var(--surface); color:var(--ink-2);
+  border:1px solid var(--border); border-radius:999px; padding:6px 12px;
+}
+.tglr:hover{color:var(--ink); border-color:var(--accent)}
+
+/* section rhythm */
+section{padding:74px 0}
+section + section{border-top:1px solid var(--border-soft)}
+.sec-head{max-width:64ch; margin-bottom:34px}
+.sec-head h2{margin:12px 0 14px}
+
+/* ---------- HERO ---------- */
+.hero{padding:56px 0 30px}
+.hero-grid{display:grid; grid-template-columns:1.05fr 1.35fr; gap:44px; align-items:center}
+.hero h1{margin:14px 0 18px}
+.hero .lede{margin-bottom:24px}
+.hero .lede code{color:var(--ink); background:var(--surface-2); padding:1px 6px; border-radius:5px; font-size:.9em}
+
+.picker-label{font-family:var(--mono); font-size:.7rem; letter-spacing:.14em; text-transform:uppercase; color:var(--dim); margin-bottom:10px}
+.chips{display:flex; flex-wrap:wrap; gap:8px}
+.chip{
+  display:inline-flex; align-items:center; gap:8px; cursor:pointer;
+  background:var(--surface); border:1px solid var(--border); color:var(--ink-2);
+  padding:7px 12px 7px 9px; border-radius:999px; font-size:.86rem; font-weight:600;
+  transition:border-color .15s, color .15s, transform .05s;
+}
+.chip:hover{color:var(--ink); border-color:var(--accent)}
+.chip[aria-pressed="true"]{color:var(--ink); border-color:var(--accent);
+  box-shadow:inset 0 0 0 1px var(--accent)}
+.chip .sw{width:14px; height:14px; border-radius:50%; box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.22)}
+
+.accent-row{display:flex; align-items:center; gap:10px; margin-top:18px; flex-wrap:wrap}
+.accent-row .picker-label{margin:0}
+.dots{display:inline-flex; gap:7px}
+.dot{width:20px; height:20px; border-radius:50%; cursor:pointer; border:2px solid transparent;
+  box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.25)}
+.dot[aria-pressed="true"]{border-color:var(--ink)}
+
+/* ---------- MOCK APP ---------- */
+.mock-shell{
+  border:1px solid var(--border); border-radius:16px; overflow:hidden;
+  box-shadow:var(--shadow); background:var(--surface);
+}
+.mock-chrome{display:flex; align-items:center; gap:7px; padding:9px 12px;
+  background:var(--surface-2); border-bottom:1px solid var(--border)}
+.mock-chrome .tl{width:11px; height:11px; border-radius:50%; background:var(--dim); opacity:.5}
+.mock-chrome .name{margin-left:8px; font-family:var(--mono); font-size:.72rem; color:var(--dim)}
+
+/* the app itself — driven entirely by --m-* tokens */
+.mock{
+  /* midnight defaults — JS re-primes per selected theme; these keep it styled without/before JS */
+  --m-bg:#14121a; --m-surface:#1e1b26; --m-surface-2:#272233;
+  --m-ink:#edeaf3; --m-ink-dim:#9089a0; --m-accent:#c2a2da; --m-accent-ink:#1a1222;
+  --m-border:#2e2a3a; --m-radius:10px;
+  display:grid; grid-template-columns:52px 232px 1fr; grid-template-rows:1fr auto;
+  height:430px; background:var(--m-bg); color:var(--m-ink);
+  font-size:13px; line-height:1.45;
+}
+.mock *{box-sizing:border-box}
+.m-rail{grid-row:1 / span 2; background:var(--m-surface); border-right:1px solid var(--m-border);
+  display:flex; flex-direction:column; align-items:center; gap:6px; padding:12px 0}
+.m-logo{width:26px; height:26px; border-radius:8px; margin-bottom:8px;
+  background:linear-gradient(140deg, var(--m-accent), color-mix(in srgb, var(--m-accent) 40%, var(--m-surface)))}
+.m-nav{width:36px; height:36px; border-radius:9px; display:grid; place-items:center; color:var(--m-ink-dim); cursor:pointer}
+.m-nav svg{width:19px; height:19px; fill:none; stroke:currentColor; stroke-width:1.7}
+.m-nav.on{background:color-mix(in srgb, var(--m-accent) 20%, transparent); color:var(--m-accent)}
+.m-rail .grow{flex:1}
+.m-railswatch{width:20px; height:20px; border-radius:50%; background:var(--m-accent); box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.25)}
+
+.m-tools{background:var(--m-surface); border-right:1px solid var(--m-border); display:flex; flex-direction:column; min-height:0}
+.m-seg{display:flex; gap:2px; padding:10px; border-bottom:1px solid var(--m-border); overflow-x:auto}
+.m-seg button{flex:0 0 auto; font:inherit; font-size:11px; font-weight:600; cursor:pointer;
+  color:var(--m-ink-dim); background:transparent; border:0; border-radius:7px; padding:6px 9px; display:flex; align-items:center; gap:5px}
+.m-seg button svg{width:14px; height:14px; fill:none; stroke:currentColor; stroke-width:1.7}
+.m-seg button.on{color:var(--m-accent-ink); background:var(--m-accent)}
+.m-panel{padding:14px; overflow:auto; flex:1}
+.m-lbl{font-family:var(--mono); font-size:9.5px; letter-spacing:.13em; text-transform:uppercase; color:var(--m-ink-dim); margin:0 0 8px}
+.m-row{display:flex; gap:6px; flex-wrap:wrap; margin-bottom:14px}
+.m-tag{font-size:11px; padding:4px 9px; border-radius:999px; border:1px solid var(--m-border); color:var(--m-ink-dim); background:var(--m-surface-2)}
+.m-tag.on{color:var(--m-accent); border-color:var(--m-accent); background:color-mix(in srgb, var(--m-accent) 14%, transparent)}
+.m-field{background:var(--m-surface-2); border:1px solid var(--m-border); border-radius:8px; padding:9px 10px; font-family:var(--mono); font-size:11px; color:var(--m-ink); margin-bottom:14px}
+.m-field .ts{color:var(--m-ink-dim)}
+.m-swatches{display:flex; gap:5px; flex-wrap:wrap; margin-bottom:14px}
+.m-swatches i{width:20px; height:20px; border-radius:6px; display:block; box-shadow:inset 0 0 0 1px rgba(255,255,255,.12)}
+.m-slider{margin-bottom:13px}
+.m-slider .cap{display:flex; justify-content:space-between; font-size:10.5px; color:var(--m-ink-dim); margin-bottom:5px; font-family:var(--mono)}
+.m-track{height:5px; border-radius:3px; background:var(--m-surface-2); position:relative}
+.m-track::after{content:""; position:absolute; left:0; top:0; bottom:0; width:var(--v,55%); border-radius:3px; background:var(--m-accent)}
+.m-track .knob{position:absolute; top:50%; left:var(--v,55%); width:13px; height:13px; border-radius:50%; background:var(--m-accent); transform:translate(-50%,-50%); box-shadow:0 0 0 3px var(--m-surface)}
+.m-select{display:flex; justify-content:space-between; align-items:center; background:var(--m-surface-2);
+  border:1px solid var(--m-border); border-radius:8px; padding:8px 10px; font-size:11.5px; margin-bottom:10px; color:var(--m-ink)}
+.m-select svg{width:13px; height:13px; stroke:var(--m-ink-dim); fill:none; stroke-width:1.8}
+
+.m-stage{position:relative; background:
+  repeating-conic-gradient(color-mix(in srgb,var(--m-bg) 92%, #808080) 0% 25%, var(--m-bg) 0% 50%) 50% / 22px 22px;
+  display:grid; place-items:center; padding:22px; overflow:hidden}
+.m-canvas{position:relative; width:100%; max-width:430px; aspect-ratio:16/10; border-radius:6px; overflow:hidden;
+  box-shadow:0 10px 30px -12px rgba(0,0,0,.6)}
+.m-photo{position:absolute; inset:0; background:
+  linear-gradient(180deg,#c98a4e 0%, #d6a25f 26%, #b98b52 40%, #6f7d55 41%, #56663f 72%, #3d4a2c 100%)}
+.m-sun{position:absolute; right:16%; top:12%; width:64px; height:64px; border-radius:50%;
+  background:radial-gradient(circle, rgba(255,238,190,.95), rgba(255,210,140,.15) 70%, transparent)}
+.m-bar{position:absolute; left:0; right:0; height:15%; background:#000}
+.m-bar.top{top:0} .m-bar.bot{bottom:0}
+.m-chat{position:absolute; left:12px; top:16%; font-family:var(--mono); font-size:10.5px; line-height:1.5; text-shadow:0 1px 2px rgba(0,0,0,.85)}
+.m-chat .t{color:#d9d4c8} .m-chat .a{color:#8fb7e0} .m-chat .b{color:#e0a86a} .m-chat .me{color:#c9a9d8; font-style:italic}
+.m-float{position:absolute; top:10px; right:10px; display:flex; gap:3px; background:color-mix(in srgb, var(--m-surface) 88%, transparent);
+  border:1px solid var(--m-border); border-radius:9px; padding:4px; backdrop-filter:blur(6px)}
+.m-float button{width:26px; height:26px; border:0; background:transparent; border-radius:6px; cursor:pointer; color:var(--m-ink-dim); display:grid; place-items:center}
+.m-float button:hover{color:var(--m-accent); background:color-mix(in srgb,var(--m-accent) 15%, transparent)}
+.m-float svg{width:15px; height:15px; fill:none; stroke:currentColor; stroke-width:1.7}
+
+.m-action{grid-column:2 / span 2; display:flex; align-items:center; gap:10px; padding:10px 14px;
+  background:var(--m-surface); border-top:1px solid var(--m-border)}
+.m-btn{font:inherit; font-size:12px; font-weight:700; cursor:pointer; border-radius:8px; padding:9px 16px; display:inline-flex; align-items:center; gap:7px}
+.m-btn svg{width:15px; height:15px; fill:none; stroke:currentColor; stroke-width:1.8}
+.m-btn.primary{background:var(--m-accent); color:var(--m-accent-ink); border:0}
+.m-btn.ghost{background:transparent; color:var(--m-ink-dim); border:1px solid var(--m-border)}
+.m-action .grow{flex:1}
+.m-hint{font-family:var(--mono); font-size:10px; color:var(--m-ink-dim)}
+
+.mock-cap{display:flex; gap:8px; align-items:baseline; margin-top:14px; font-size:.82rem; color:var(--dim); font-family:var(--mono)}
+
+/* ---------- generic cards ---------- */
+.grid{display:grid; gap:18px}
+.g3{grid-template-columns:repeat(3,1fr)}
+.g2{grid-template-columns:repeat(2,1fr)}
+.card{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:22px}
+.card h3{margin-bottom:8px}
+.card p{color:var(--ink-2); font-size:.95rem}
+.card .num{font-family:var(--mono); font-size:.72rem; letter-spacing:.14em; color:var(--dim); text-transform:uppercase}
+.card code{background:var(--surface-2); padding:1px 5px; border-radius:4px; font-size:.85em; color:var(--ink)}
+
+/* theme gallery */
+.tgal{display:grid; grid-template-columns:repeat(4,1fr); gap:16px}
+.tcard{--m-bg:#14121a; --m-surface:#1e1b26; --m-surface-2:#272233; --m-accent:#c2a2da; --m-border:#2e2a3a;
+  --m-radius:8px; text-align:left; cursor:pointer; padding:0; border:1px solid var(--border);
+  background:var(--surface); border-radius:14px; overflow:hidden; color:inherit; font:inherit;
+  transition:transform .12s, border-color .12s}
+.tcard:hover{transform:translateY(-3px); border-color:var(--accent)}
+.tprev{height:104px; background:var(--m-bg); padding:10px; display:flex; gap:8px}
+.tprev .side{width:34%; background:var(--m-surface); border:1px solid var(--m-border); border-radius:6px; padding:7px; display:flex; flex-direction:column; gap:5px}
+.tprev .side b{height:6px; border-radius:3px; background:var(--m-accent); width:70%; display:block}
+.tprev .side u{height:5px; border-radius:3px; background:var(--m-surface-2); width:100%; display:block; text-decoration:none}
+.tprev .side u.short{width:60%}
+.tprev .main{flex:1; background:var(--m-surface-2); border:1px solid var(--m-border); border-radius:6px; position:relative; overflow:hidden}
+.tprev .main::before{content:""; position:absolute; inset:0; background:linear-gradient(160deg, color-mix(in srgb,var(--m-accent) 30%, var(--m-bg)), var(--m-bg))}
+.tprev .main .btn{position:absolute; right:7px; bottom:7px; width:34px; height:11px; border-radius:4px; background:var(--m-accent)}
+.tmeta{display:flex; align-items:center; justify-content:space-between; padding:11px 13px; border-top:1px solid var(--border)}
+.tmeta .nm{font-weight:700; font-size:.9rem}
+.tmeta .sub{font-family:var(--mono); font-size:.66rem; color:var(--dim); text-transform:uppercase; letter-spacing:.08em}
+.tmeta .sws{display:flex; gap:4px}
+.tmeta .sws i{width:12px; height:12px; border-radius:50%; box-shadow:inset 0 0 0 1px rgba(255,255,255,.15)}
+
+/* token diagram */
+.tokens{display:grid; grid-template-columns:repeat(6,1fr); gap:10px; margin-top:6px}
+.token{border:1px solid var(--border); border-radius:10px; overflow:hidden; background:var(--surface)}
+.token .chip2{height:46px}
+.token .tk{padding:8px 10px; font-family:var(--mono); font-size:.68rem}
+.token .tk b{color:var(--ink); font-weight:700; display:block}
+.token .tk span{color:var(--dim)}
+
+/* code */
+pre{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius);
+  padding:18px 20px; overflow-x:auto; margin:0}
+pre code{font-family:var(--mono); font-size:.82rem; line-height:1.7; color:var(--ink-2)}
+.tok-k{color:var(--accent-2)} .tok-t{color:#79d0c4} .tok-f{color:var(--warn)} .tok-c{color:var(--dim); font-style:italic} .tok-s{color:var(--good)}
+
+/* before / after */
+.ba{display:grid; grid-template-columns:1fr 1fr; gap:16px}
+.ba .col{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:18px}
+.ba .tag{font-family:var(--mono); font-size:.68rem; letter-spacing:.12em; text-transform:uppercase; padding:3px 8px; border-radius:999px; display:inline-block; margin-bottom:12px}
+.ba .before .tag{color:var(--bad); border:1px solid color-mix(in srgb,var(--bad) 45%, transparent)}
+.ba .after .tag{color:var(--good); border:1px solid color-mix(in srgb,var(--good) 45%, transparent)}
+.stacklist{list-style:none; padding:0; margin:0; font-family:var(--mono); font-size:.78rem}
+.stacklist li{padding:5px 8px; border-radius:6px; color:var(--ink-2); margin-bottom:3px; background:var(--surface-2)}
+.stacklist.scroll li{opacity:.9}
+.stacklist .prim{background:var(--accent); color:var(--accent-ink); font-weight:700}
+.flowlist{list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:10px}
+.flowlist{list-style:none; padding:0; margin:0; display:flex; flex-direction:column; gap:9px}
+.flowlist li{display:flex; gap:11px; font-size:.92rem; color:var(--ink-2)}
+.flowlist .n{flex:0 0 auto; width:22px; height:22px; border-radius:6px; background:var(--surface-2); color:var(--accent);
+  font-family:var(--mono); font-size:.72rem; font-weight:700; display:grid; place-items:center}
+
+/* stats */
+.stats{display:grid; grid-template-columns:repeat(4,1fr); gap:14px}
+.stat{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:20px}
+.stat .v{font-size:2rem; font-weight:800; letter-spacing:-.03em; font-variant-numeric:tabular-nums}
+.stat .v.accent{color:var(--accent)}
+.stat .k{font-family:var(--mono); font-size:.68rem; letter-spacing:.1em; text-transform:uppercase; color:var(--dim); margin-top:4px}
+
+/* roadmap */
+.road{display:grid; grid-template-columns:repeat(3,1fr); gap:16px}
+.phase{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:20px; position:relative}
+.phase .v{font-family:var(--mono); font-size:.74rem; color:var(--accent); font-weight:700; letter-spacing:.08em}
+.phase h3{margin:8px 0 10px; font-size:1.02rem}
+.phase ul{margin:0; padding-left:18px; color:var(--ink-2); font-size:.9rem}
+.phase li{margin-bottom:5px}
+.phase.next{border-color:var(--accent); box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--accent) 40%, transparent)}
+
+footer{padding:40px 0 60px; color:var(--dim); font-family:var(--mono); font-size:.76rem; border-top:1px solid var(--border-soft)}
+footer .wrap{display:flex; gap:10px; flex-wrap:wrap; align-items:center}
+
+/* responsive */
+@media (max-width:920px){
+  .hero-grid{grid-template-columns:1fr; gap:30px}
+  .g3,.g2{grid-template-columns:1fr}
+  .tgal{grid-template-columns:repeat(2,1fr)}
+  .tokens{grid-template-columns:repeat(3,1fr)}
+  .stats{grid-template-columns:repeat(2,1fr)}
+  .road{grid-template-columns:1fr}
+  .ba{grid-template-columns:1fr}
+  .mock-scroll{overflow-x:auto}
+  .mock{min-width:640px}
+}
+@media (max-width:520px){
+  .tgal{grid-template-columns:1fr}
+  .tokens{grid-template-columns:repeat(2,1fr)}
+  .stats{grid-template-columns:1fr}
+  section{padding:52px 0}
+}
+@media (prefers-reduced-motion:reduce){
+  *{transition:none !important; animation:none !important}
+}
+
+/* ---- site chrome (public-site additions) ---- */
+html{scroll-behavior:smooth}
+[id]{scroll-margin-top:74px}
+.brand{cursor:pointer; color:var(--ink); text-decoration:none}
+.brand:hover{text-decoration:none}
+.topnav{display:flex; align-items:center; gap:2px}
+.topnav a{color:var(--ink-2); font-size:.86rem; font-weight:500; padding:6px 10px; border-radius:8px}
+.topnav a:hover{color:var(--ink); background:var(--surface); text-decoration:none}
+.topnav .gh{display:inline-flex; align-items:center; gap:6px}
+.topnav .gh svg{width:16px; height:16px; fill:currentColor}
+.cta-row{display:flex; gap:12px; flex-wrap:wrap; margin:24px 0 6px}
+.btn-cta{display:inline-flex; align-items:center; gap:9px; font-weight:700; font-size:.95rem;
+  padding:12px 20px; border-radius:11px; cursor:pointer; text-decoration:none;
+  border:1px solid transparent; transition:transform .05s, background .15s, border-color .15s}
+.btn-cta:hover{text-decoration:none}
+.btn-cta:active{transform:translateY(1px)}
+.btn-cta.primary{background:var(--accent); color:var(--accent-ink)}
+.btn-cta.primary:hover{background:var(--accent-2)}
+.btn-cta.secondary{background:var(--surface); color:var(--ink); border-color:var(--border)}
+.btn-cta.secondary:hover{border-color:var(--accent)}
+.btn-cta svg{width:17px; height:17px; fill:none; stroke:currentColor; stroke-width:1.9}
+.btn-cta svg.gh{fill:currentColor; stroke:none}
+.hero .os-note{font-family:var(--mono); font-size:.72rem; color:var(--dim); margin-top:12px}
+footer .wrap{gap:8px}
+footer a{color:var(--ink-2)}
+footer a:hover{color:var(--accent-2); text-decoration:none}
+@media (max-width:680px){ .topnav .hide-sm{display:none} }
+@media (prefers-reduced-motion:reduce){ html{scroll-behavior:auto} }
+</style>
+</head>
+<body id="top">
+
+<div class="topbar">
+  <div class="wrap">
+    <a class="brand" href="#top"><span class="glyph"></span>ScreeniesEditor</a>
+    <span class="pill">3.0 preview</span>
+    <span class="spacer"></span>
+    <nav class="topnav">
+      <a class="hide-sm" href="#themes">Themes</a>
+      <a class="hide-sm" href="#roadmap">Roadmap</a>
+      <a class="gh" href="https://github.com/ezlp/screenies-editor" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 .3a12 12 0 0 0-3.8 23.4c.6.1.8-.3.8-.6v-2c-3.3.7-4-1.6-4-1.6-.6-1.4-1.3-1.8-1.3-1.8-1.1-.7 0-.7 0-.7 1.2 0 1.9 1.2 1.9 1.2 1 1.8 2.8 1.3 3.5 1 0-.8.4-1.3.7-1.6-2.7-.3-5.5-1.3-5.5-6 0-1.2.5-2.3 1.3-3.1-.2-.4-.6-1.6 0-3.2 0 0 1-.3 3.4 1.2a11.5 11.5 0 0 1 6 0c2.3-1.5 3.3-1.2 3.3-1.2.7 1.6.2 2.8 0 3.2.9.8 1.3 1.9 1.3 3.2 0 4.6-2.8 5.6-5.5 5.9.5.4.9 1 .9 2.2v3.3c0 .3.1.7.8.6A12 12 0 0 0 12 .3"/></svg>GitHub</a>
+    </nav>
+    <button class="tglr" id="pageTheme" type="button" aria-label="Toggle page theme">
+      <span id="pageThemeIcon">◐</span> <span id="pageThemeLbl">Theme</span>
+    </button>
+  </div>
+</div>
+
+<!-- ================= HERO ================= -->
+<header class="hero">
+  <div class="wrap hero-grid">
+    <div>
+      <span class="kicker">The theme update</span>
+      <h1>Make it yours.<br>Keep it featherweight.</h1>
+      <p class="lede"><strong>ScreeniesEditor</strong> is a lightweight, native editor for SA-MP roleplay screenshots — crop, chatlog overlays, cinematic bars, filters, censor &amp; stickers, one-click PNG export. Version&nbsp;3 makes the whole interface <em>yours</em>: a real theme engine where a look is a handful of colors in a struct — not a stylesheet, not an asset, not one extra megabyte.</p>
+
+      <div class="cta-row">
+        <a class="btn-cta primary" href="https://github.com/ezlp/screenies-editor/releases" target="_blank" rel="noopener"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v13M7 11l5 5 5-5M5 21h14"/></svg>Download</a>
+        <a class="btn-cta secondary" href="https://github.com/ezlp/screenies-editor" target="_blank" rel="noopener"><svg class="gh" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 .3a12 12 0 0 0-3.8 23.4c.6.1.8-.3.8-.6v-2c-3.3.7-4-1.6-4-1.6-.6-1.4-1.3-1.8-1.3-1.8-1.1-.7 0-.7 0-.7 1.2 0 1.9 1.2 1.9 1.2 1 1.8 2.8 1.3 3.5 1 0-.8.4-1.3.7-1.6-2.7-.3-5.5-1.3-5.5-6 0-1.2.5-2.3 1.3-3.1-.2-.4-.6-1.6 0-3.2 0 0 1-.3 3.4 1.2a11.5 11.5 0 0 1 6 0c2.3-1.5 3.3-1.2 3.3-1.2.7 1.6.2 2.8 0 3.2.9.8 1.3 1.9 1.3 3.2 0 4.6-2.8 5.6-5.5 5.9.5.4.9 1 .9 2.2v3.3c0 .3.1.7.8.6A12 12 0 0 0 12 .3"/></svg>View on GitHub</a>
+      </div>
+      <div class="os-note">Windows · macOS · Linux (.deb / .rpm / AppImage) — free &amp; open source</div>
+
+      <div class="picker-label">Pick a look — the editor repaints live →</div>
+      <div class="chips" id="chips" role="group" aria-label="App theme">
+        <button class="chip" data-t="midnight" aria-pressed="true"><span class="sw" style="background:#c2a2da"></span>Midnight</button>
+        <button class="chip" data-t="paper"><span class="sw" style="background:#7a4fd0"></span>Paper</button>
+        <button class="chip" data-t="slate"><span class="sw" style="background:#5aa9e6"></span>Slate</button>
+        <button class="chip" data-t="ember"><span class="sw" style="background:#e8955a"></span>Ember</button>
+        <button class="chip" data-t="sanandreas"><span class="sw" style="background:#e6a23c"></span>San&nbsp;Andreas</button>
+        <button class="chip" data-t="frost"><span class="sw" style="background:#79d0c4"></span>Frost</button>
+        <button class="chip" data-t="contrast"><span class="sw" style="background:#ffd400"></span>Contrast</button>
+      </div>
+
+      <div class="accent-row">
+        <span class="picker-label">Accent</span>
+        <span class="dots" id="dots" role="group" aria-label="Accent color">
+          <span class="dot" data-a="" title="Theme default" aria-pressed="true" style="background:linear-gradient(135deg,#c2a2da,#79d0c4)"></span>
+          <span class="dot" data-a="#c2a2da" style="background:#c2a2da"></span>
+          <span class="dot" data-a="#5aa9e6" style="background:#5aa9e6"></span>
+          <span class="dot" data-a="#79d0c4" style="background:#79d0c4"></span>
+          <span class="dot" data-a="#e6a23c" style="background:#e6a23c"></span>
+          <span class="dot" data-a="#6fcf97" style="background:#6fcf97"></span>
+          <span class="dot" data-a="#e68fb8" style="background:#e68fb8"></span>
+        </span>
+      </div>
+    </div>
+
+    <!-- the mock app -->
+    <div>
+      <div class="mock-shell">
+        <div class="mock-chrome"><span class="tl"></span><span class="tl"></span><span class="tl"></span><span class="name">ScreeniesEditor — beach_pursuit.png</span></div>
+        <div class="mock-scroll">
+          <div class="mock" id="mock" data-mock-theme="midnight">
+            <!-- nav rail -->
+            <div class="m-rail">
+              <div class="m-logo"></div>
+              <div class="m-nav on" title="Editor"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M3 15l5-4 4 3 3-3 6 5"/><circle cx="9" cy="9" r="1.4"/></svg></div>
+              <div class="m-nav" title="Gallery"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="1.5"/><rect x="13" y="3" width="8" height="8" rx="1.5"/><rect x="3" y="13" width="8" height="8" rx="1.5"/><rect x="13" y="13" width="8" height="8" rx="1.5"/></svg></div>
+              <div class="m-nav" title="Settings"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/></svg></div>
+              <div class="grow"></div>
+              <div class="m-railswatch" title="Active theme"></div>
+            </div>
+
+            <!-- tool sidebar -->
+            <div class="m-tools">
+              <div class="m-seg" id="mseg">
+                <button data-tab="photo"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="8.5" cy="10" r="1.6"/><path d="M4 17l5-4 4 3 3-2 4 3"/></svg>Photo</button>
+                <button data-tab="crop"><svg viewBox="0 0 24 24"><path d="M6 2v14a2 2 0 0 0 2 2h14M2 6h14a2 2 0 0 1 2 2v14"/></svg>Crop</button>
+                <button data-tab="chatlog" class="on"><svg viewBox="0 0 24 24"><path d="M4 5h16v10H9l-4 4V5z"/></svg>Chatlog</button>
+                <button data-tab="text"><svg viewBox="0 0 24 24"><path d="M5 6h14M12 6v12M9 18h6"/></svg>Text</button>
+                <button data-tab="fx"><svg viewBox="0 0 24 24"><path d="M5 8h9M18 8h1M5 16h1M10 16h9"/><circle cx="16" cy="8" r="2"/><circle cx="8" cy="16" r="2"/></svg>FX</button>
+              </div>
+              <div class="m-panel" id="mpanel"><!-- filled by JS --></div>
+            </div>
+
+            <!-- stage -->
+            <div class="m-stage">
+              <div class="m-float">
+                <button title="Undo"><svg viewBox="0 0 24 24"><path d="M9 7L4 12l5 5M4 12h11a5 5 0 0 1 0 10h-1"/></svg></button>
+                <button title="Redo"><svg viewBox="0 0 24 24"><path d="M15 7l5 5-5 5M20 12H9a5 5 0 0 0 0 10h1"/></svg></button>
+                <button title="Fit"><svg viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg></button>
+              </div>
+              <div class="m-canvas">
+                <div class="m-photo"></div>
+                <div class="m-sun"></div>
+                <div class="m-bar top"></div>
+                <div class="m-bar bot"></div>
+                <div class="m-chat">
+                  <div><span class="t">[19:32:41]</span> <span class="a">Antonio_Vega</span> says: you got the package?</div>
+                  <div><span class="me">* Antonio Vega glances over his shoulder.</span></div>
+                  <div><span class="t">[19:32:55]</span> <span class="b">Marcus_Cole</span> says: keep your voice down.</div>
+                </div>
+              </div>
+            </div>
+
+            <!-- action bar -->
+            <div class="m-action">
+              <span class="m-hint">1440 × 900 · 2 chatlogs · cinematic</span>
+              <span class="grow"></span>
+              <button class="m-btn ghost"><svg viewBox="0 0 24 24"><path d="M12 3v13M7 11l5 5 5-5M5 21h14"/></svg>Save draft</button>
+              <button class="m-btn primary"><svg viewBox="0 0 24 24"><path d="M12 3v13M7 11l5 5 5-5M5 21h14"/></svg>Export PNG</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="mock-cap"><span>▲</span><span>Fully interactive — switch themes, accents, and tool tabs. This is the proposed 3.0 layout.</span></div>
+    </div>
+  </div>
+</header>
+
+<!-- ================= CURRENT STATE ================= -->
+<section>
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="kicker">Where 3.0 starts</span>
+      <h2>An honest look at the app today</h2>
+      <p class="lede">The engine is solid and the feature set is real. What's thin is the surface — the parts a first-time user actually touches. Three things 3.0 inherits:</p>
+    </div>
+    <div class="grid g3">
+      <div class="card">
+        <div class="num">Theming</div>
+        <h3>Two hard-coded looks</h3>
+        <p>The entire theme system is one line run every frame: <code>set_visuals(dark ? dark() : light())</code>. There's no accent, no rounding, no spacing of your own. The one brand color — that lavender <code>#c2a2da</code> — is a magic number buried in the crop painter, not a token.</p>
+      </div>
+      <div class="card">
+        <div class="num">The editor</div>
+        <h3>One sidebar, 14 groups, one scroll</h3>
+        <p>Undo, photo tabs, load, crop, cinematic, chatlog, palette, anchor, text, filters, censor, stickers — all stacked in a single 320&nbsp;px column. Only 4 collapse. <strong>Export</strong>, the main action, sits at the very bottom.</p>
+      </div>
+      <div class="card">
+        <div class="num">Navigation</div>
+        <h3>Back to the menu, every time</h3>
+        <p>It's hub-and-spoke: to go Editor&nbsp;→&nbsp;Gallery you bounce through the landing menu. And the theme + language toggles are duplicated in <em>three</em> places — nav bar, menu, and a near-empty Settings screen.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= PILLAR 1: THEME ENGINE ================= -->
+<section id="themes">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="kicker">Pillar one</span>
+      <h2>A theme is data, not CSS</h2>
+      <p class="lede">Define a theme as a dozen values — grounds, ink, one accent, corner radius, density. egui rebuilds the UI from it on the next frame. Ship a handful, let people build their own.</p>
+    </div>
+
+    <div class="tokens" aria-hidden="true" id="tokdiagram">
+      <div class="token"><div class="chip2" style="background:var(--tk-bg)"></div><div class="tk"><b>bg</b><span>window</span></div></div>
+      <div class="token"><div class="chip2" style="background:var(--tk-surface)"></div><div class="tk"><b>surface</b><span>panels</span></div></div>
+      <div class="token"><div class="chip2" style="background:var(--tk-ink)"></div><div class="tk"><b>ink</b><span>text</span></div></div>
+      <div class="token"><div class="chip2" style="background:var(--tk-accent)"></div><div class="tk"><b>accent</b><span>action</span></div></div>
+      <div class="token"><div class="chip2" style="background:var(--tk-surface2); border-radius:14px 14px 0 0"></div><div class="tk"><b>radius</b><span>12px</span></div></div>
+      <div class="token"><div class="chip2" style="background:repeating-linear-gradient(90deg,var(--tk-surface2) 0 6px, var(--tk-bg) 6px 9px)"></div><div class="tk"><b>density</b><span>cozy</span></div></div>
+    </div>
+
+    <h3 style="margin:36px 0 16px">Seven built-in themes, ~12 values each</h3>
+    <div class="tgal" id="tgal">
+      <button class="tcard" data-mock-theme="midnight"><div class="tprev"><div class="side"><b></b><u></u><u class="short"></u><u></u></div><div class="main"><span class="btn"></span></div></div><div class="tmeta"><div><div class="nm">Midnight</div><div class="sub">default · violet-black</div></div><div class="sws"><i style="background:#14121a"></i><i style="background:#1e1b26"></i><i style="background:#c2a2da"></i></div></div></button>
+      <button class="tcard" data-mock-theme="paper"><div class="tprev"><div class="side"><b></b><u></u><u class="short"></u><u></u></div><div class="main"><span class="btn"></span></div></div><div class="tmeta"><div><div class="nm">Paper</div><div class="sub">light · cool</div></div><div class="sws"><i style="background:#eeecf4"></i><i style="background:#ffffff"></i><i style="background:#7a4fd0"></i></div></div></button>
+      <button class="tcard" data-mock-theme="slate"><div class="tprev"><div class="side"><b></b><u></u><u class="short"></u><u></u></div><div class="main"><span class="btn"></span></div></div><div class="tmeta"><div><div class="nm">Slate</div><div class="sub">neutral · blue</div></div><div class="sws"><i style="background:#15181d"></i><i style="background:#1e232b"></i><i style="background:#5aa9e6"></i></div></div></button>
+      <button class="tcard" data-mock-theme="ember"><div class="tprev"><div class="side"><b></b><u></u><u class="short"></u><u></u></div><div class="main"><span class="btn"></span></div></div><div class="tmeta"><div><div class="nm">Ember</div><div class="sub">warm · filmic</div></div><div class="sws"><i style="background:#17120e"></i><i style="background:#211913"></i><i style="background:#e8955a"></i></div></div></button>
+      <button class="tcard" data-mock-theme="sanandreas"><div class="tprev"><div class="side"><b></b><u></u><u class="short"></u><u></u></div><div class="main"><span class="btn"></span></div></div><div class="tmeta"><div><div class="nm">San Andreas</div><div class="sub">homage · orange</div></div><div class="sws"><i style="background:#14140e"></i><i style="background:#1e1d14"></i><i style="background:#e6a23c"></i></div></div></button>
+      <button class="tcard" data-mock-theme="frost"><div class="tprev"><div class="side"><b></b><u></u><u class="short"></u><u></u></div><div class="main"><span class="btn"></span></div></div><div class="tmeta"><div><div class="nm">Frost</div><div class="sub">cool · teal</div></div><div class="sws"><i style="background:#161b20"></i><i style="background:#1f262e"></i><i style="background:#79d0c4"></i></div></div></button>
+      <button class="tcard" data-mock-theme="contrast"><div class="tprev"><div class="side"><b></b><u></u><u class="short"></u><u></u></div><div class="main"><span class="btn"></span></div></div><div class="tmeta"><div><div class="nm">Contrast</div><div class="sub">a11y · amp'd</div></div><div class="sws"><i style="background:#000000"></i><i style="background:#0b0b0b"></i><i style="background:#ffd400"></i></div></div></button>
+      <button class="tcard" data-mock-theme="paper" style="border-style:dashed; display:grid; place-items:center; min-height:100%"><div style="text-align:center; padding:22px"><div style="font-size:1.6rem; color:var(--accent); font-weight:800">+</div><div class="sub" style="font-family:var(--mono); font-size:.7rem; color:var(--dim); text-transform:uppercase; letter-spacing:.08em; margin-top:6px">Your own<br>(3.1)</div></div></button>
+    </div>
+
+    <h3 style="margin:40px 0 14px">…and it compiles to about this much Rust</h3>
+    <pre><code><span class="tok-c">// A theme is plain data. No assets, no I/O, no allocation.</span>
+<span class="tok-k">struct</span> <span class="tok-t">Theme</span> {
+    name:    &amp;<span class="tok-k">'static</span> <span class="tok-t">str</span>,
+    dark:    <span class="tok-t">bool</span>,
+    bg:      <span class="tok-t">Color32</span>,   <span class="tok-c">// window / panel ground</span>
+    surface: <span class="tok-t">Color32</span>,   <span class="tok-c">// sidebars, cards, fields</span>
+    ink:     <span class="tok-t">Color32</span>,
+    accent:  <span class="tok-t">Color32</span>,   <span class="tok-c">// the one that carries the identity</span>
+    rounding: <span class="tok-t">f32</span>,
+    dense:   <span class="tok-t">bool</span>,
+}
+
+<span class="tok-k">impl</span> <span class="tok-t">Theme</span> {
+    <span class="tok-k">fn</span> <span class="tok-f">apply</span>(&amp;<span class="tok-k">self</span>, ctx: &amp;<span class="tok-t">egui</span>::<span class="tok-t">Context</span>) {
+        <span class="tok-k">let mut</span> v = <span class="tok-k">if</span> <span class="tok-k">self</span>.dark { <span class="tok-t">Visuals</span>::<span class="tok-f">dark</span>() } <span class="tok-k">else</span> { <span class="tok-t">Visuals</span>::<span class="tok-f">light</span>() };
+        v.panel_fill        = <span class="tok-k">self</span>.bg;
+        v.window_fill       = <span class="tok-k">self</span>.surface;
+        v.override_text_color = <span class="tok-t">Some</span>(<span class="tok-k">self</span>.ink);
+        v.selection.bg_fill = <span class="tok-k">self</span>.accent.<span class="tok-f">gamma_multiply</span>(<span class="tok-s">0.35</span>);
+        v.widgets.active.bg_fill = <span class="tok-k">self</span>.accent;   <span class="tok-c">// primary buttons</span>
+        v.hyperlink_color   = <span class="tok-k">self</span>.accent;
+        ctx.<span class="tok-f">set_visuals</span>(v);
+
+        <span class="tok-k">let mut</span> s = (*ctx.<span class="tok-f">style</span>()).<span class="tok-f">clone</span>();
+        s.spacing.item_spacing = <span class="tok-k">if</span> <span class="tok-k">self</span>.dense { <span class="tok-f">vec2</span>(<span class="tok-s">6.0</span>, <span class="tok-s">4.0</span>) } <span class="tok-k">else</span> { <span class="tok-f">vec2</span>(<span class="tok-s">8.0</span>, <span class="tok-s">8.0</span>) };
+        ctx.<span class="tok-f">set_style</span>(s);
+    }
+}</code></pre>
+    <p class="dim" style="margin-top:14px; font-size:.9rem">Swapping themes is a struct assignment. 3.1 makes <code style="font-family:var(--mono)">Theme</code> serde-serializable → save, share, and drop <code style="font-family:var(--mono)">.toml</code> theme files into a folder to see them in the gallery.</p>
+  </div>
+</section>
+
+<!-- ================= PILLAR 2: EDITOR ================= -->
+<section>
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="kicker">Pillar two</span>
+      <h2>An editor you operate, not scroll</h2>
+      <p class="lede">Same features, restructured around what you're doing right now. The single 14-group column becomes a segmented tool rail — only the active tool's controls are ever on screen.</p>
+    </div>
+
+    <div class="ba">
+      <div class="col before">
+        <span class="tag">Today · one scroll</span>
+        <ul class="stacklist scroll">
+          <li>Undo / Redo</li><li>Photo tabs</li><li>Load photo</li><li>Crop / resolution</li><li>Cinematic mode</li><li>Chatlog blocks</li><li>Color palette</li><li>Anchor / BG</li><li>Text · font · size</li><li>Filters</li><li>Censor areas</li><li>Stickers</li><li class="prim">↓ Export (bottom)</li>
+        </ul>
+      </div>
+      <div class="col after">
+        <span class="tag">3.0 · contextual</span>
+        <ul class="flowlist">
+          <li><span class="n">◧</span><div><strong>Tool rail</strong> — Photo · Crop · Chatlog · Text · FX. Pick one; you see only its controls. No more hunting a 14-item scroll.</div></li>
+          <li><span class="n">⌖</span><div><strong>Floating preview toolbar</strong> — undo, redo, zoom, fit — live over the canvas where your eyes already are.</div></li>
+          <li><span class="n">▸</span><div><strong>Persistent action bar</strong> — <em>Export</em> is always one click away and filled in the accent, so the primary action finally looks primary.</div></li>
+          <li><span class="n">✦</span><div><strong>Contextual controls</strong> — censor strength, sticker width, cinematic bars appear only when relevant. Already true for a few; now the rule.</div></li>
+        </ul>
+      </div>
+    </div>
+    <p class="dim" style="margin-top:16px; font-size:.9rem">Try the tool tabs in the mock at the top of the page — the panel swaps, the canvas stays put.</p>
+  </div>
+</section>
+
+<!-- ================= PILLAR 3: NAV ================= -->
+<section>
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="kicker">Pillar three</span>
+      <h2>Navigation that remembers where you are</h2>
+    </div>
+    <div class="grid g3">
+      <div class="card">
+        <div class="num">Nav rail</div>
+        <h3>No more round-trips</h3>
+        <p>A slim persistent rail — Editor, Gallery, Settings — always down the left edge. Jump straight between screens instead of returning to a landing menu each time.</p>
+      </div>
+      <div class="card">
+        <div class="num">Settings</div>
+        <h3>One home for personalization</h3>
+        <p>Themes, accent, density, UI scale, language, default chatlog font — the things scattered across the nav bar, menu, and a near-empty Settings screen today, gathered into one real place.</p>
+      </div>
+      <div class="card">
+        <div class="num">Icons</div>
+        <h3>One coherent set</h3>
+        <p>The 18 default-font emoji (📂 🗑 🎬 ✏ …) that render inconsistently give way to a single monochrome line-icon set that inherits the theme accent — like every icon on this page.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= LIGHTWEIGHT ================= -->
+<section>
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="kicker">The constraint</span>
+      <h2>Featherweight by construction</h2>
+      <p class="lede">The whole point of the native rewrite was a small, fast app for old laptops with no webview. Themes don't threaten that — they're the one big feature that costs almost nothing.</p>
+    </div>
+    <div class="stats">
+      <div class="stat"><div class="v accent">0</div><div class="k">New runtime assets</div></div>
+      <div class="stat"><div class="v tabnums">~96&nbsp;B</div><div class="k">Bytes per theme</div></div>
+      <div class="stat"><div class="v">None</div><div class="k">Extra repaint cost</div></div>
+      <div class="stat"><div class="v">Still&nbsp;0</div><div class="k">Webviews required</div></div>
+    </div>
+    <div class="grid g2" style="margin-top:20px">
+      <div class="card">
+        <h3>Why it's basically free</h3>
+        <p>In an Electron or webview app, theming means shipping stylesheets and asking a browser engine to recompute layout. In egui there's no DOM to reflow — the UI is rebuilt every frame from your <code>Style</code>, so a theme swap just hands it different numbers. Maximum personality, near-zero cost. That's precisely why themes are the right flagship for a <em>lightweight</em> app.</p>
+      </div>
+      <div class="card">
+        <h3>It's a homecoming, not a new cost</h3>
+        <p>The old 1.x Tauri build actually had a CSS-variable theme system — the migration notes even say "custom themes can be added later." The native rewrite dropped it to defaults to ship. 3.0 brings that capability back, this time as plain Rust data that weighs nothing.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= ROADMAP ================= -->
+<section id="roadmap">
+  <div class="wrap">
+    <div class="sec-head">
+      <span class="kicker">Sequencing</span>
+      <h2>How it could ship</h2>
+      <p class="lede">Themes first because they're the headline and the cheapest big win. The IA work rides along since the accent system touches every screen anyway.</p>
+    </div>
+    <div class="road">
+      <div class="phase next">
+        <div class="v">3.0.0</div>
+        <h3>The theme update</h3>
+        <ul>
+          <li>Theme engine + 7 built-in themes</li>
+          <li>Accent picker &amp; density toggle</li>
+          <li>Editor tool rail + action bar</li>
+          <li>Persistent nav rail; unified Settings</li>
+          <li>Coherent icon set</li>
+        </ul>
+      </div>
+      <div class="phase">
+        <div class="v">3.1</div>
+        <h3>Make your own</h3>
+        <ul>
+          <li>Live custom-theme editor — tweak any token, see it instantly</li>
+          <li>Import / export as a tiny <code>.toml</code></li>
+          <li>Persist the last N custom themes</li>
+        </ul>
+      </div>
+      <div class="phase">
+        <div class="v">3.2</div>
+        <h3>Share the look</h3>
+        <ul>
+          <li>Drop a <code>.toml</code> in a themes folder → it appears in the gallery</li>
+          <li>Community theme packs for the SA-MP scene</li>
+          <li>Optional per-screenshot theme presets</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <a class="brand" href="#top" style="font-size:.92rem"><span class="glyph"></span>ScreeniesEditor</a>
+    <span class="spacer"></span>
+    <a href="https://github.com/ezlp/screenies-editor" target="_blank" rel="noopener">GitHub</a>
+    <span class="dim">·</span>
+    <a href="https://github.com/ezlp/screenies-editor/releases" target="_blank" rel="noopener">Releases</a>
+    <span class="dim">·</span>
+    <a href="https://github.com/ezlp/screenies-editor/issues" target="_blank" rel="noopener">Issues</a>
+    <span class="dim">·</span>
+    <span class="dim">built with Rust + egui · the 3.0 vision, a work in progress</span>
+  </div>
+</footer>
+
+<script>
+(function(){
+  "use strict";
+  var mock = document.getElementById('mock');
+  var chips = Array.prototype.slice.call(document.querySelectorAll('#chips .chip'));
+  var dots  = Array.prototype.slice.call(document.querySelectorAll('#dots .dot'));
+
+  /* --- theme token table (mirrors the CSS [data-mock-theme] blocks) --- */
+  var THEMES = {
+    midnight:  {bg:'#14121a',surface:'#1e1b26',s2:'#272233',ink:'#edeaf3',dim:'#9089a0',ac:'#c2a2da',ai:'#1a1222',bd:'#2e2a3a',r:'10px'},
+    paper:     {bg:'#eeecf4',surface:'#ffffff',s2:'#f3f1f9',ink:'#23202b',dim:'#6a6479',ac:'#7a4fd0',ai:'#ffffff',bd:'#e2deec',r:'10px'},
+    slate:     {bg:'#15181d',surface:'#1e232b',s2:'#262d37',ink:'#e6eaf0',dim:'#8a93a1',ac:'#5aa9e6',ai:'#08121c',bd:'#2c333e',r:'8px'},
+    ember:     {bg:'#17120e',surface:'#211913',s2:'#2b2018',ink:'#f1e7dd',dim:'#a89684',ac:'#e8955a',ai:'#1c1009',bd:'#33261c',r:'12px'},
+    sanandreas:{bg:'#14140e',surface:'#1e1d14',s2:'#26251a',ink:'#ede9d6',dim:'#9a9578',ac:'#e6a23c',ai:'#171204',bd:'#2e2c1e',r:'6px'},
+    frost:     {bg:'#161b20',surface:'#1f262e',s2:'#273038',ink:'#e4ecf2',dim:'#8798a6',ac:'#79d0c4',ai:'#06201c',bd:'#2b353e',r:'10px'},
+    contrast:  {bg:'#000000',surface:'#0b0b0b',s2:'#151515',ink:'#ffffff',dim:'#c8c8c8',ac:'#ffd400',ai:'#000000',bd:'#ffffff',r:'2px'}
+  };
+  function applyVars(el, t){
+    el.style.setProperty('--m-bg',t.bg);
+    el.style.setProperty('--m-surface',t.surface);
+    el.style.setProperty('--m-surface-2',t.s2);
+    el.style.setProperty('--m-ink',t.ink);
+    el.style.setProperty('--m-ink-dim',t.dim);
+    el.style.setProperty('--m-accent',t.ac);
+    el.style.setProperty('--m-accent-ink',t.ai);
+    el.style.setProperty('--m-border',t.bd);
+    el.style.setProperty('--m-radius',t.r);
+  }
+  /* prime every element that carries data-mock-theme (mock + gallery cards + token diagram) */
+  Array.prototype.forEach.call(document.querySelectorAll('[data-mock-theme]'), function(el){
+    var t = THEMES[el.getAttribute('data-mock-theme')]; if(t) applyVars(el,t);
+  });
+  /* token diagram pulls from midnight */
+  (function(){
+    var d = document.getElementById('tokdiagram'); var t = THEMES.midnight;
+    d.style.setProperty('--tk-bg',t.bg); d.style.setProperty('--tk-surface',t.surface);
+    d.style.setProperty('--tk-surface2',t.s2); d.style.setProperty('--tk-ink',t.ink);
+    d.style.setProperty('--tk-accent',t.ac);
+  })();
+
+  var accentOverride = '';
+  function setTheme(name){
+    var t = THEMES[name]; if(!t) return;
+    mock.setAttribute('data-mock-theme', name);
+    applyVars(mock, t);
+    if(accentOverride){ mock.style.setProperty('--m-accent', accentOverride); }
+    chips.forEach(function(c){ c.setAttribute('aria-pressed', c.getAttribute('data-t')===name ? 'true':'false'); });
+  }
+  chips.forEach(function(c){ c.addEventListener('click', function(){ accentOverride=''; syncDots(); setTheme(c.getAttribute('data-t')); }); });
+
+  function syncDots(){ dots.forEach(function(d){ d.setAttribute('aria-pressed', d.getAttribute('data-a')===accentOverride ? 'true':'false'); }); }
+  dots.forEach(function(d){ d.setAttribute('role','button'); d.setAttribute('tabindex','0');
+    function go(){ accentOverride = d.getAttribute('data-a')||''; var cur=mock.getAttribute('data-mock-theme'); var t=THEMES[cur];
+      if(accentOverride){ mock.style.setProperty('--m-accent', accentOverride); }
+      else { mock.style.setProperty('--m-accent', t.ac); }
+      syncDots();
+    }
+    d.addEventListener('click', go);
+    d.addEventListener('keydown', function(e){ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); go(); } });
+  });
+
+  /* gallery card → preview in the hero mock */
+  Array.prototype.forEach.call(document.querySelectorAll('#tgal .tcard'), function(card){
+    var nm = card.getAttribute('data-mock-theme');
+    if(THEMES[nm]){ card.addEventListener('click', function(){ accentOverride=''; syncDots(); setTheme(nm);
+      window.scrollTo({top:0, behavior: (matchMedia('(prefers-reduced-motion:reduce)').matches?'auto':'smooth')}); }); }
+  });
+
+  /* ---- tool sidebar tabs ---- */
+  var PANELS = {
+    photo:
+      '<div class="m-lbl">Photos</div><div class="m-row"><span class="m-tag on">Foto 1</span><span class="m-tag">Foto 2</span><span class="m-tag">+ Add</span></div>'+
+      '<div class="m-select">Load photo…<svg viewBox="0 0 24 24"><path d="M4 5h6l2 2h8v11H4z"/></svg></div>'+
+      '<div class="m-lbl">Resolution</div><div class="m-row"><span class="m-tag on">Free</span><span class="m-tag">1:1</span><span class="m-tag">16:9</span><span class="m-tag">21:9</span><span class="m-tag">800×600</span></div>'+
+      '<div class="m-hint" style="font-family:var(--mono);color:var(--m-ink-dim);font-size:10px">1440 × 900 px source</div>',
+    crop:
+      '<div class="m-lbl">Crop mode</div><div class="m-row"><span class="m-tag on">Potong</span><span class="m-tag">Muat penuh</span></div>'+
+      '<div class="m-select">Edit crop frame<svg viewBox="0 0 24 24"><path d="M6 2v16h16M2 6h16v16"/></svg></div>'+
+      '<div class="m-lbl">Cinematic</div><div class="m-row"><span class="m-tag">Normal</span><span class="m-tag on">Sinema</span></div>'+
+      '<div class="m-slider"><div class="cap"><span>Bar height</span><span>15%</span></div><div class="m-track" style="--v:38%"><span class="knob"></span></div></div>'+
+      '<div class="m-row"><span class="m-tag on">Both</span><span class="m-tag">Top</span><span class="m-tag">Bottom</span></div>',
+    chatlog:
+      '<div class="m-lbl">Chatlog blocks</div><div class="m-row"><span class="m-tag on">#1</span><span class="m-tag">#2</span><span class="m-tag">+ Add</span><span class="m-tag">📂 Folder</span></div>'+
+      '<div class="m-field"><span class="ts">[19:32:41]</span> Antonio_Vega says:<br>you got the package?</div>'+
+      '<div class="m-lbl">Color palette</div><div class="m-swatches"><i style="background:#e04b4b"></i><i style="background:#e6a23c"></i><i style="background:#6fcf97"></i><i style="background:#5aa9e6"></i><i style="background:#c2a2da"></i><i style="background:#ffffff"></i><i style="background:#8fb7e0"></i><i style="background:#e68fb8"></i></div>'+
+      '<div class="m-select">Position: Kiri Bawah<svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></div>'+
+      '<div class="m-select">BG: Mask<svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></div>',
+    text:
+      '<div class="m-lbl">Typeface</div><div class="m-select">Verdana<svg viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg></div>'+
+      '<div class="m-slider"><div class="cap"><span>Size</span><span>27 px</span></div><div class="m-track" style="--v:45%"><span class="knob"></span></div></div>'+
+      '<div class="m-slider"><div class="cap"><span>Line spacing</span><span>122%</span></div><div class="m-track" style="--v:35%"><span class="knob"></span></div></div>'+
+      '<div class="m-row"><span class="m-tag on">Auto outline</span></div>'+
+      '<div class="m-hint" style="color:var(--m-ink-dim);font-size:10px">Outline scales with text size</div>',
+    fx:
+      '<div class="m-lbl">Filters</div>'+
+      '<div class="m-slider"><div class="cap"><span>Brightness</span><span>100</span></div><div class="m-track" style="--v:33%"><span class="knob"></span></div></div>'+
+      '<div class="m-slider"><div class="cap"><span>Contrast</span><span>115</span></div><div class="m-track" style="--v:57%"><span class="knob"></span></div></div>'+
+      '<div class="m-slider"><div class="cap"><span>Saturate</span><span>90</span></div><div class="m-track" style="--v:30%"><span class="knob"></span></div></div>'+
+      '<div class="m-lbl" style="margin-top:6px">Censor area</div><div class="m-row"><span class="m-tag">+ Blur</span><span class="m-tag">+ Pixelate</span></div>'+
+      '<div class="m-lbl">Stickers</div><div class="m-row"><span class="m-tag">+ Add sticker</span></div>'
+  };
+  var seg = document.getElementById('mseg');
+  var panel = document.getElementById('mpanel');
+  function setTab(name){
+    Array.prototype.forEach.call(seg.children, function(b){ b.classList.toggle('on', b.getAttribute('data-tab')===name); });
+    panel.innerHTML = PANELS[name] || '';
+  }
+  Array.prototype.forEach.call(seg.children, function(b){ b.addEventListener('click', function(){ setTab(b.getAttribute('data-tab')); }); });
+  setTab('chatlog');
+
+  /* ---- page light/dark toggle ---- */
+  var root = document.documentElement;
+  var btnIcon = document.getElementById('pageThemeIcon');
+  var btnLbl = document.getElementById('pageThemeLbl');
+  function prefDark(){ return matchMedia('(prefers-color-scheme: dark)').matches; }
+  function curDark(){ var a=root.getAttribute('data-theme'); return a? a==='dark' : prefDark(); }
+  function reflect(){ var d=curDark(); btnIcon.textContent = d? '☾':'☀'; btnLbl.textContent = d? 'Dark':'Light'; }
+  document.getElementById('pageTheme').addEventListener('click', function(){
+    root.setAttribute('data-theme', curDark()? 'light':'dark'); reflect();
+  });
+  reflect();
+})();
+</script>
+</body>
+</html>
