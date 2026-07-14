@@ -35,6 +35,10 @@ pub struct RenderJob {
     /// None = normal mode (photo fills output). serde(default) keeps old payloads.
     #[serde(default)]
     pub canvas: Option<Canvas>,
+    /// Fit the whole photo inside the output (letterbox/pillarbox with black
+    /// padding) instead of cropping to fill. Keeps the entire image.
+    #[serde(default)]
+    pub fit: bool,
     pub font_family: String,
     /// Text size in output px.
     pub text_size: f32,
@@ -65,17 +69,30 @@ pub struct CensorRegion {
     pub strength: f32,
 }
 
-/// The "cinematic" letterbox: solid-color bars painted over the top AND bottom
+/// Which cinematic bar(s) to draw.
+#[derive(Debug, Clone, Copy, Deserialize, Default, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum BarPos {
+    #[default]
+    Both,
+    Top,
+    Bottom,
+}
+
+/// The "cinematic" letterbox: solid-color bars painted over the top and/or bottom
 /// of the output. They grow INWARD (covering the photo's edges), so the output
 /// size is unchanged. Bars sit under stickers/text, so captions stay visible on
-/// them. `bar` is each bar's height in output px.
+/// them. `bar` is each bar's height in output px; `bars` picks which are drawn.
 #[derive(Debug, Clone, Copy, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Canvas {
-    /// RGBA of the top & bottom bars.
+    /// RGBA of the bars.
     pub color: [u8; 4],
-    /// Height of each bar (top and bottom) in output px.
+    /// Height of each bar (top and/or bottom) in output px.
     pub bar: u32,
+    /// Which bars to draw (both / top only / bottom only).
+    #[serde(default)]
+    pub bars: BarPos,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Deserialize)]

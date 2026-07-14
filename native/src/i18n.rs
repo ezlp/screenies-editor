@@ -52,7 +52,15 @@ pub fn t(lang: Lang, id: &'static str) -> &'static str {
         "🎬 Sinema" => "🎬 Cinematic",
         "Tinggi bar %" => "Bar height %",
         "Warna bar" => "Bar color",
-        "Bar warna menutup atas & bawah foto (efek sinema)." => "Color bars cover the photo's top & bottom (cinematic).",
+        "Posisi bar" => "Bar position",
+        "Keduanya" => "Both",
+        "Atas" => "Top",
+        "Bawah" => "Bottom",
+        "Bar sinema digambar di dalam foto (pilih posisi)." => "Cinematic bars drawn inside the photo (pick a side).",
+        // editor — crop fit / crop toggle
+        "Potong" => "Crop",
+        "Muat penuh" => "Fit",
+        "Muat: simpan seluruh gambar + bar (ukuran tetap)." => "Fit: keep the whole image + bars (fixed sizes).",
         // editor — chatlog
         "Chatlog:" => "Chatlog:",
         "Tambah chatlog" => "Add chatlog",
