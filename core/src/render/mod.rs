@@ -65,19 +65,17 @@ pub struct CensorRegion {
     pub strength: f32,
 }
 
-/// The "cinematic" letterbox: the photo fills a centered sub-rectangle of a
-/// solid-color output; the rest (bars above/below or around it) stays `color`.
-/// The photo is cropped/resized/filtered to the rect; text, stickers and censors
-/// still run over the whole output, so captions can sit on the bars. Output px.
+/// The "cinematic" letterbox: solid-color bars painted over the top AND bottom
+/// of the output. They grow INWARD (covering the photo's edges), so the output
+/// size is unchanged. Bars sit under stickers/text, so captions stay visible on
+/// them. `bar` is each bar's height in output px.
 #[derive(Debug, Clone, Copy, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Canvas {
-    /// RGBA background filling the whole output before the photo is placed.
+    /// RGBA of the top & bottom bars.
     pub color: [u8; 4],
-    pub photo_x: f32,
-    pub photo_y: f32,
-    pub photo_w: f32,
-    pub photo_h: f32,
+    /// Height of each bar (top and bottom) in output px.
+    pub bar: u32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Deserialize)]

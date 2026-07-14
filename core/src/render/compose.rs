@@ -1,6 +1,6 @@
 //! compose.rs — the export pipeline, start to finish.
 
-use super::{crop, filters, sticker, text, RenderJob, Size};
+use super::{crop, filters, sticker, text, RenderJob};
 use crate::error::AppError;
 use base64::Engine;
 use image::RgbaImage;
@@ -16,34 +16,14 @@ pub fn render(job: &RenderJob) -> Result<RgbaImage, AppError> {
         .map_err(|e| AppError::Render(format!("decode foto: {e}")))?
         .to_rgba8();
 
-    // Normal mode: the photo fills the output. Cinematic mode: a solid-color
-    // canvas with the photo placed in a centered sub-rect (bars around it).
-    // Filters apply to the photo only; the bars stay the pure canvas color.
-    let mut out = match &job.canvas {
-        None => {
-            let mut o = crop::crop_and_resize(&src, &job.crop, &job.output)?;
-            filters::apply(&mut o, &job.filters);
-            o
-        }
-        Some(cv) => {
-            let mut canvas = image::RgbaImage::from_pixel(
-                job.output.w.max(1),
-                job.output.h.max(1),
-                image::Rgba(cv.color),
-            );
-            let pw = (cv.photo_w.round() as u32).max(1);
-            let ph = (cv.photo_h.round() as u32).max(1);
-            let mut photo = crop::crop_and_resize(&src, &job.crop, &Size { w: pw, h: ph })?;
-            filters::apply(&mut photo, &job.filters);
-            image::imageops::overlay(
-                &mut canvas,
-                &photo,
-                cv.photo_x.round() as i64,
-                cv.photo_y.round() as i64,
-            );
-            canvas
-        }
-    };
+    // Photo: crop → resize to the output → filters. Cinematic mode then paints
+    // solid bars over the top & bottom (they grow inward, so the output size is
+    // unchanged); the bars sit under the stickers/text drawn next.
+    let mut out = crop::crop_and_resize(&src, &job.crop, &job.output)?;
+    filters::apply(&mut out, &job.filters);
+    if let Some(cv) = &job.canvas {
+        draw_letterbox(&mut out, cv);
+    }
 
     // Stickers under the text, then text (with its bg strips).
     sticker::overlay_all(&mut out, &job.stickers)?;
@@ -53,6 +33,23 @@ pub fn render(job: &RenderJob) -> Result<RgbaImage, AppError> {
     // photo, stickers, AND text (so you can redact a name/plate over anything).
     filters::apply_censors(&mut out, &job.censors);
     Ok(out)
+}
+
+/// Cinematic letterbox: paint solid top & bottom bars over the image. The bars
+/// grow inward (output size unchanged) and are clamped so they never overlap.
+fn draw_letterbox(img: &mut RgbaImage, cv: &super::Canvas) {
+    let (w, h) = img.dimensions();
+    let bar = cv.bar.min(h / 2);
+    if bar == 0 {
+        return;
+    }
+    let color = image::Rgba(cv.color);
+    for y in 0..bar {
+        for x in 0..w {
+            img.put_pixel(x, y, color);
+            img.put_pixel(x, h - 1 - y, color);
+        }
+    }
 }
 
 /// Encode the rendered image as PNG bytes.
@@ -109,23 +106,20 @@ mod tests {
     }
 
     #[test]
-    fn cinematic_canvas_has_solid_bars_and_a_centered_photo() {
-        // 8×12 output: 2px black bars top & bottom, an 8×8 photo band centered.
+    fn cinematic_letterbox_paints_bars_over_photo_top_and_bottom() {
+        // Output stays 8×12; 3px black bars cover the top and bottom rows, the
+        // photo shows through the middle band.
         let mut job = tiny_job();
         job.output = Size { w: 8, h: 12 };
-        job.canvas = Some(Canvas {
-            color: [0, 0, 0, 255],
-            photo_x: 0.0,
-            photo_y: 2.0,
-            photo_w: 8.0,
-            photo_h: 8.0,
-        });
+        job.canvas = Some(Canvas { color: [0, 0, 0, 255], bar: 3 });
         let img = render(&job).unwrap();
-        assert_eq!((img.width(), img.height()), (8, 12));
-        // Top and bottom rows are the pure canvas color (black).
+        assert_eq!((img.width(), img.height()), (8, 12)); // size unchanged by bars
+        // Top 3 and bottom 3 rows are the bar color (black).
         assert_eq!(img.get_pixel(4, 0).0, [0, 0, 0, 255]);
+        assert_eq!(img.get_pixel(4, 2).0, [0, 0, 0, 255]);
+        assert_eq!(img.get_pixel(4, 9).0, [0, 0, 0, 255]);
         assert_eq!(img.get_pixel(4, 11).0, [0, 0, 0, 255]);
-        // The photo band (red → grayscaled by tiny_job) is not black.
-        assert!(img.get_pixel(4, 6).0[0] > 0, "photo band should be visible");
+        // The middle band shows the photo (red → grayscaled), not black.
+        assert!(img.get_pixel(4, 6).0[0] > 0, "photo band should show through");
     }
 }

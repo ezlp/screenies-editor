@@ -136,6 +136,8 @@ pub struct EditorState {
 
     // Text controls (shared across blocks).
     font_family: String,
+    /// Installed font families for the picker dropdown (populated lazily).
+    font_list: Vec<String>,
     text_size: f32,
     line_gap: f32,
     stroke_auto: bool,
@@ -190,6 +192,7 @@ impl Default for EditorState {
             lang: crate::i18n::Lang::default(),
             chatlog: crate::chatlog_browser::ChatlogBrowser::default(),
             font_family: "Verdana".into(),
+            font_list: Vec::new(),
             text_size: 27.0,
             line_gap: 122.0,
             stroke_auto: true,
@@ -372,7 +375,7 @@ impl EditorState {
                         self.dirty = true;
                     }
                 });
-                ui.small(self.t("Foto di tengah kanvas warna solid, bar di atas & bawah."));
+                ui.small(self.t("Bar warna menutup atas & bawah foto (efek sinema)."));
             }
 
             ui.separator();
@@ -432,7 +435,23 @@ impl EditorState {
             let font_lbl = self.t("Font");
             ui.horizontal(|ui| {
                 ui.label(font_lbl);
-                if ui.text_edit_singleline(&mut self.font_family).changed() {
+                if self.font_list.is_empty() {
+                    self.font_list = screenies_core::fonts::families();
+                }
+                let mut chosen: Option<String> = None;
+                egui::ComboBox::from_id_salt("font")
+                    .selected_text(self.font_family.clone())
+                    .width(190.0)
+                    .show_ui(ui, |ui| {
+                        for i in 0..self.font_list.len() {
+                            let fam = self.font_list[i].clone();
+                            if ui.selectable_label(self.font_family == fam, &fam).clicked() {
+                                chosen = Some(fam);
+                            }
+                        }
+                    });
+                if let Some(f) = chosen {
+                    self.font_family = f;
                     self.dirty = true;
                 }
             });
@@ -991,9 +1010,11 @@ impl EditorState {
         }
     }
 
-    /// The photo's own output size (before cinematic bars): a fixed-resolution
-    /// override wins, else the crop size, else the whole photo.
-    fn photo_output_dims(&self) -> (f32, f32) {
+    /// Full render/output size — a fixed-resolution override wins, else the crop
+    /// size, else the whole photo. This is the coordinate space stickers, censor
+    /// boxes and text live in. Cinematic bars are drawn INSIDE this (they cover
+    /// the photo's top/bottom and don't change the output size).
+    fn output_dims(&self) -> (f32, f32) {
         if let Some((w, h)) = self.output_override {
             (w as f32, h as f32)
         } else if let Some(c) = self.crop {
@@ -1005,21 +1026,15 @@ impl EditorState {
         }
     }
 
-    /// Cinematic bar height (px) added above AND below the photo (0 = off).
+    /// Cinematic bar height (px) — each bar covers this much of the output's top
+    /// and bottom (grows inward; 0 = off).
     fn cinematic_bar_px(&self) -> f32 {
         if self.cinematic {
-            let (_, ph) = self.photo_output_dims();
-            (ph * (self.cinematic_bar / 100.0)).round().max(0.0)
+            let (_, oh) = self.output_dims();
+            (oh * (self.cinematic_bar / 100.0)).round().max(0.0)
         } else {
             0.0
         }
-    }
-
-    /// Full render/output size — the coordinate space stickers, censor boxes and
-    /// text all live in. Cinematic mode adds bars above and below the photo.
-    fn output_dims(&self) -> (f32, f32) {
-        let (w, h) = self.photo_output_dims();
-        (w, h + 2.0 * self.cinematic_bar_px())
     }
 
     /// Add a sticker (PNG/WebP/…) centered, sized to ~30% of the output width.
@@ -1093,18 +1108,17 @@ impl EditorState {
         }
     }
 
-    /// Fixed output resolution (e.g. 800×600): use the WHOLE photo and scale it
-    /// to exactly w×h. Unlike the aspect-ratio presets this does NOT crop — a
-    /// 1920×1080 shot becomes a full-frame 800×600, so it's no longer just a
-    /// duplicate of the 4:3 crop. The frame is stretched to fit, so a 16:9
-    /// source is squished into 4:3; click "Edit crop" to reframe if you want to
-    /// keep proportions.
+    /// Fixed output resolution (e.g. 800×600): crop to that aspect ratio and scale
+    /// the result to exactly w×h. The crop box is editable (drag to reframe), so
+    /// nothing is stretched; the output is a true w×h file — unlike the plain 4:3
+    /// preset, which keeps the source resolution.
     fn set_resolution(&mut self, w: u32, h: u32) {
         if let Some(p) = &self.photo {
-            self.crop_ratio = None;
-            self.crop = Some(centered_crop(p.w, p.h, None)); // whole photo
+            let ratio = w as f32 / h as f32;
+            self.crop_ratio = Some(ratio);
+            self.crop = Some(centered_crop(p.w, p.h, Some(ratio)));
             self.output_override = Some((w, h));
-            self.crop_editing = false;
+            self.crop_editing = true;
             self.dirty = true;
         }
     }
@@ -1209,8 +1223,9 @@ impl EditorState {
         let crop = self
             .crop
             .unwrap_or(CropRect { x: 0.0, y: 0.0, w: photo.w as f64, h: photo.h as f64 });
-        // Photo output size (fixed-resolution override, else the crop).
-        let photo_size = match self.output_override {
+        // Output size (fixed-resolution override, else the crop). Cinematic mode
+        // keeps this size — its bars are painted INSIDE the photo, not added.
+        let output = match self.output_override {
             Some((w, h)) => Size { w, h },
             None => Size {
                 w: (crop.w.round() as u32).max(1),
@@ -1218,29 +1233,19 @@ impl EditorState {
             },
         };
 
-        // Cinematic mode: a taller solid-color canvas with the photo centered
-        // (equal bars above/below). Normal mode: the canvas IS the photo.
-        let bar = self.cinematic_bar_px() as u32;
-        let (output, canvas) = if self.cinematic {
-            let out = Size {
-                w: photo_size.w,
-                h: photo_size.h + 2 * bar,
-            };
-            let cv = Canvas {
+        // Cinematic mode: solid bars over the output's top & bottom (inward).
+        let canvas = if self.cinematic {
+            Some(Canvas {
                 color: [
                     self.cinematic_color[0],
                     self.cinematic_color[1],
                     self.cinematic_color[2],
                     255,
                 ],
-                photo_x: 0.0,
-                photo_y: bar as f32,
-                photo_w: photo_size.w as f32,
-                photo_h: photo_size.h as f32,
-            };
-            (out, Some(cv))
+                bar: self.cinematic_bar_px() as u32,
+            })
         } else {
-            (photo_size, None)
+            None
         };
 
         let blocks = if let Ok(measure) = GlyphMeasure::new(&self.font_family, self.text_size) {
