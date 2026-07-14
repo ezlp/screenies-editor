@@ -319,6 +319,11 @@ section + section{border-top:1px solid var(--border-soft)}
 .st-field{display:flex; justify-content:space-between; align-items:center; background:var(--m-surface-2); border:1px solid var(--m-border); border-radius:8px; padding:7px 10px; font-size:11.5px; flex:1; min-width:140px; color:var(--m-ink)}
 .st-field svg{width:12px; height:12px; stroke:var(--m-ink-dim); fill:none; stroke-width:1.8}
 .st-ghost{font:inherit; font-size:11.5px; font-weight:600; cursor:pointer; background:transparent; border:1px dashed var(--m-border); color:var(--m-ink-dim); border-radius:8px; padding:7px 11px}
+.st-cred{display:flex; flex-direction:column; margin-top:4px}
+.st-credrow{display:flex; justify-content:space-between; align-items:baseline; gap:10px; padding:7px 0; border-bottom:1px solid var(--m-border); font-size:12px}
+.st-credrow:last-child{border-bottom:0}
+.st-credname{font-weight:600; color:var(--m-ink)}
+.st-credrole{color:var(--m-ink-dim); font-family:var(--mono); font-size:10px; text-align:right}
 
 .mock-cap{display:flex; gap:8px; align-items:baseline; margin-top:14px; font-size:.82rem; color:var(--dim); font-family:var(--mono)}
 
@@ -631,9 +636,20 @@ footer a:hover{color:var(--accent-2); text-decoration:none}
                     <div class="st-row"><span class="st-k">Gallery</span><span class="st-field">~/Pictures/SSRP <svg viewBox="0 0 24 24"><path d="M3 7h6l2 2h10v10H3z"/></svg></span></div>
                     <div class="st-row"><span class="st-k">Chatlog</span><span class="st-field">~/Documents/GTA SA/chatlog <svg viewBox="0 0 24 24"><path d="M3 7h6l2 2h10v10H3z"/></svg></span></div>
                   </div>
-                  <div class="st-group" style="margin-bottom:0">
+                  <div class="st-group">
                     <h4>Language</h4>
                     <div class="st-row"><span class="st-k">Interface</span><span class="st-seg"><button class="on">Bahasa</button><button>English</button></span></div>
+                  </div>
+                  <div class="st-group" style="border-top:1px solid var(--m-border); padding-top:15px; margin-bottom:0">
+                    <div class="st-lbl">About</div>
+                    <h4>ScreeniesEditor <span style="font-weight:400;color:var(--m-ink-dim);font-size:11px">· v3.0 · native egui</span></h4>
+                    <p>Screenshot &amp; chatlog toolkit for the SA-MP roleplay community.</p>
+                    <div class="st-cred">
+                      <div class="st-credrow"><span class="st-credname">Isutindraputra</span><span class="st-credrole">Lead developer · @isutip</span></div>
+                      <div class="st-credrow"><span class="st-credname">Claude</span><span class="st-credrole">Code</span></div>
+                      <div class="st-credrow"><span class="st-credname">avbelibe</span><span class="st-credrole">Supporter · tech access</span></div>
+                      <div class="st-credrow"><span class="st-credname">KWS Community</span><span class="st-credrole">Testing · discord.gg/EaZsG6eUcd</span></div>
+                    </div>
                   </div>
                 </div>
               </div>
