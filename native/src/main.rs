@@ -282,12 +282,3 @@ fn title_of(s: Screen) -> &'static str {
         Screen::Settings => "Settings",
     }
 }
-
-fn stub(ui: &mut egui::Ui, title: &str, note: &str) {
-    ui.vertical_centered(|ui| {
-        ui.add_space(80.0);
-        ui.heading(title);
-        ui.add_space(8.0);
-        ui.label(egui::RichText::new(note).weak());
-    });
-}

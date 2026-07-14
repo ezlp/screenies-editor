@@ -758,7 +758,7 @@ impl EditorState {
             } else {
                 egui::Color32::from_rgb(210, 210, 210)
             };
-            painter.rect_stroke(rect, 0.0, egui::Stroke::new(if selected { 2.0 } else { 1.0 }, color));
+            painter.rect_stroke(rect, 0.0, egui::Stroke::new(if selected { 2.0_f32 } else { 1.0_f32 }, color));
             let tag = match c.kind {
                 CensorKind::Blur => "blur",
                 CensorKind::Pixelate => "pixel",
@@ -810,7 +810,7 @@ impl EditorState {
 
             if selected {
                 let color = egui::Color32::from_rgb(255, 200, 120);
-                painter.rect_stroke(rect, 0.0, egui::Stroke::new(2.0, color));
+                painter.rect_stroke(rect, 0.0, egui::Stroke::new(2.0_f32, color));
                 let hrect = egui::Rect::from_min_size(rect.max - egui::vec2(HANDLE, HANDLE), egui::vec2(HANDLE, HANDLE));
                 painter.rect_filled(hrect, 0.0, color);
                 let hr = ui.interact(hrect, egui::Id::new(("sticker-resize", i)), egui::Sense::drag());
@@ -868,7 +868,7 @@ impl EditorState {
         painter.rect_filled(egui::Rect::from_min_max(egui::pos2(cr.max.x, cr.min.y), egui::pos2(img_rect.max.x, cr.max.y)), z, dim);
 
         let accent = egui::Color32::from_rgb(194, 162, 218);
-        painter.rect_stroke(cr, z, egui::Stroke::new(2.0, accent));
+        painter.rect_stroke(cr, z, egui::Stroke::new(2.0_f32, accent));
 
         let body = ui.interact(cr, egui::Id::new("crop-body"), egui::Sense::drag());
         if body.dragged() {
