@@ -75,6 +75,7 @@ jobs:
             --executable target/release/screenies-native \
             --desktop-file assets/screenies-native.desktop \
             --icon-file assets/icon.png \
+            --icon-filename screenies-native \
             --output appimage
 
       - name: Stage artifacts
@@ -86,7 +87,7 @@ jobs:
           cp native/target/generate-rpm/*.rpm out/
           cp native/*.AppImage out/ 2>/dev/null || echo "no AppImage (best-effort step may have failed)"
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: linux
           path: out/
@@ -111,7 +112,7 @@ jobs:
           mkdir -p out
           cp native/target/release/screenies-native.exe out/screenies-native-windows-x86_64.exe
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: windows
           path: out/
@@ -122,13 +123,13 @@ jobs:
     runs-on: ubuntu-22.04
     steps:
       - name: Download built artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: dist
           merge-multiple: true
 
       - name: Publish release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ github.ref_type == 'tag' && github.ref_name || 'native-preview' }}
           name: ScreeniesEditor ${{ github.ref_name }}
