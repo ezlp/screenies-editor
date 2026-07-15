@@ -9,6 +9,7 @@
 
 use base64::Engine;
 use eframe::egui;
+use std::sync::Arc;
 use screenies_core::chatlog::{self, preset::ParsePreset};
 use screenies_core::render::compose;
 use screenies_core::render::layout::{self, Anchor, BgMode, LayoutBlock, LayoutParams};
@@ -20,7 +21,10 @@ use screenies_core::render::{
 /// A loaded photo: base64 for the render pipeline + its pixel dimensions.
 #[derive(Clone)]
 struct Photo {
-    base64: String,
+    /// Encoded photo bytes, shared behind `Arc` so cloning the doc (tab switch)
+    /// or building a per-frame RenderJob is a refcount bump, not a deep copy of
+    /// several MB. Only `prepare_base`/export actually decode it.
+    base64: Arc<str>,
     w: u32,
     h: u32,
 }
@@ -122,6 +126,22 @@ struct BaseCache {
     img: image::RgbaImage,
 }
 
+/// A cached FILTERED base: the base image with filters + cinematic bars already
+/// applied, before any stickers/text/censors. Reused while only those overlay
+/// params change, so dragging a sticker, censor box or text block skips the
+/// whole-image color pass. Keyed on the base inputs PLUS filters + canvas; sits
+/// on top of `BaseCache` (a filtered miss rebuilds from the base, a base miss
+/// rebuilds both).
+struct FilteredCache {
+    crop: CropRect,
+    out_w: u32,
+    out_h: u32,
+    fit: bool,
+    filters: FilterValues,
+    canvas: Option<Canvas>,
+    img: image::RgbaImage,
+}
+
 pub struct EditorState {
     preset: ParsePreset,
     photo: Option<Photo>,
@@ -196,6 +216,9 @@ pub struct EditorState {
     /// Cached decoded/cropped/resized photo (before filters/text), reused across
     /// filter/effect/text changes so sliders don't re-decode + re-resize.
     base_cache: Option<BaseCache>,
+    /// Cached filtered base (photo + filters + bars), reused across overlay-only
+    /// edits so dragging a sticker/censor/text skips the whole-image filter pass.
+    filtered_cache: Option<FilteredCache>,
 }
 
 impl Default for EditorState {
@@ -239,6 +262,7 @@ impl Default for EditorState {
             texture: None,
             error: None,
             base_cache: None,
+            filtered_cache: None,
         }
     }
 }
@@ -1010,7 +1034,7 @@ impl EditorState {
                 ));
                 self.source_tex = None;
                 self.photo = Some(Photo {
-                    base64: base64::engine::general_purpose::STANDARD.encode(&bytes),
+                    base64: base64::engine::general_purpose::STANDARD.encode(&bytes).into(),
                     w,
                     h,
                 });
@@ -1020,6 +1044,7 @@ impl EditorState {
                 self.crop_editing = false;
                 self.error = None;
                 self.base_cache = None; // new photo → invalidate the preview base
+                self.filtered_cache = None;
                 self.dirty = true;
             }
             Err(e) => self.error = Some(format!("Gagal decode gambar: {e}")),
@@ -1057,6 +1082,7 @@ impl EditorState {
         self.history.clear();
         self.future.clear();
         self.base_cache = None; // switched document/photo → invalidate the base
+        self.filtered_cache = None;
         self.dirty = true;
     }
 
@@ -1240,6 +1266,30 @@ impl EditorState {
         }
     }
 
+    /// True when the live editable state equals `s`, compared in place so
+    /// `maybe_commit` can decide "did anything change?" without materializing a
+    /// `Snapshot` (which deep-clones every block, sticker and its base64 string)
+    /// on frames where nothing changed. Keep the field list in sync with
+    /// `snapshot`/`restore`.
+    fn matches_snapshot(&self, s: &Snapshot) -> bool {
+        self.blocks == s.blocks
+            && self.censors == s.censors
+            && self.stickers == s.stickers
+            && self.crop == s.crop
+            && self.crop_ratio == s.crop_ratio
+            && self.crop_fit == s.crop_fit
+            && self.filters == s.filters
+            && self.cinematic == s.cinematic
+            && self.cinematic_bar == s.cinematic_bar
+            && self.cinematic_bar_pos == s.cinematic_bar_pos
+            && self.cinematic_color == s.cinematic_color
+            && self.font_family == s.font_family
+            && self.text_size == s.text_size
+            && self.line_gap == s.line_gap
+            && self.stroke_auto == s.stroke_auto
+            && self.stroke_width == s.stroke_width
+    }
+
     fn restore(&mut self, s: Snapshot) {
         self.blocks = s.blocks;
         self.censors = s.censors;
@@ -1268,9 +1318,11 @@ impl EditorState {
         if ctx.input(|i| i.pointer.any_down()) {
             return; // mid-drag — wait for release
         }
-        let snap = self.snapshot();
-        if self.history.last() != Some(&snap) {
-            self.history.push(snap);
+        // Compare live state to the last commit in place; only build a snapshot
+        // (which deep-clones blocks/stickers/base64) once we're actually pushing.
+        let changed = self.history.last().map_or(true, |last| !self.matches_snapshot(last));
+        if changed {
+            self.history.push(self.snapshot());
             if self.history.len() > 80 {
                 self.history.remove(0);
             }
@@ -1403,38 +1455,67 @@ impl EditorState {
             self.texture = None;
             return;
         };
-        // Reuse the cached base (decoded/cropped/resized photo) when only
-        // filter/effect/text params changed — skips re-decoding and re-resizing
-        // the photo on every slider tick. Keyed on the inputs that affect the
-        // base; cleared when the photo changes.
-        let hit = self.base_cache.as_ref().map_or(false, |c| {
+
+        // Layer 1: the filtered base (photo + filters + cinematic bars). When it
+        // hits, an overlay-only edit (sticker/censor/text drag) skips BOTH the
+        // base prep AND the whole-image filter pass — we composite straight onto
+        // the cached filtered image. Keyed on the base inputs plus filters/canvas.
+        let filt_hit = self.filtered_cache.as_ref().map_or(false, |c| {
             c.crop == job.crop
                 && c.out_w == job.output.w
                 && c.out_h == job.output.h
                 && c.fit == job.fit
+                && c.filters == job.filters
+                && c.canvas == job.canvas
         });
-        let base = if hit {
-            self.base_cache.as_ref().unwrap().img.clone()
+        let filtered = if filt_hit {
+            self.filtered_cache.as_ref().unwrap().img.clone()
         } else {
-            match compose::prepare_base(&job) {
-                Ok(b) => {
-                    self.base_cache = Some(BaseCache {
-                        crop: job.crop,
-                        out_w: job.output.w,
-                        out_h: job.output.h,
-                        fit: job.fit,
-                        img: b.clone(),
-                    });
-                    b
+            // Layer 0: decoded/cropped/resized photo. Its own cache is keyed on
+            // just crop/size/fit, so a filter change reuses the base and rebuilds
+            // only the filtered layer. Cleared (both layers) when the photo changes.
+            let base_hit = self.base_cache.as_ref().map_or(false, |c| {
+                c.crop == job.crop
+                    && c.out_w == job.output.w
+                    && c.out_h == job.output.h
+                    && c.fit == job.fit
+            });
+            let base = if base_hit {
+                self.base_cache.as_ref().unwrap().img.clone()
+            } else {
+                match compose::prepare_base(&job) {
+                    Ok(b) => {
+                        self.base_cache = Some(BaseCache {
+                            crop: job.crop,
+                            out_w: job.output.w,
+                            out_h: job.output.h,
+                            fit: job.fit,
+                            img: b.clone(),
+                        });
+                        b
+                    }
+                    Err(e) => {
+                        self.error = Some(format!("Render gagal: {e}"));
+                        return;
+                    }
                 }
-                Err(e) => {
-                    self.error = Some(format!("Render gagal: {e}"));
-                    return;
-                }
-            }
+            };
+            let filtered = compose::apply_filters_and_bars(base, &job);
+            self.filtered_cache = Some(FilteredCache {
+                crop: job.crop,
+                out_w: job.output.w,
+                out_h: job.output.h,
+                fit: job.fit,
+                filters: job.filters,
+                canvas: job.canvas,
+                img: filtered.clone(),
+            });
+            filtered
         };
 
-        match compose::render_onto(base, &job) {
+        // Layer 2: overlays (stickers, text, censors) — always re-run, since
+        // they're what's being edited, but now on top of the cached filtered base.
+        match compose::draw_overlays(filtered, &job) {
             Ok(img) => {
                 let size = [img.width() as usize, img.height() as usize];
                 let color = egui::ColorImage::from_rgba_unmultiplied(size, img.as_raw());

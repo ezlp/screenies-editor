@@ -14,6 +14,9 @@ pub struct ChatlogBrowser {
     folder: Option<PathBuf>,
     files: Vec<PathBuf>,
     content: Option<(String, String)>, // (filename, text)
+    /// Colored preview of `content`, parsed once when a file loads instead of
+    /// rebuilt every frame the popup repaints (scroll/hover). `None` = no file.
+    preview_job: Option<egui::text::LayoutJob>,
     open: bool,
     error: Option<String>,
 }
@@ -41,6 +44,7 @@ impl ChatlogBrowser {
         if let Some(dir) = rfd::FileDialog::new().pick_folder() {
             self.folder = Some(dir);
             self.content = None;
+            self.preview_job = None;
             self.rescan();
         }
     }
@@ -79,6 +83,7 @@ impl ChatlogBrowser {
         let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("?").to_string();
         match fs::read_to_string(path) {
             Ok(text) => {
+                self.preview_job = Some(colored_log(&text)); // parse once, here
                 self.content = Some((name, text));
                 self.error = None;
             }
@@ -149,9 +154,14 @@ impl ChatlogBrowser {
                                 egui::ScrollArea::vertical()
                                     .auto_shrink([false, false])
                                     .show(ui, |ui| {
-                                        let mut job = colored_log(&text);
-                                        job.wrap.max_width = ui.available_width();
-                                        ui.add(egui::Label::new(job).selectable(true));
+                                        if let Some(job) = &self.preview_job {
+                                            // Clone the parsed job (cheap) rather
+                                            // than re-parsing every line per frame;
+                                            // only max_width varies frame to frame.
+                                            let mut job = job.clone();
+                                            job.wrap.max_width = ui.available_width();
+                                            ui.add(egui::Label::new(job).selectable(true));
+                                        }
                                     });
                             });
                     } else {

@@ -19,8 +19,10 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct RenderJob {
-    /// Source photo bytes, base64 (PNG/JPEG/WebP/BMP).
-    pub image_base64: String,
+    /// Source photo bytes, base64 (PNG/JPEG/WebP/BMP). `Arc<str>` so the editor
+    /// can hand the same bytes to every per-frame RenderJob with a refcount bump
+    /// instead of a multi-MB string copy (only `prepare_base`/export read it).
+    pub image_base64: std::sync::Arc<str>,
     pub crop: CropRect,
     pub output: Size,
     pub stickers: Vec<StickerJob>,
@@ -83,7 +85,7 @@ pub enum BarPos {
 /// of the output. They grow INWARD (covering the photo's edges), so the output
 /// size is unchanged. Bars sit under stickers/text, so captions stay visible on
 /// them. `bar` is each bar's height in output px; `bars` picks which are drawn.
-#[derive(Debug, Clone, Copy, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Canvas {
     /// RGBA of the bars.

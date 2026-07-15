@@ -10,17 +10,39 @@ use super::{ExportBlock, RenderJob};
 use crate::error::AppError;
 use ab_glyph::{Font, FontVec, PxScale, ScaleFont};
 use image::RgbaImage;
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex, OnceLock};
 
 struct Faces {
     bold: FontVec,
     heavy: FontVec,
 }
 
+/// Parsed faces, memoized by family. `load_faces` copies each font file out of
+/// fontdb (`data.to_vec()`) and re-parses it in ab_glyph — expensive to redo on
+/// every preview frame. Faces are size-independent (the `PxScale` is applied at
+/// draw time), so the only cache key is the family name. The measurer
+/// (`GlyphMeasure::new`) and the renderer (`draw_blocks`) share one `Arc`, so a
+/// family that used to load four times per refresh now loads once and is reused.
+fn faces_for(family: &str) -> Result<Arc<Faces>, AppError> {
+    static CACHE: OnceLock<Mutex<HashMap<String, Arc<Faces>>>> = OnceLock::new();
+    let cache = CACHE.get_or_init(|| Mutex::new(HashMap::new()));
+    // Two short lock windows rather than one held across the slow load: a
+    // concurrent miss may load twice, but both faces are equivalent and the
+    // last insert wins — harmless, and the UI/export paths are single-threaded.
+    if let Some(faces) = cache.lock().unwrap().get(family) {
+        return Ok(faces.clone());
+    }
+    let faces = Arc::new(load_faces(family)?);
+    cache.lock().unwrap().insert(family.to_string(), faces.clone());
+    Ok(faces)
+}
+
 pub fn draw_blocks(img: &mut RgbaImage, job: &RenderJob) -> Result<(), AppError> {
     if job.blocks.iter().all(|b| b.rows.is_empty()) {
         return Ok(());
     }
-    let faces = load_faces(&job.font_family)?;
+    let faces = faces_for(&job.font_family)?;
     let scale = PxScale::from(job.text_size);
     // Precomputed once (v0.12.0 fix: was re-allocated per token). Empty
     // when stroke is 0 → the outline pass is skipped entirely.
@@ -147,14 +169,15 @@ fn advance_width(font: &FontVec, scale: PxScale, text: &str) -> f32 {
 /// every word. Correctness depends on installed fonts, so it isn't unit-tested
 /// here — the layout math is tested against a deterministic mock instead.
 pub struct GlyphMeasure {
-    faces: Faces,
+    faces: Arc<Faces>,
     scale: PxScale,
 }
 
 impl GlyphMeasure {
     /// Load the family's faces at `text_size`. Errors if the font is missing.
+    /// Faces come from the shared per-family cache (see `faces_for`).
     pub fn new(font_family: &str, text_size: f32) -> Result<Self, AppError> {
-        Ok(Self { faces: load_faces(font_family)?, scale: PxScale::from(text_size) })
+        Ok(Self { faces: faces_for(font_family)?, scale: PxScale::from(text_size) })
     }
 }
 

@@ -167,7 +167,11 @@ fn box_blur(img: &mut RgbaImage, radius: u32) {
     // Each pass slides a window sum: at every step drop the pixel leaving on one
     // edge and add the one entering on the other (both edge-clamped) — the same
     // clamped average as the naive version, without the per-radius inner loop.
-    let mut scratch = img.clone();
+    //
+    // Pass 1 writes every pixel of `scratch` (RGB) from `img`, and pass 2 reads
+    // back only its RGB — never its alpha — so `scratch` just needs allocating,
+    // not cloning. Final alpha comes from `img`, which pass 2 leaves untouched.
+    let mut scratch = RgbaImage::new(w, h);
     for y in 0..h {
         let (mut sr, mut sg, mut sb) = (0i64, 0i64, 0i64);
         for dx in -r..=r {

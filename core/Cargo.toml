@@ -9,7 +9,7 @@ edition = "2021"
 rust-version = "1.77"
 
 [dependencies]
-serde = { version = "1", features = ["derive"] }
+serde = { version = "1", features = ["derive", "rc"] } # rc: Arc<str> in RenderJob (shared photo bytes)
 regex = "1"
 fontdb = "0.18"
 image = "0.25"

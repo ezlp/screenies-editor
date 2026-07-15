@@ -13,7 +13,7 @@ use std::io::Cursor;
 /// otherwise it crops to fill.
 pub fn prepare_base(job: &RenderJob) -> Result<RgbaImage, AppError> {
     let bytes = base64::engine::general_purpose::STANDARD
-        .decode(&job.image_base64)
+        .decode(job.image_base64.as_bytes())
         .map_err(|e| AppError::Parse(format!("base64: {e}")))?;
     let src = image::load_from_memory(&bytes)
         .map_err(|e| AppError::Render(format!("decode foto: {e}")))?
@@ -25,18 +25,34 @@ pub fn prepare_base(job: &RenderJob) -> Result<RgbaImage, AppError> {
     }
 }
 
-/// Apply everything on top of a prepared base: filters, cinematic bars, stickers,
-/// text, then censor boxes LAST (so blur/pixelate cover whatever sits under them
-/// — photo, stickers, AND text). Takes the base by value.
-pub fn render_onto(mut out: RgbaImage, job: &RenderJob) -> Result<RgbaImage, AppError> {
+/// The filter layer: per-pixel color ops + cinematic bars. Depends ONLY on the
+/// base image, `job.filters` and `job.canvas`, so a shell can cache the result
+/// and re-run just `draw_overlays` when only text/stickers/censors move —
+/// skipping the whole-image color pass on every such frame. Takes base by value.
+pub fn apply_filters_and_bars(mut out: RgbaImage, job: &RenderJob) -> RgbaImage {
     filters::apply(&mut out, &job.filters);
     if let Some(cv) = &job.canvas {
         draw_letterbox(&mut out, cv);
     }
+    out
+}
+
+/// The overlay layer: stickers, then text, then censor boxes LAST (so
+/// blur/pixelate cover whatever sits under them — photo, stickers, AND text).
+/// Split from `apply_filters_and_bars` so the expensive filter layer can be
+/// cached across overlay-only edits.
+pub fn draw_overlays(mut out: RgbaImage, job: &RenderJob) -> Result<RgbaImage, AppError> {
     sticker::overlay_all(&mut out, &job.stickers)?;
     text::draw_blocks(&mut out, job)?;
     filters::apply_censors(&mut out, &job.censors);
     Ok(out)
+}
+
+/// Apply everything on top of a prepared base: the filter layer, then overlays.
+/// The preview splits these two calls to cache the filter layer; export runs the
+/// whole thing from scratch.
+pub fn render_onto(out: RgbaImage, job: &RenderJob) -> Result<RgbaImage, AppError> {
+    draw_overlays(apply_filters_and_bars(out, job), job)
 }
 
 /// Full render: base64 photo → cropped/resized/fitted → filtered, text-stamped.
@@ -88,7 +104,7 @@ mod tests {
         let mut png = std::io::Cursor::new(Vec::new());
         img.write_to(&mut png, image::ImageFormat::Png).unwrap();
         RenderJob {
-            image_base64: base64::engine::general_purpose::STANDARD.encode(png.into_inner()),
+            image_base64: base64::engine::general_purpose::STANDARD.encode(png.into_inner()).into(),
             crop: CropRect { x: 0.0, y: 0.0, w: 4.0, h: 4.0 },
             output: Size { w: 8, h: 8 },
             stickers: vec![],
