@@ -16,8 +16,10 @@ Current status (2026-07-17T19:03:00+07:00):
 Next recommended steps:
 1. Move Export to action bar (if not already) and move Undo/Redo to floating toolbar
 2. Add keyboard shortcuts (1..5) to switch tools — DONE
-3. Add unit/manual smoke tests and update CI if needed
+3. Add unit/manual smoke tests and update CI if needed — DONE (headless egui smoke test covers every tool panel)
 4. Visual QA & screenshots for PR
+
+Visual QA checklist: [QA.md](QA.md) · PR draft: [PR-DESCRIPTION.md](PR-DESCRIPTION.md)
 
 How to run:
 - Build checks run by CI: .github/workflows/build.yml

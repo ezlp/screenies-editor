@@ -288,6 +288,21 @@ mod tests {
         let ed = EditorState::default();
         assert_eq!(ed.active_tool, Tool::Photo);
     }
+
+    #[test]
+    fn every_tool_panel_renders_without_panicking() {
+        for tool in [Tool::Photo, Tool::Crop, Tool::Chatlog, Tool::Text, Tool::Fx] {
+            let ctx = egui::Context::default();
+            let mut editor = EditorState {
+                active_tool: tool,
+                ..Default::default()
+            };
+
+            ctx.run(egui::RawInput::default(), |ctx| {
+                egui::CentralPanel::default().show(ctx, |ui| editor.controls(ui));
+            });
+        }
+    }
 }
 
     pub fn ui(&mut self, ui: &mut egui::Ui) {
@@ -414,28 +429,12 @@ mod tests {
             }
         });
 
-        // Fixed action bar at bottom of the controls panel (Export + future actions)
+        // Fixed action bar at bottom of the controls panel.
         ui.separator();
         ui.horizontal(|ui| {
             if ui.button(self.t("💾  Export PNG")).clicked() {
                 self.export();
             }
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if ui
-                    .add_enabled(self.history.len() > 1, egui::Button::new("↩  Undo"))
-                    .on_hover_text("Ctrl+Z")
-                    .clicked()
-                {
-                    self.undo();
-                }
-                if ui
-                    .add_enabled(!self.future.is_empty(), egui::Button::new("↪  Redo"))
-                    .on_hover_text("Ctrl+Y")
-                    .clicked()
-                {
-                    self.redo();
-                }
-            });
         });
     }
 
@@ -467,11 +466,6 @@ mod tests {
             ui.small(self.t("Belum ada foto."));
         }
 
-        ui.separator();
-        // Export lives on the Photo panel.
-        if ui.button(self.t("💾  Export PNG")).clicked() {
-            self.export();
-        }
         if let Some(err) = &self.error {
             ui.colored_label(ui.visuals().error_fg_color, err);
         }

@@ -8,6 +8,8 @@ Milestone B — Change Log
 - Fixed chatlog browser to handle non-UTF8 files (lossy read)
 - Moved Export UI into a fixed action bar at the bottom of the controls panel
 - Added floating Undo/Redo toolbar overlaying preview (top-right)
+- Added headless egui smoke coverage for all five tool panels
+- Removed duplicate Export and Undo/Redo controls so the action bar and preview toolbar remain the single sources of those actions
 
 Commits (branch feature/milestone-b-tool-rail):
 - feat(milestone-b): add Tool enum, active_tool persistence and left tool rail UI
@@ -18,4 +20,3 @@ Files changed:
 - native/src/main.rs
 - native/src/editor.rs
 - native/src/chatlog_browser.rs
-
