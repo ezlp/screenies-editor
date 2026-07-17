@@ -277,34 +277,6 @@ impl EditorState {
         crate::i18n::t(self.lang, s)
     }
 
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn editor_default_active_tool_is_photo() {
-        let ed = EditorState::default();
-        assert_eq!(ed.active_tool, Tool::Photo);
-    }
-
-    #[test]
-    fn every_tool_panel_renders_without_panicking() {
-        for tool in [Tool::Photo, Tool::Crop, Tool::Chatlog, Tool::Text, Tool::Fx] {
-            let ctx = egui::Context::default();
-            let mut editor = EditorState {
-                active_tool: tool,
-                ..Default::default()
-            };
-
-            ctx.run(egui::RawInput::default(), |ctx| {
-                egui::CentralPanel::default().show(ctx, |ui| editor.controls(ui));
-            });
-        }
-    }
-}
-
     pub fn ui(&mut self, ui: &mut egui::Ui) {
         // Keyboard handling — skip while a text field is focused so the
         // textarea's own editing keys win.
@@ -1673,6 +1645,32 @@ mod tests {
                 }
             }
             Err(e) => self.error = Some(format!("Render gagal: {e}")),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn editor_default_active_tool_is_photo() {
+        let ed = EditorState::default();
+        assert_eq!(ed.active_tool, Tool::Photo);
+    }
+
+    #[test]
+    fn every_tool_panel_renders_without_panicking() {
+        for tool in [Tool::Photo, Tool::Crop, Tool::Chatlog, Tool::Text, Tool::Fx] {
+            let ctx = egui::Context::default();
+            let mut editor = EditorState {
+                active_tool: tool,
+                ..Default::default()
+            };
+
+            ctx.run(egui::RawInput::default(), |ctx| {
+                egui::CentralPanel::default().show(ctx, |ui| editor.controls(ui));
+            });
         }
     }
 }
