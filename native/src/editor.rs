@@ -278,10 +278,11 @@ impl EditorState {
     }
 
     pub fn ui(&mut self, ui: &mut egui::Ui) {
-        // Keyboard undo/redo — skipped while a text field is focused so the
+        // Keyboard handling — skip while a text field is focused so the
         // textarea's own editing keys win.
         let typing = ui.ctx().memory(|m| m.focused().is_some());
         if !typing {
+            // Undo/Redo (Ctrl/Cmd+Z, Ctrl+Y)
             let (do_undo, do_redo) = ui.ctx().input(|i| {
                 let cmd = i.modifiers.command;
                 let undo = cmd && !i.modifiers.shift && i.key_pressed(egui::Key::Z);
@@ -294,6 +295,18 @@ impl EditorState {
             }
             if do_redo {
                 self.redo();
+            }
+
+            // Tool shortcuts: 1..5 select Photo, Crop, Chatlog, Text, Fx
+            if let Some(key_tool) = ui.ctx().input(|i| {
+                if i.key_pressed(egui::Key::Num1) { Some(Tool::Photo) }
+                else if i.key_pressed(egui::Key::Num2) { Some(Tool::Crop) }
+                else if i.key_pressed(egui::Key::Num3) { Some(Tool::Chatlog) }
+                else if i.key_pressed(egui::Key::Num4) { Some(Tool::Text) }
+                else if i.key_pressed(egui::Key::Num5) { Some(Tool::Fx) }
+                else { None }
+            }) {
+                self.active_tool = key_tool;
             }
         }
 

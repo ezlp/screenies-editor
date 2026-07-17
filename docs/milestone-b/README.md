@@ -15,7 +15,7 @@ Current status (2026-07-17T19:03:00+07:00):
 
 Next recommended steps:
 1. Move Export to action bar (if not already) and move Undo/Redo to floating toolbar
-2. Add keyboard shortcuts (1..5) to switch tools
+2. Add keyboard shortcuts (1..5) to switch tools — DONE
 3. Add unit/manual smoke tests and update CI if needed
 4. Visual QA & screenshots for PR
 
