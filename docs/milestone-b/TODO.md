@@ -7,8 +7,8 @@ Milestone B — TODO (tracking)
 - [x] Refactor editor.controls into tool_* panels (photo/crop/chatlog/text/fx)
 - [x] Fix chatlog non-UTF8 read bug
 
-- [ ] Move Export to action bar (or keep in Photo panel and add dedicated action bar)
-- [ ] Move Undo/Redo to floating preview toolbar
+- [x] Move Export to action bar (or keep in Photo panel and add dedicated action bar)
+- [x] Move Undo/Redo to floating preview toolbar
 - [ ] Add keyboard shortcuts (1..5) for tool switching
 - [ ] Add unit/manual smoke tests for each tool panel
 - [ ] Create screenshots and update PR description

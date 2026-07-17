@@ -6,6 +6,8 @@ Milestone B — Change Log
 - Implemented left tool rail UI (icons for Photo, Crop, Chatlog, Text, Fx)
 - Refactored editor.controls into tool_photo/tool_crop/tool_chatlog/tool_text/tool_fx
 - Fixed chatlog browser to handle non-UTF8 files (lossy read)
+- Moved Export UI into a fixed action bar at the bottom of the controls panel
+- Added floating Undo/Redo toolbar overlaying preview (top-right)
 
 Commits (branch feature/milestone-b-tool-rail):
 - feat(milestone-b): add Tool enum, active_tool persistence and left tool rail UI
