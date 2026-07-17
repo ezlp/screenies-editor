@@ -88,6 +88,31 @@ impl Tool {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json;
+
+    #[test]
+    fn tool_from_id_roundtrip() {
+        assert_eq!(Tool::from_id("photo"), Tool::Photo);
+        assert_eq!(Tool::from_id("crop"), Tool::Crop);
+        assert_eq!(Tool::from_id("chatlog"), Tool::Chatlog);
+        assert_eq!(Tool::from_id("text"), Tool::Text);
+        assert_eq!(Tool::from_id("fx"), Tool::Fx);
+        assert_eq!(Tool::from_id("unknown"), Tool::Photo);
+    }
+
+    #[test]
+    fn settings_serialize_active_tool() {
+        let s = Settings { active_tool: "crop".into(), ..Settings::default() };
+        let js = serde_json::to_string(&s).expect("serialize");
+        let des: Settings = serde_json::from_str(&js).expect("deserialize");
+        assert_eq!(des.active_tool, "crop");
+    }
+}
+
+
 struct App {
     screen: Screen,
     editor: EditorState,

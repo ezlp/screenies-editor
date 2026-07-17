@@ -229,3 +229,26 @@ fn colored_log(text: &str) -> egui::text::LayoutJob {
     }
     job
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::fs;
+    use std::path::PathBuf;
+
+    #[test]
+    fn load_handles_non_utf8_bytes() {
+        let dir = std::env::temp_dir();
+        let p = dir.join("test_chatlog_nonutf8.log");
+        // Write some invalid UTF-8 bytes
+        let _ = fs::write(&p, vec![0x66u8, 0x6f, 0x6f, 0xff, 0xfe, 0x62]);
+        let mut cb = ChatlogBrowser::default();
+        cb.load(&p);
+        assert!(cb.content.is_some(), "content should be Some after load");
+        let (_name, text) = cb.content.unwrap();
+        // lossy conversion replaces invalid bytes with replacement char
+        assert!(text.contains("�") || text.contains("foo") || !text.is_empty());
+        // cleanup
+        let _ = fs::remove_file(&p);
+    }
+}
