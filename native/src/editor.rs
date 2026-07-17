@@ -848,7 +848,7 @@ impl EditorState {
         let toolbar_x = area.max.x - toolbar_w - 12.0;
         let toolbar_y = area.min.y + 12.0;
         let toolbar_pos = egui::pos2(toolbar_x, toolbar_y);
-        egui::Area::new("preview_toolbar")
+        egui::Area::new(egui::Id::new("preview_toolbar"))
             .fixed_pos(toolbar_pos)
             .show(ui.ctx(), |ui| {
                 ui.horizontal(|ui| {
