@@ -18,6 +18,8 @@ use screenies_core::render::{
     BarPos, Canvas, CensorKind, CensorRegion, CropRect, FilterValues, RenderJob, Size, StickerJob,
 };
 
+use crate::Tool;
+
 /// A loaded photo: base64 for the render pipeline + its pixel dimensions.
 #[derive(Clone)]
 struct Photo {
@@ -219,6 +221,8 @@ pub struct EditorState {
     /// Cached filtered base (photo + filters + bars), reused across overlay-only
     /// edits so dragging a sticker/censor/text skips the whole-image filter pass.
     filtered_cache: Option<FilteredCache>,
+    // Active tool for the editor UI (mirrors App.active_tool)
+    pub active_tool: Tool,
 }
 
 impl Default for EditorState {
@@ -263,6 +267,7 @@ impl Default for EditorState {
             error: None,
             base_cache: None,
             filtered_cache: None,
+            active_tool: Tool::default(),
         }
     }
 }
@@ -291,6 +296,55 @@ impl EditorState {
                 self.redo();
             }
         }
+
+        // Tool rail (left, 56px). Sits left of the controls panel.
+        egui::SidePanel::left("tool_rail")
+            .resizable(false)
+            .default_width(56.0)
+            .show_inside(ui, |ui| {
+                ui.vertical_centered(|ui| {
+                    ui.add_space(8.0);
+                    // Photo
+                    if ui
+                        .add(egui::Button::new("🖼").min_size(egui::Vec2::splat(40.0)))
+                        .on_hover_text(self.t("Foto")).clicked()
+                    {
+                        self.active_tool = Tool::Photo;
+                    }
+                    ui.add_space(6.0);
+                    // Crop
+                    if ui
+                        .add(egui::Button::new("✂️").min_size(egui::Vec2::splat(40.0)))
+                        .on_hover_text(self.t("Potong")).clicked()
+                    {
+                        self.active_tool = Tool::Crop;
+                    }
+                    ui.add_space(6.0);
+                    // Chatlog
+                    if ui
+                        .add(egui::Button::new("💬").min_size(egui::Vec2::splat(40.0)))
+                        .on_hover_text(self.t("Chatlog")).clicked()
+                    {
+                        self.active_tool = Tool::Chatlog;
+                    }
+                    ui.add_space(6.0);
+                    // Text
+                    if ui
+                        .add(egui::Button::new("🔤").min_size(egui::Vec2::splat(40.0)))
+                        .on_hover_text(self.t("Teks")).clicked()
+                    {
+                        self.active_tool = Tool::Text;
+                    }
+                    ui.add_space(6.0);
+                    // Fx
+                    if ui
+                        .add(egui::Button::new("✨").min_size(egui::Vec2::splat(40.0)))
+                        .on_hover_text(self.t("Efek")).clicked()
+                    {
+                        self.active_tool = Tool::Fx;
+                    }
+                });
+            });
 
         egui::SidePanel::left("controls")
             .resizable(true)

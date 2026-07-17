@@ -50,12 +50,52 @@ enum Screen {
     Settings,
 }
 
+#[derive(serde::Serialize, serde::Deserialize, PartialEq, Eq, Clone, Copy, Debug)]
+#[serde(rename_all = "lowercase")]
+enum Tool {
+    Photo,
+    Crop,
+    Chatlog,
+    Text,
+    Fx,
+}
+
+impl Default for Tool {
+    fn default() -> Self {
+        Tool::Photo
+    }
+}
+
+impl Tool {
+    fn id(self) -> &'static str {
+        match self {
+            Tool::Photo => "photo",
+            Tool::Crop => "crop",
+            Tool::Chatlog => "chatlog",
+            Tool::Text => "text",
+            Tool::Fx => "fx",
+        }
+    }
+
+    fn from_id(s: &str) -> Self {
+        match s {
+            "crop" => Tool::Crop,
+            "chatlog" => Tool::Chatlog,
+            "text" => Tool::Text,
+            "fx" => Tool::Fx,
+            _ => Tool::Photo,
+        }
+    }
+}
+
 struct App {
     screen: Screen,
     editor: EditorState,
     gallery: GalleryState,
     lang: Lang,
     ui_scale: f32,
+    /// Current tool (persisted in settings)
+    active_tool: Tool,
     /// Current theme id (e.g., "midnight", "paper").
     theme_id: String,
     /// Optional custom accent override.
@@ -72,6 +112,7 @@ impl Default for App {
             gallery: GalleryState::default(),
             lang: Lang::default(),
             ui_scale: 1.0,
+            active_tool: Tool::default(),
             theme_id: "midnight".into(),
             accent: None,
             dense: false,
@@ -104,6 +145,9 @@ struct Settings {
     /// Gallery folder path (persisted for Phase D).
     #[serde(default)]
     gallery_folder: Option<String>,
+    /// Active tool id (photo/crop/chatlog/text/fx)
+    #[serde(default)]
+    active_tool: String,
 }
 
 impl Default for Settings {
@@ -121,6 +165,7 @@ impl Default for Settings {
             accent: None,
             dense: false,
             gallery_folder: None,
+            active_tool: "photo".into(),
         }
     }
 }
@@ -155,6 +200,9 @@ impl App {
 
                 // Restore accent override if set.
                 app.accent = s.accent.map(|[r, g, b]| egui::Color32::from_rgb(r, g, b));
+
+                // Restore active tool if present
+                app.active_tool = Tool::from_id(&s.active_tool);
 
                 app.editor.set_font(s.font);
                 app.editor.apply_prefs(s.text_size, s.line_gap, s.filters);
@@ -193,12 +241,17 @@ impl eframe::App for App {
             });
         }
 
+        // Sync active tool into the editor before drawing, and read it back
+        // afterwards so clicks inside the editor update App state.
+        self.editor.active_tool = self.active_tool;
         egui::CentralPanel::default().show(ctx, |ui| match self.screen {
             Screen::Menu => self.menu(ui),
             Screen::Editor => self.editor.ui(ui),
             Screen::Gallery => self.gallery.ui(ui),
             Screen::Settings => self.settings_screen(ui, &theme_obj),
         });
+        // read back the active tool (user may have clicked the rail)
+        self.active_tool = self.editor.active_tool;
 
         // Gallery → "Buka di editor": load the photo and jump to the editor.
         if let Some(path) = self.gallery.open_request.take() {
@@ -234,6 +287,7 @@ impl eframe::App for App {
             }),
             dense: self.dense,
             gallery_folder: self.gallery.gallery_folder(),
+            active_tool: self.active_tool.id().to_string(),
         };
         eframe::set_value(storage, "settings", &s);
     }
