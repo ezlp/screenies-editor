@@ -229,8 +229,8 @@ impl eframe::App for App {
             chatlog_folder: self.editor.chatlog_folder(),
             theme: self.theme_id.clone(),
             accent: self.accent.map(|c| {
-                let [r, g, b, _] = c.to_srgba();
-                [r, g, b]
+                let rgba = c.to_array();
+                [rgba[0], rgba[1], rgba[2]]
             }),
             dense: self.dense,
             gallery_folder: self.gallery.gallery_folder(),
@@ -280,23 +280,21 @@ impl App {
                 let is_active = self.theme_id == builtin.id;
                 let btn_color = builtin.accent;
                 let border_stroke = if is_active {
-                    egui::Stroke::new(2.0, ui.visuals().selection.stroke.color)
+                    egui::Stroke::new(2.0_f32, ui.visuals().selection.stroke.color)
                 } else {
-                    egui::Stroke::new(1.0, ui.visuals().window_stroke.color)
+                    egui::Stroke::new(1.0_f32, ui.visuals().window_stroke.color)
                 };
                 let rect_response = ui.add(
                     egui::Button::new("  ")
                         .fill(btn_color)
                         .stroke(border_stroke)
-                        .min_size([40.0, 40.0]),
+                        .min_size(egui::Vec2::splat(40.0)),
                 );
                 if rect_response.clicked() {
                     self.theme_id = builtin.id.to_string();
                 }
                 if rect_response.hovered() {
-                    egui::show_tooltip_ui(ui.ctx(), egui::Id::new(&builtin.id), |ui| {
-                        ui.label(builtin.name);
-                    });
+                    egui::show_tooltip_text(ui.ctx(), egui::Id::new(&builtin.id), builtin.name.to_string());
                 }
             }
         });
@@ -306,10 +304,13 @@ impl App {
         ui.label(t(lang, "Accent color"));
         let mut accent_rgb = self.accent
             .map(|c| {
-                let [r, g, b, _] = c.to_srgba();
-                [r, g, b]
+                let rgba = c.to_array();
+                [rgba[0], rgba[1], rgba[2]]
             })
-            .unwrap_or(theme_obj.accent.to_srgb());
+            .unwrap_or_else(|| {
+                let rgba = theme_obj.accent.to_array();
+                [rgba[0], rgba[1], rgba[2]]
+            });
         if ui.color_edit_button_srgb(&mut accent_rgb).changed() {
             self.accent = Some(egui::Color32::from_rgb(accent_rgb[0], accent_rgb[1], accent_rgb[2]));
         }
@@ -329,9 +330,7 @@ impl App {
         
         ui.horizontal(|ui| {
             ui.label(t(lang, "Font"));
-            if ui.button(self.editor.font()).clicked() {
-                self.editor.show_font_picker();
-            }
+            ui.label(self.editor.font());
         });
         ui.add_space(8.0);
 

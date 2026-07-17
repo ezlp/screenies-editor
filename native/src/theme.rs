@@ -47,9 +47,9 @@ impl Theme {
         v.hyperlink_color = accent;
         v.error_fg_color = self.error;
         v.warn_fg_color = self.warn;
-        v.window_stroke = Stroke::new(1.0, self.border);
+        v.window_stroke = Stroke::new(1.0_f32, self.border);
         v.selection.bg_fill = accent.linear_multiply(0.35);
-        v.selection.stroke = Stroke::new(1.0, accent);
+        v.selection.stroke = Stroke::new(1.0_f32, accent);
 
         let r = Rounding::same(self.rounding);
         for w in [
@@ -60,12 +60,12 @@ impl Theme {
             &mut v.widgets.open,
         ] {
             w.rounding = r;
-            w.bg_stroke = Stroke::new(1.0, self.border);
-            w.fg_stroke = Stroke::new(1.0, self.ink);
+            w.bg_stroke = Stroke::new(1.0_f32, self.border);
+            w.fg_stroke = Stroke::new(1.0_f32, self.ink);
         }
         v.widgets.inactive.weak_bg_fill = self.surface_2; // idle buttons
         v.widgets.active.bg_fill = accent;
-        v.widgets.active.fg_stroke = Stroke::new(1.0, self.accent_ink);
+        v.widgets.active.fg_stroke = Stroke::new(1.0_f32, self.accent_ink);
 
         ctx.set_visuals(v);
 
