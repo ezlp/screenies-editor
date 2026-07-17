@@ -13,12 +13,14 @@ mod chatlog_browser;
 mod editor;
 mod gallery;
 mod i18n;
+mod theme;
 
 use eframe::egui;
 use editor::EditorState;
 use gallery::GalleryState;
 use i18n::{t, Lang};
 use screenies_core::render::FilterValues;
+use theme::Theme;
 
 fn main() -> eframe::Result {
     let mut viewport = egui::ViewportBuilder::default()
@@ -52,9 +54,14 @@ struct App {
     screen: Screen,
     editor: EditorState,
     gallery: GalleryState,
-    dark: bool,
     lang: Lang,
     ui_scale: f32,
+    /// Current theme id (e.g., "midnight", "paper").
+    theme_id: String,
+    /// Optional custom accent override.
+    accent: Option<egui::Color32>,
+    /// Density toggle: true = compact, false = cozy.
+    dense: bool,
 }
 
 impl Default for App {
@@ -63,9 +70,11 @@ impl Default for App {
             screen: Screen::default(),
             editor: EditorState::default(),
             gallery: GalleryState::default(),
-            dark: true,
             lang: Lang::default(),
             ui_scale: 1.0,
+            theme_id: "midnight".into(),
+            accent: None,
+            dense: false,
         }
     }
 }
@@ -74,6 +83,7 @@ impl Default for App {
 #[derive(serde::Serialize, serde::Deserialize)]
 #[serde(default)]
 struct Settings {
+    /// Legacy light/dark toggle (migrated to theme in App::new).
     dark: bool,
     font: String,
     lang: Lang,
@@ -82,6 +92,18 @@ struct Settings {
     filters: FilterValues,
     ui_scale: f32,
     chatlog_folder: Option<String>,
+    /// Theme id (e.g., "midnight", "paper"). Empty → migrate from dark.
+    #[serde(default)]
+    theme: String,
+    /// Optional custom accent override as [R, G, B].
+    #[serde(default)]
+    accent: Option<[u8; 3]>,
+    /// Density toggle: true = compact, false = cozy.
+    #[serde(default)]
+    dense: bool,
+    /// Gallery folder path (persisted for Phase D).
+    #[serde(default)]
+    gallery_folder: Option<String>,
 }
 
 impl Default for Settings {
@@ -95,6 +117,10 @@ impl Default for Settings {
             filters: default_filters(),
             ui_scale: 1.0,
             chatlog_folder: None,
+            theme: String::new(),
+            accent: None,
+            dense: false,
+            gallery_folder: None,
         }
     }
 }
@@ -116,12 +142,24 @@ impl App {
         let mut app = App::default();
         if let Some(storage) = cc.storage {
             if let Some(s) = eframe::get_value::<Settings>(storage, "settings") {
-                app.dark = s.dark;
                 app.lang = s.lang;
                 app.ui_scale = s.ui_scale.clamp(0.7, 1.6);
+                app.dense = s.dense;
+
+                // Migrate from dark bool to theme id.
+                app.theme_id = if s.theme.is_empty() {
+                    if s.dark { "midnight" } else { "paper" }.into()
+                } else {
+                    s.theme.clone()
+                };
+
+                // Restore accent override if set.
+                app.accent = s.accent.map(|[r, g, b]| egui::Color32::from_rgb(r, g, b));
+
                 app.editor.set_font(s.font);
                 app.editor.apply_prefs(s.text_size, s.line_gap, s.filters);
                 app.editor.set_chatlog_folder(s.chatlog_folder);
+                app.gallery.set_gallery_folder(s.gallery_folder);
             }
         }
         app
@@ -130,14 +168,9 @@ impl App {
 
 impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        ctx.set_visuals(if self.dark {
-            egui::Visuals::dark()
-        } else {
-            egui::Visuals::light()
-        });
-
-        // "Resize the editing space" — scale the whole UI (persisted).
-        ctx.set_zoom_factor(self.ui_scale);
+        // Apply the current theme.
+        let theme_obj = theme::by_id(&self.theme_id).clone();
+        theme_obj.apply(ctx, self.accent, self.ui_scale);
 
         // Propagate the current language to each screen before it draws.
         self.editor.lang = self.lang;
@@ -152,9 +185,6 @@ impl eframe::App for App {
                     ui.separator();
                     ui.heading(title_of(self.screen));
                     ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if ui.button(if self.dark { "☀" } else { "🌙" }).on_hover_text(t(self.lang, "Ganti tema")).clicked() {
-                            self.dark = !self.dark;
-                        }
                         if ui.button(lang_label(self.lang)).on_hover_text("ID / EN").clicked() {
                             self.lang = self.lang.toggled();
                         }
@@ -167,7 +197,7 @@ impl eframe::App for App {
             Screen::Menu => self.menu(ui),
             Screen::Editor => self.editor.ui(ui),
             Screen::Gallery => self.gallery.ui(ui),
-            Screen::Settings => self.settings_screen(ui),
+            Screen::Settings => self.settings_screen(ui, &theme_obj),
         });
 
         // Gallery → "Buka di editor": load the photo and jump to the editor.
@@ -189,7 +219,7 @@ impl eframe::App for App {
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
         let (text_size, line_gap, filters) = self.editor.prefs();
         let s = Settings {
-            dark: self.dark,
+            dark: false, // legacy, not used by new code but kept for compat
             font: self.editor.font().to_string(),
             lang: self.lang,
             text_size,
@@ -197,6 +227,13 @@ impl eframe::App for App {
             filters,
             ui_scale: self.ui_scale,
             chatlog_folder: self.editor.chatlog_folder(),
+            theme: self.theme_id.clone(),
+            accent: self.accent.map(|c| {
+                let [r, g, b, _] = c.to_srgba();
+                [r, g, b]
+            }),
+            dense: self.dense,
+            gallery_folder: self.gallery.gallery_folder(),
         };
         eframe::set_value(storage, "settings", &s);
     }
@@ -222,39 +259,106 @@ impl App {
             }
 
             ui.add_space(16.0);
-            ui.horizontal(|ui| {
-                let theme = if self.dark { "☀  Mode terang" } else { "🌙  Mode gelap" };
-                if ui.button(t(lang, theme)).clicked() {
-                    self.dark = !self.dark;
-                }
-                if ui.button(lang_label(lang)).on_hover_text("ID / EN").clicked() {
-                    self.lang = self.lang.toggled();
-                }
-            });
-
-            ui.add_space(16.0);
             ui.small(format!("v{} · native (egui) · preview", env!("CARGO_PKG_VERSION")));
         });
     }
 
-    fn settings_screen(&mut self, ui: &mut egui::Ui) {
+    fn settings_screen(&mut self, ui: &mut egui::Ui, theme_obj: &Theme) {
         let lang = self.lang;
         ui.add_space(12.0);
         ui.heading(t(lang, "Pengaturan"));
         ui.add_space(12.0);
-        ui.label(t(lang, "Ukuran ruang edit"));
-        ui.add(egui::Slider::new(&mut self.ui_scale, 0.7..=1.6).text("×"));
-        ui.small(t(lang, "Perbesar/perkecil seluruh tampilan aplikasi."));
-        ui.add_space(16.0);
-        ui.horizontal(|ui| {
-            let theme = if self.dark { "☀  Mode terang" } else { "🌙  Mode gelap" };
-            if ui.button(t(lang, theme)).clicked() {
-                self.dark = !self.dark;
-            }
-            if ui.button(lang_label(lang)).on_hover_text("ID / EN").clicked() {
-                self.lang = self.lang.toggled();
+
+        // Appearance section
+        ui.label(t(lang, "Penampilan"));
+        ui.separator();
+
+        // Theme grid (7 swatches)
+        ui.label(t(lang, "Tema"));
+        ui.horizontal_wrapped(|ui| {
+            for builtin in theme::builtins() {
+                let is_active = self.theme_id == builtin.id;
+                let btn_color = builtin.accent;
+                let border_stroke = if is_active {
+                    egui::Stroke::new(2.0, ui.visuals().selection.stroke.color)
+                } else {
+                    egui::Stroke::new(1.0, ui.visuals().window_stroke.color)
+                };
+                let rect_response = ui.add(
+                    egui::Button::new("  ")
+                        .fill(btn_color)
+                        .stroke(border_stroke)
+                        .min_size([40.0, 40.0]),
+                );
+                if rect_response.clicked() {
+                    self.theme_id = builtin.id.to_string();
+                }
+                if rect_response.hovered() {
+                    egui::show_tooltip_ui(ui.ctx(), egui::Id::new(&builtin.id), |ui| {
+                        ui.label(builtin.name);
+                    });
+                }
             }
         });
+        ui.add_space(8.0);
+
+        // Accent color picker
+        ui.label(t(lang, "Accent color"));
+        let mut accent_rgb = self.accent
+            .map(|c| {
+                let [r, g, b, _] = c.to_srgba();
+                [r, g, b]
+            })
+            .unwrap_or(theme_obj.accent.to_srgb());
+        if ui.color_edit_button_srgb(&mut accent_rgb).changed() {
+            self.accent = Some(egui::Color32::from_rgb(accent_rgb[0], accent_rgb[1], accent_rgb[2]));
+        }
+        ui.add_space(8.0);
+
+        // Density toggle
+        ui.label(t(lang, "Kepadatan UI"));
+        ui.horizontal(|ui| {
+            ui.selectable_value(&mut self.dense, false, t(lang, "Nyaman"));
+            ui.selectable_value(&mut self.dense, true, t(lang, "Kompak"));
+        });
+        ui.add_space(12.0);
+
+        // Editing defaults section
+        ui.label(t(lang, "Default edit"));
+        ui.separator();
+        
+        ui.horizontal(|ui| {
+            ui.label(t(lang, "Font"));
+            if ui.button(self.editor.font()).clicked() {
+                self.editor.show_font_picker();
+            }
+        });
+        ui.add_space(8.0);
+
+        // UI scale
+        ui.label(t(lang, "Ukuran ruang edit"));
+        ui.add(egui::Slider::new(&mut self.ui_scale, 0.7..=1.6).text("×"));
+        ui.add_space(12.0);
+
+        // Language section
+        ui.label(t(lang, "Bahasa"));
+        ui.separator();
+        ui.horizontal(|ui| {
+            ui.selectable_value(&mut self.lang, Lang::Id, "Bahasa Indonesia");
+            ui.selectable_value(&mut self.lang, Lang::En, "English");
+        });
+        ui.add_space(12.0);
+
+        // About section
+        ui.label(t(lang, "Tentang"));
+        ui.separator();
+        ui.small(format!("v{}", env!("CARGO_PKG_VERSION")));
+        ui.small(t(lang, "Screenshot Roleplay toolkit — komunitas SA-MP"));
+        ui.hyperlink_to(
+            t(lang, "GitHub"),
+            "https://github.com/ezlp/screenies-editor",
+        );
+        ui.small(format!("© 2024 Isut Indraputra & Claude (Anthropic)"));
     }
 }
 

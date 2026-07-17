@@ -630,7 +630,7 @@ impl EditorState {
                 self.export();
             }
             if let Some(err) = &self.error {
-                ui.colored_label(egui::Color32::from_rgb(220, 90, 90), err);
+                ui.colored_label(ui.visuals().error_fg_color, err);
             }
         });
     }
@@ -793,9 +793,9 @@ impl EditorState {
             }
 
             let color = if selected {
-                egui::Color32::from_rgb(120, 200, 255)
+                ui.visuals().selection.stroke.color
             } else {
-                egui::Color32::from_rgb(210, 210, 210)
+                ui.visuals().text_color()
             };
             painter.rect_stroke(rect, 0.0, egui::Stroke::new(if selected { 2.0_f32 } else { 1.0_f32 }, color));
             let tag = match c.kind {
@@ -848,7 +848,7 @@ impl EditorState {
             }
 
             if selected {
-                let color = egui::Color32::from_rgb(255, 200, 120);
+                let color = ui.visuals().warn_fg_color;
                 painter.rect_stroke(rect, 0.0, egui::Stroke::new(2.0_f32, color));
                 let hrect = egui::Rect::from_min_size(rect.max - egui::vec2(HANDLE, HANDLE), egui::vec2(HANDLE, HANDLE));
                 painter.rect_filled(hrect, 0.0, color);
@@ -906,7 +906,7 @@ impl EditorState {
         painter.rect_filled(egui::Rect::from_min_max(egui::pos2(img_rect.min.x, cr.min.y), egui::pos2(cr.min.x, cr.max.y)), z, dim);
         painter.rect_filled(egui::Rect::from_min_max(egui::pos2(cr.max.x, cr.min.y), egui::pos2(img_rect.max.x, cr.max.y)), z, dim);
 
-        let accent = egui::Color32::from_rgb(194, 162, 218);
+        let accent = ui.visuals().selection.stroke.color;
         painter.rect_stroke(cr, z, egui::Stroke::new(2.0_f32, accent));
 
         // Move the whole box: the inner area (inset so it doesn't fight the edge

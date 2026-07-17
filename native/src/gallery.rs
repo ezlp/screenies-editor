@@ -35,6 +35,34 @@ impl GalleryState {
         crate::i18n::t(self.lang, s)
     }
 
+    /// Get the persisted gallery folder path (for Settings).
+    pub fn gallery_folder(&self) -> Option<String> {
+        self.folder.as_ref().map(|p| p.to_string_lossy().into_owned())
+    }
+
+    /// Set the gallery folder path (for Settings load).
+    pub fn set_gallery_folder(&mut self, path: Option<String>) {
+        self.folder = path.filter(|s| !s.is_empty()).map(PathBuf::from);
+        if self.folder.is_some() {
+            self.rescan();
+        }
+    }
+
+    fn rescan(&mut self) {
+        self.items.clear();
+        self.thumbs.clear();
+        self.selected = None;
+        self.preview = None;
+        let Some(dir) = &self.folder else { return };
+        match gallery::list_folder(dir) {
+            Ok(items) => {
+                self.items = items;
+                self.error = None;
+            }
+            Err(e) => self.error = Some(format!("Gagal baca folder: {e}")),
+        }
+    }
+
     pub fn ui(&mut self, ui: &mut egui::Ui) {
         ui.add_space(6.0);
         ui.horizontal(|ui| {
@@ -48,7 +76,7 @@ impl GalleryState {
             }
         });
         if let Some(err) = &self.error {
-            ui.colored_label(egui::Color32::from_rgb(220, 90, 90), err);
+            ui.colored_label(ui.visuals().error_fg_color, err);
         }
         ui.separator();
 
@@ -180,7 +208,7 @@ impl GalleryState {
                         ui.image(egui::load::SizedTexture::new(tex.id(), s * scale));
                     });
                 } else if let Some(err) = &self.error {
-                    ui.colored_label(egui::Color32::from_rgb(220, 90, 90), err);
+                    ui.colored_label(ui.visuals().error_fg_color, err);
                 }
             });
         // Close on the window ✕, or after jumping to the editor.

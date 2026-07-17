@@ -127,6 +127,17 @@ pub fn t(lang: Lang, id: &'static str) -> &'static str {
         "Pilih folder berisi foto hasil edit." => "Pick a folder with your edited photos.",
         "Pilih gambar dari daftar." => "Pick an image from the list.",
         "✏  Buka di editor" => "✏  Open in editor",
+        // settings screen — appearance (theme engine, Milestone A)
+        "Penampilan" => "Appearance",
+        "Tema" => "Theme",
+        "Accent color" => "Accent color",
+        "Kepadatan UI" => "UI Density",
+        "Nyaman" => "Cozy",
+        "Kompak" => "Compact",
+        "Default edit" => "Editing Defaults",
+        "Bahasa" => "Language",
+        "Tentang" => "About",
+        "GitHub" => "GitHub",
         _ => id,
     }
 }

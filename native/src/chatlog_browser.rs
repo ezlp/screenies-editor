@@ -113,7 +113,7 @@ impl ChatlogBrowser {
                     }
                 });
                 if let Some(err) = &self.error {
-                    ui.colored_label(egui::Color32::from_rgb(220, 90, 90), err);
+                    ui.colored_label(ui.visuals().error_fg_color, err);
                 }
                 ui.separator();
 
