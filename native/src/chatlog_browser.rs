@@ -81,8 +81,11 @@ impl ChatlogBrowser {
 
     fn load(&mut self, path: &PathBuf) {
         let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("?").to_string();
-        match fs::read_to_string(path) {
-            Ok(text) => {
+        match fs::read(path) {
+            Ok(bytes) => {
+                // Accept non-UTF-8 by doing a lossy conversion so the preview
+                // still shows text even when encoding is ambiguous.
+                let text = String::from_utf8_lossy(&bytes).into_owned();
                 self.preview_job = Some(colored_log(&text)); // parse once, here
                 self.content = Some((name, text));
                 self.error = None;
