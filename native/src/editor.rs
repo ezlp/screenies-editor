@@ -374,9 +374,27 @@ impl EditorState {
     }
 
     fn controls(&mut self, ui: &mut egui::Ui) {
+        // Main scrollable content
         egui::ScrollArea::vertical().show(ui, |ui| {
             ui.add_space(6.0);
-            ui.horizontal(|ui| {
+
+            // Dispatch to the active tool panel.
+            match self.active_tool {
+                Tool::Photo => self.tool_photo(ui),
+                Tool::Crop => self.tool_crop(ui),
+                Tool::Chatlog => self.tool_chatlog(ui),
+                Tool::Text => self.tool_text(ui),
+                Tool::Fx => self.tool_fx(ui),
+            }
+        });
+
+        // Fixed action bar at bottom of the controls panel (Export + future actions)
+        ui.separator();
+        ui.horizontal(|ui| {
+            if ui.button(self.t("💾  Export PNG")).clicked() {
+                self.export();
+            }
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if ui
                     .add_enabled(self.history.len() > 1, egui::Button::new("↩  Undo"))
                     .on_hover_text("Ctrl+Z")
@@ -392,15 +410,6 @@ impl EditorState {
                     self.redo();
                 }
             });
-
-            // Dispatch to the active tool panel.
-            match self.active_tool {
-                Tool::Photo => self.tool_photo(ui),
-                Tool::Crop => self.tool_crop(ui),
-                Tool::Chatlog => self.tool_chatlog(ui),
-                Tool::Text => self.tool_text(ui),
-                Tool::Fx => self.tool_fx(ui),
-            }
         });
     }
 
@@ -839,6 +848,34 @@ impl EditorState {
         let painter = ui.painter_at(area);
         let uv = egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0));
         painter.image(tex_id, img_rect, uv, egui::Color32::WHITE);
+
+        // Floating preview toolbar (top-right) with Undo/Redo and other quick actions.
+        // Position it relative to the preview area so it overlays the image.
+        let toolbar_w = 160.0;
+        let toolbar_h = 40.0;
+        let toolbar_x = area.max.x - toolbar_w - 12.0;
+        let toolbar_y = area.min.y + 12.0;
+        let toolbar_pos = egui::pos2(toolbar_x, toolbar_y);
+        egui::Area::new("preview_toolbar")
+            .fixed_pos(toolbar_pos)
+            .show(ui.ctx(), |ui| {
+                ui.horizontal(|ui| {
+                    if ui
+                        .add_enabled(self.history.len() > 1, egui::Button::new("↩  Undo"))
+                        .on_hover_text("Ctrl+Z")
+                        .clicked()
+                    {
+                        self.undo();
+                    }
+                    if ui
+                        .add_enabled(!self.future.is_empty(), egui::Button::new("↪  Redo"))
+                        .on_hover_text("Ctrl+Y")
+                        .clicked()
+                    {
+                        self.redo();
+                    }
+                });
+            });
 
         // Censor boxes: output coords → screen via (origin + coord*scale).
         // The blur/pixelate itself is already baked into the image by core;
