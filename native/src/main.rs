@@ -293,9 +293,7 @@ impl App {
                 if rect_response.clicked() {
                     self.theme_id = builtin.id.to_string();
                 }
-                if rect_response.hovered() {
-                    egui::show_tooltip_text(ui.ctx(), egui::Id::new(&builtin.id), builtin.name.to_string());
-                }
+                rect_response.on_hover_text(builtin.name);
             }
         });
         ui.add_space(8.0);
