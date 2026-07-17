@@ -72,7 +72,7 @@ pub struct CensorRegion {
 }
 
 /// Which cinematic bar(s) to draw.
-#[derive(Debug, Clone, Copy, Deserialize, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, Default, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum BarPos {
     #[default]

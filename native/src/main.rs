@@ -156,6 +156,18 @@ struct Settings {
     text_size: f32,
     line_gap: f32,
     filters: FilterValues,
+    #[serde(default = "default_true")]
+    stroke_auto: bool,
+    #[serde(default = "default_stroke_width")]
+    stroke_width: f32,
+    #[serde(default)]
+    cinematic: bool,
+    #[serde(default = "default_cinematic_bar")]
+    cinematic_bar: f32,
+    #[serde(default)]
+    cinematic_bar_pos: screenies_core::render::BarPos,
+    #[serde(default)]
+    cinematic_color: [u8; 3],
     ui_scale: f32,
     chatlog_folder: Option<String>,
     /// Theme id (e.g., "midnight", "paper"). Empty → migrate from dark.
@@ -173,7 +185,16 @@ struct Settings {
     /// Active tool id (photo/crop/chatlog/text/fx)
     #[serde(default)]
     active_tool: String,
+    /// Last folders used by the photo picker and PNG exporter.
+    #[serde(default)]
+    last_open_folder: Option<String>,
+    #[serde(default)]
+    last_save_folder: Option<String>,
 }
+
+fn default_true() -> bool { true }
+fn default_stroke_width() -> f32 { 3.0 }
+fn default_cinematic_bar() -> f32 { 12.0 }
 
 impl Default for Settings {
     fn default() -> Self {
@@ -184,6 +205,12 @@ impl Default for Settings {
             text_size: 27.0,
             line_gap: 122.0,
             filters: default_filters(),
+            stroke_auto: true,
+            stroke_width: 3.0,
+            cinematic: false,
+            cinematic_bar: 12.0,
+            cinematic_bar_pos: screenies_core::render::BarPos::Both,
+            cinematic_color: [0, 0, 0],
             ui_scale: 1.0,
             chatlog_folder: None,
             theme: String::new(),
@@ -191,6 +218,8 @@ impl Default for Settings {
             dense: false,
             gallery_folder: None,
             active_tool: "photo".into(),
+            last_open_folder: None,
+            last_save_folder: None,
         }
     }
 }
@@ -230,8 +259,12 @@ impl App {
                 app.active_tool = Tool::from_id(&s.active_tool);
 
                 app.editor.set_font(s.font);
-                app.editor.apply_prefs(s.text_size, s.line_gap, s.filters);
+                app.editor.apply_prefs(
+                    s.text_size, s.line_gap, s.filters, s.stroke_auto, s.stroke_width,
+                    s.cinematic, s.cinematic_bar, s.cinematic_bar_pos, s.cinematic_color,
+                );
                 app.editor.set_chatlog_folder(s.chatlog_folder);
+                app.editor.set_file_folders(s.last_open_folder, s.last_save_folder);
                 app.gallery.set_gallery_folder(s.gallery_folder);
             }
         }
@@ -295,14 +328,20 @@ impl eframe::App for App {
     }
 
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
-        let (text_size, line_gap, filters) = self.editor.prefs();
+        let prefs = self.editor.prefs();
         let s = Settings {
             dark: false, // legacy, not used by new code but kept for compat
             font: self.editor.font().to_string(),
             lang: self.lang,
-            text_size,
-            line_gap,
-            filters,
+            text_size: prefs.text_size,
+            line_gap: prefs.line_gap,
+            filters: prefs.filters,
+            stroke_auto: prefs.stroke_auto,
+            stroke_width: prefs.stroke_width,
+            cinematic: prefs.cinematic,
+            cinematic_bar: prefs.cinematic_bar,
+            cinematic_bar_pos: prefs.cinematic_bar_pos,
+            cinematic_color: prefs.cinematic_color,
             ui_scale: self.ui_scale,
             chatlog_folder: self.editor.chatlog_folder(),
             theme: self.theme_id.clone(),
@@ -313,6 +352,8 @@ impl eframe::App for App {
             dense: self.dense,
             gallery_folder: self.gallery.gallery_folder(),
             active_tool: self.active_tool.id().to_string(),
+            last_open_folder: self.editor.last_open_folder(),
+            last_save_folder: self.editor.last_save_folder(),
         };
         eframe::set_value(storage, "settings", &s);
     }

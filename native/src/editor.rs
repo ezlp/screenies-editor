@@ -9,7 +9,10 @@
 
 use base64::Engine;
 use eframe::egui;
-use std::sync::Arc;
+use std::{
+    path::{Path, PathBuf},
+    sync::Arc,
+};
 use screenies_core::chatlog::{self, preset::ParsePreset};
 use screenies_core::render::compose;
 use screenies_core::render::layout::{self, Anchor, BgMode, LayoutBlock, LayoutParams};
@@ -144,6 +147,21 @@ struct FilteredCache {
     img: image::RgbaImage,
 }
 
+/// Editor-wide choices that should survive between launches, without saving
+/// the current photo or chat content as a document.
+#[derive(Clone, Copy)]
+pub struct EditorPrefs {
+    pub text_size: f32,
+    pub line_gap: f32,
+    pub filters: FilterValues,
+    pub stroke_auto: bool,
+    pub stroke_width: f32,
+    pub cinematic: bool,
+    pub cinematic_bar: f32,
+    pub cinematic_bar_pos: BarPos,
+    pub cinematic_color: [u8; 3],
+}
+
 pub struct EditorState {
     preset: ParsePreset,
     photo: Option<Photo>,
@@ -157,6 +175,8 @@ pub struct EditorState {
     // for editing at a time.
     blocks: Vec<ChatBlock>,
     selected_block: usize,
+    /// Position of a free text block when a preview drag began.
+    text_drag_start: Option<(usize, f32, f32)>,
 
     // Color palette: last non-empty text selection (block, start, end char),
     // + the custom-picker color.
@@ -215,6 +235,9 @@ pub struct EditorState {
     dirty: bool,
     texture: Option<egui::TextureHandle>,
     error: Option<String>,
+    /// Directories remembered for the native open and export dialogs.
+    last_open_folder: Option<PathBuf>,
+    last_save_folder: Option<PathBuf>,
     /// Cached decoded/cropped/resized photo (before filters/text), reused across
     /// filter/effect/text changes so sliders don't re-decode + re-resize.
     base_cache: Option<BaseCache>,
@@ -234,6 +257,7 @@ impl Default for EditorState {
             active: 0,
             blocks: vec![ChatBlock::new(0)],
             selected_block: 0,
+            text_drag_start: None,
             text_selection: None,
             custom_color: [255, 255, 255],
             lang: crate::i18n::Lang::default(),
@@ -265,6 +289,8 @@ impl Default for EditorState {
             dirty: false,
             texture: None,
             error: None,
+            last_open_folder: None,
+            last_save_folder: None,
             base_cache: None,
             filtered_cache: None,
             active_tool: Tool::default(),
@@ -869,6 +895,48 @@ impl EditorState {
                 });
             });
 
+        // Free chatlog blocks are positioned in output pixels. Reuse core's
+        // layout bounds so the hit area matches the text that will be exported.
+        // Pinned blocks deliberately stay fixed; only "Free" is draggable.
+        for (i, bounds) in self.text_block_bounds().into_iter().enumerate() {
+            if self.blocks[i].anchor != Anchor::Free {
+                continue;
+            }
+            let Some(bounds) = bounds else { continue };
+            let rect = egui::Rect::from_min_size(
+                egui::pos2(origin.x + bounds.x * scale, origin.y + bounds.y * scale),
+                egui::vec2(bounds.w * scale, bounds.h * scale),
+            ).expand(5.0);
+            let response = ui
+                .interact(rect, egui::Id::new(("free-text", i)), egui::Sense::click_and_drag())
+                .on_hover_cursor(egui::CursorIcon::Grab);
+            if response.clicked() {
+                self.selected_block = i;
+            }
+            if response.drag_started() {
+                self.text_drag_start = Some((i, self.blocks[i].x, self.blocks[i].y));
+            }
+            if response.dragged() {
+                if let Some((dragged, x, y)) = self.text_drag_start {
+                    if dragged == i {
+                        let delta = response.drag_delta() / scale;
+                        self.blocks[i].x = (x + delta.x).max(0.0);
+                        self.blocks[i].y = (y + delta.y).max(0.0);
+                        self.selected_block = i;
+                        self.dirty = true;
+                    }
+                }
+            }
+            if response.drag_stopped() {
+                self.text_drag_start = None;
+            }
+            if self.selected_block == i {
+                painter.rect_stroke(
+                    rect, 2.0, egui::Stroke::new(1.5, ui.visuals().selection.stroke.color),
+                );
+            }
+        }
+
         // Censor boxes: output coords → screen via (origin + coord*scale).
         // The blur/pixelate itself is already baked into the image by core;
         // here we only draw the editable outline + handle and take the input.
@@ -1079,10 +1147,12 @@ impl EditorState {
     }
 
     fn pick_photo(&mut self) {
-        if let Some(path) = rfd::FileDialog::new()
-            .add_filter("Gambar", &["png", "jpg", "jpeg", "webp", "bmp"])
-            .pick_file()
-        {
+        let mut dialog =
+            rfd::FileDialog::new().add_filter("Gambar", &["png", "jpg", "jpeg", "webp", "bmp"]);
+        if let Some(folder) = &self.last_open_folder {
+            dialog = dialog.set_directory(folder);
+        }
+        if let Some(path) = dialog.pick_file() {
             self.load_photo_path(&path);
         }
     }
@@ -1103,19 +1173,50 @@ impl EditorState {
     pub fn set_chatlog_folder(&mut self, p: Option<String>) {
         self.chatlog.set_folder_path(p);
     }
-    pub fn prefs(&self) -> (f32, f32, FilterValues) {
-        (self.text_size, self.line_gap, self.filters)
+    pub fn prefs(&self) -> EditorPrefs {
+        EditorPrefs {
+            text_size: self.text_size,
+            line_gap: self.line_gap,
+            filters: self.filters,
+            stroke_auto: self.stroke_auto,
+            stroke_width: self.stroke_width,
+            cinematic: self.cinematic,
+            cinematic_bar: self.cinematic_bar,
+            cinematic_bar_pos: self.cinematic_bar_pos,
+            cinematic_color: self.cinematic_color,
+        }
     }
-    pub fn apply_prefs(&mut self, size: f32, gap: f32, filters: FilterValues) {
+    pub fn apply_prefs(
+        &mut self, size: f32, gap: f32, filters: FilterValues, stroke_auto: bool,
+        stroke_width: f32, cinematic: bool, cinematic_bar: f32, cinematic_bar_pos: BarPos,
+        cinematic_color: [u8; 3],
+    ) {
         self.text_size = size.clamp(8.0, 60.0);
         self.line_gap = gap.clamp(80.0, 200.0);
         self.filters = filters;
+        self.stroke_auto = stroke_auto;
+        self.stroke_width = stroke_width.clamp(0.0, 10.0);
+        self.cinematic = cinematic;
+        self.cinematic_bar = cinematic_bar.clamp(0.0, 40.0);
+        self.cinematic_bar_pos = cinematic_bar_pos;
+        self.cinematic_color = cinematic_color;
         self.dirty = true;
+    }
+    pub fn last_open_folder(&self) -> Option<String> {
+        self.last_open_folder.as_ref().map(|path| path.to_string_lossy().into_owned())
+    }
+    pub fn last_save_folder(&self) -> Option<String> {
+        self.last_save_folder.as_ref().map(|path| path.to_string_lossy().into_owned())
+    }
+    pub fn set_file_folders(&mut self, open: Option<String>, save: Option<String>) {
+        self.last_open_folder = open.filter(|path| !path.is_empty()).map(PathBuf::from);
+        self.last_save_folder = save.filter(|path| !path.is_empty()).map(PathBuf::from);
     }
 
     /// Load a photo from a path (used by the file picker and the Gallery's
     /// "open in editor"). Resets the crop to the whole photo.
     pub fn load_photo_path(&mut self, path: &std::path::Path) {
+        self.last_open_folder = path.parent().map(Path::to_path_buf);
         let bytes = match std::fs::read(path) {
             Ok(b) => b,
             Err(e) => {
@@ -1456,6 +1557,33 @@ impl EditorState {
         }
     }
 
+    /// Bounds for every editable chat block in preview/output coordinates.
+    /// Keeping empty blocks in this list preserves indices into `self.blocks`.
+    fn text_block_bounds(&self) -> Vec<Option<layout::Bounds>> {
+        let Ok(measure) = GlyphMeasure::new(&self.font_family, self.text_size) else {
+            return vec![None; self.blocks.len()];
+        };
+        let (output_w, output_h) = self.output_dims();
+        let params = LayoutParams {
+            text_size: self.text_size,
+            line_gap: self.line_gap,
+            bg_offset: 0.0,
+            output_w,
+            output_h,
+        };
+        let blocks: Vec<LayoutBlock> = self.blocks.iter().map(|block| LayoutBlock {
+            lines: chatlog::parse(&block.text, &self.preset),
+            anchor: block.anchor,
+            bg_mode: block.bg_mode,
+            x: block.x,
+            y: block.y,
+        }).collect();
+        layout::layout_blocks(&blocks, &params, &measure)
+            .into_iter()
+            .map(|laid| laid.bounds)
+            .collect()
+    }
+
     /// Assemble the render job from the current state (None if no photo).
     /// Text is laid out in core; font-load failure just drops the text layer
     /// (the photo still renders) so the preview never goes blank on a typo.
@@ -1632,14 +1760,17 @@ impl EditorState {
         };
         match compose::render(&job).and_then(|img| compose::encode_png(&img)) {
             Ok(png) => {
-                if let Some(path) = rfd::FileDialog::new()
+                let mut dialog = rfd::FileDialog::new()
                     .add_filter("PNG", &["png"])
-                    .set_file_name("screenie.png")
-                    .save_file()
-                {
-                    if let Err(e) = std::fs::write(path, png) {
+                    .set_file_name("screenie.png");
+                if let Some(folder) = &self.last_save_folder {
+                    dialog = dialog.set_directory(folder);
+                }
+                if let Some(path) = dialog.save_file() {
+                    if let Err(e) = std::fs::write(&path, png) {
                         self.error = Some(format!("Gagal simpan: {e}"));
                     } else {
+                        self.last_save_folder = path.parent().map(Path::to_path_buf);
                         self.error = None;
                     }
                 }
