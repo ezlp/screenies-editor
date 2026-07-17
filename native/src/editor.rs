@@ -393,300 +393,316 @@ impl EditorState {
                 }
             });
 
-            // Photo tabs (multiple photos).
-            ui.horizontal_wrapped(|ui| {
-                for i in 0..self.docs.len() {
-                    if ui.selectable_label(self.active == i, format!("Foto {}", i + 1)).clicked() {
-                        self.switch_doc(i);
-                    }
-                }
-                if ui.button("➕").on_hover_text(self.t("Tambah foto")).clicked() {
-                    self.add_doc();
-                }
-                if self.docs.len() > 1
-                    && ui.button("✕").on_hover_text(self.t("Tutup foto ini")).clicked()
-                {
-                    self.close_doc(self.active);
-                }
-            });
-
-            if ui.button(self.t("📂  Muat Foto")).clicked() {
-                self.pick_photo();
-            }
-            if let Some(p) = &self.photo {
-                ui.small(format!("{}×{} px", p.w, p.h));
-            } else {
-                ui.small(self.t("Belum ada foto."));
-            }
-
-            ui.separator();
-            ui.label(self.t("Crop / Resolusi"));
-            ui.horizontal_wrapped(|ui| {
-                if ui.button(self.t("Bebas")).clicked() {
-                    self.set_ratio(None);
-                }
-                if ui.button("1:1").clicked() {
-                    self.set_ratio(Some(1.0));
-                }
-                if ui.button("4:3").clicked() {
-                    self.set_ratio(Some(4.0 / 3.0));
-                }
-                if ui.button("16:9").clicked() {
-                    self.set_ratio(Some(16.0 / 9.0));
-                }
-                if ui.button("21:9").clicked() {
-                    self.set_ratio(Some(21.0 / 9.0));
-                }
-                if ui.button("800×600").clicked() {
-                    self.set_resolution(800, 600);
-                }
-            });
-            ui.horizontal(|ui| {
-                let (potong, muat) = (self.t("Potong"), self.t("Muat penuh"));
-                let prev = self.crop_fit;
-                ui.selectable_value(&mut self.crop_fit, false, potong);
-                ui.selectable_value(&mut self.crop_fit, true, muat);
-                if self.crop_fit != prev {
-                    if self.crop_fit {
-                        self.crop_editing = false; // fit needs no crop step
-                    }
-                    self.dirty = true;
-                }
-            });
-            if self.crop_fit {
-                ui.small(self.t("Muat: simpan seluruh gambar + bar (ukuran tetap)."));
-            }
-            let crop_btn = self.t(if self.crop_editing { "✓ Selesai crop" } else { "✏ Edit crop" });
-            if ui.add_enabled(self.photo.is_some(), egui::Button::new(crop_btn)).clicked() {
-                self.toggle_crop_edit();
-            }
-            if self.crop.is_some() || self.output_override.is_some() || self.cinematic {
-                let (ow, oh) = self.output_dims();
-                ui.small(format!("Output: {}×{}", ow.round() as u32, oh.round() as u32));
-            }
-
-            ui.separator();
-            ui.label(self.t("Mode"));
-            ui.horizontal(|ui| {
-                if ui.selectable_label(!self.cinematic, self.t("Normal")).clicked() {
-                    self.cinematic = false;
-                    self.dirty = true;
-                }
-                if ui.selectable_label(self.cinematic, self.t("🎬 Sinema")).clicked() {
-                    self.cinematic = true;
-                    self.dirty = true;
-                }
-            });
-            if self.cinematic {
-                let bar_lbl = self.t("Tinggi bar %");
-                if ui
-                    .add(egui::Slider::new(&mut self.cinematic_bar, 0.0..=40.0).text(bar_lbl))
-                    .changed()
-                {
-                    self.dirty = true;
-                }
-                ui.horizontal(|ui| {
-                    ui.label(self.t("Posisi bar"));
-                    let (both, atas, bawah) =
-                        (self.t("Keduanya"), self.t("Atas"), self.t("Bawah"));
-                    let prev = self.cinematic_bar_pos;
-                    ui.selectable_value(&mut self.cinematic_bar_pos, BarPos::Both, both);
-                    ui.selectable_value(&mut self.cinematic_bar_pos, BarPos::Top, atas);
-                    ui.selectable_value(&mut self.cinematic_bar_pos, BarPos::Bottom, bawah);
-                    if self.cinematic_bar_pos != prev {
-                        self.dirty = true;
-                    }
-                });
-                ui.horizontal(|ui| {
-                    ui.label(self.t("Warna bar"));
-                    if ui.color_edit_button_srgb(&mut self.cinematic_color).changed() {
-                        self.dirty = true;
-                    }
-                });
-                ui.small(self.t("Bar sinema digambar di dalam foto (pilih posisi)."));
-            }
-
-            ui.separator();
-            ui.horizontal_wrapped(|ui| {
-                ui.label("Chatlog:");
-                for i in 0..self.blocks.len() {
-                    if ui
-                        .selectable_label(self.selected_block == i, format!("#{}", i + 1))
-                        .clicked()
-                    {
-                        self.selected_block = i;
-                    }
-                }
-                if ui.button("➕").on_hover_text(self.t("Tambah chatlog")).clicked() {
-                    self.blocks.push(ChatBlock::new(self.blocks.len()));
-                    self.selected_block = self.blocks.len() - 1;
-                    self.dirty = true;
-                }
-                if ui.button("📂").on_hover_text(self.t("Chatlog dari folder")).clicked() {
-                    self.chatlog.open();
-                }
-            });
-
-            let bi = self.selected_block.min(self.blocks.len() - 1);
-            self.selected_block = bi;
-            let out = egui::TextEdit::multiline(&mut self.blocks[bi].text)
-                .desired_rows(6)
-                .desired_width(f32::INFINITY)
-                .hint_text("[12:34:56] Budi_Santoso says: contoh chat")
-                .show(ui);
-            if out.response.changed() {
-                self.dirty = true;
-            }
-            // Remember the current selection so a swatch can wrap it, even
-            // after the click moves focus off the textarea.
-            if let Some(range) = out.cursor_range {
-                let a = range.primary.ccursor.index;
-                let b = range.secondary.ccursor.index;
-                let (s, e) = if a <= b { (a, b) } else { (b, a) };
-                if s != e {
-                    self.text_selection = Some((bi, s, e));
-                }
-            }
-
-            self.palette_ui(ui);
-            self.combo_anchor(ui, bi);
-            self.combo_bg(ui, bi);
-            let del_lbl = self.t("🗑 Hapus chatlog ini");
-            if self.blocks.len() > 1 && ui.button(del_lbl).clicked() {
-                self.blocks.remove(bi);
-                self.selected_block = 0;
-                self.dirty = true;
-            }
-
-            ui.separator();
-            ui.label(self.t("Teks"));
-            let font_lbl = self.t("Font");
-            ui.horizontal(|ui| {
-                ui.label(font_lbl);
-                if self.font_list.is_empty() {
-                    self.font_list = screenies_core::fonts::families();
-                }
-                let mut chosen: Option<String> = None;
-                egui::ComboBox::from_id_salt("font")
-                    .selected_text(self.font_family.clone())
-                    .width(190.0)
-                    .show_ui(ui, |ui| {
-                        for i in 0..self.font_list.len() {
-                            let fam = self.font_list[i].clone();
-                            if ui.selectable_label(self.font_family == fam, &fam).clicked() {
-                                chosen = Some(fam);
-                            }
-                        }
-                    });
-                if let Some(f) = chosen {
-                    self.font_family = f;
-                    self.dirty = true;
-                }
-            });
-            let size_lbl = self.t("Ukuran");
-            if ui
-                .add(egui::Slider::new(&mut self.text_size, 8.0..=60.0).text(size_lbl))
-                .changed()
-            {
-                self.dirty = true;
-            }
-            let gap_lbl = self.t("Jarak baris %");
-            if ui
-                .add(egui::Slider::new(&mut self.line_gap, 80.0..=200.0).text(gap_lbl))
-                .changed()
-            {
-                self.dirty = true;
-            }
-            let auto_lbl = self.t("Outline otomatis");
-            if ui.checkbox(&mut self.stroke_auto, auto_lbl).changed() {
-                self.dirty = true;
-            }
-            let outline_lbl = self.t("Outline px");
-            if !self.stroke_auto
-                && ui
-                    .add(egui::Slider::new(&mut self.stroke_width, 0.0..=10.0).text(outline_lbl))
-                    .changed()
-            {
-                self.dirty = true;
-            }
-
-            ui.separator();
-            ui.collapsing(self.t("Filter"), |ui| {
-                self.filter_slider(ui, "Brightness", 0.0..=300.0, |f| &mut f.brightness);
-                self.filter_slider(ui, "Contrast", 0.0..=200.0, |f| &mut f.contrast);
-                self.filter_slider(ui, "Grayscale", 0.0..=100.0, |f| &mut f.grayscale);
-                self.filter_slider(ui, "Sepia", 0.0..=100.0, |f| &mut f.sepia);
-                self.filter_slider(ui, "Saturate", 0.0..=300.0, |f| &mut f.saturate);
-            });
-
-            ui.collapsing(self.t("Sensor area (blur/pixelate lokal)"), |ui| {
-                ui.horizontal(|ui| {
-                    if ui.button("+ Blur").clicked() {
-                        self.add_censor(CensorKind::Blur);
-                    }
-                    if ui.button("+ Pixelate").clicked() {
-                        self.add_censor(CensorKind::Pixelate);
-                    }
-                });
-                ui.small(self.t("Klik kotak di preview untuk pilih · seret badan untuk geser · seret pojok untuk resize."));
-
-                if let Some(i) = self.selected_censor {
-                    if i < self.censors.len() {
-                        let kind = self.censors[i].kind;
-                        let label = self.t(match kind {
-                            CensorKind::Blur => "Blur radius (px)",
-                            CensorKind::Pixelate => "Blok (px)",
-                        });
-                        let mut strength = self.censors[i].strength;
-                        if ui.add(egui::Slider::new(&mut strength, 1.0..=64.0).text(label)).changed() {
-                            self.censors[i].strength = strength;
-                            self.dirty = true;
-                        }
-                        let del = self.t("🗑 Hapus area");
-                        if ui.button(del).clicked() {
-                            self.censors.remove(i);
-                            self.selected_censor = None;
-                            self.dirty = true;
-                        }
-                    }
-                }
-                ui.small(format!("{} area sensor", self.censors.len()));
-            });
-
-            ui.collapsing(self.t("Stiker"), |ui| {
-                if ui.button(self.t("+ Tambah stiker")).clicked() {
-                    self.add_sticker();
-                }
-                ui.small(self.t("Klik stiker di preview untuk pilih · seret untuk geser · pojok untuk resize."));
-                if let Some(i) = self.selected_sticker {
-                    if i < self.stickers.len() {
-                        let (out_w, _) = self.output_dims();
-                        let wl = self.t("Lebar (px)");
-                        let mut w = self.stickers[i].w;
-                        if ui.add(egui::Slider::new(&mut w, 16.0..=out_w).text(wl)).changed() {
-                            self.stickers[i].w = w;
-                            self.stickers[i].h = w / self.stickers[i].aspect;
-                            self.dirty = true;
-                        }
-                        let del = self.t("🗑 Hapus stiker");
-                        if ui.button(del).clicked() {
-                            self.stickers.remove(i);
-                            self.selected_sticker = None;
-                            self.dirty = true;
-                        }
-                    }
-                }
-                ui.small(format!("{} stiker", self.stickers.len()));
-            });
-
-            ui.separator();
-            if ui.button(self.t("💾  Export PNG")).clicked() {
-                self.export();
-            }
-            if let Some(err) = &self.error {
-                ui.colored_label(ui.visuals().error_fg_color, err);
+            // Dispatch to the active tool panel.
+            match self.active_tool {
+                Tool::Photo => self.tool_photo(ui),
+                Tool::Crop => self.tool_crop(ui),
+                Tool::Chatlog => self.tool_chatlog(ui),
+                Tool::Text => self.tool_text(ui),
+                Tool::Fx => self.tool_fx(ui),
             }
         });
+    }
+
+    // --- Tool panels (refactor of the original controls body) ---
+    fn tool_photo(&mut self, ui: &mut egui::Ui) {
+        // Photo tabs (multiple photos).
+        ui.horizontal_wrapped(|ui| {
+            for i in 0..self.docs.len() {
+                if ui.selectable_label(self.active == i, format!("Foto {}", i + 1)).clicked() {
+                    self.switch_doc(i);
+                }
+            }
+            if ui.button("➕").on_hover_text(self.t("Tambah foto")).clicked() {
+                self.add_doc();
+            }
+            if self.docs.len() > 1
+                && ui.button("✕").on_hover_text(self.t("Tutup foto ini")).clicked()
+            {
+                self.close_doc(self.active);
+            }
+        });
+
+        if ui.button(self.t("📂  Muat Foto")).clicked() {
+            self.pick_photo();
+        }
+        if let Some(p) = &self.photo {
+            ui.small(format!("{}×{} px", p.w, p.h));
+        } else {
+            ui.small(self.t("Belum ada foto."));
+        }
+
+        ui.separator();
+        // Export lives on the Photo panel.
+        if ui.button(self.t("💾  Export PNG")).clicked() {
+            self.export();
+        }
+        if let Some(err) = &self.error {
+            ui.colored_label(ui.visuals().error_fg_color, err);
+        }
+    }
+
+    fn tool_crop(&mut self, ui: &mut egui::Ui) {
+        ui.label(self.t("Crop / Resolusi"));
+        ui.horizontal_wrapped(|ui| {
+            if ui.button(self.t("Bebas")).clicked() {
+                self.set_ratio(None);
+            }
+            if ui.button("1:1").clicked() {
+                self.set_ratio(Some(1.0));
+            }
+            if ui.button("4:3").clicked() {
+                self.set_ratio(Some(4.0 / 3.0));
+            }
+            if ui.button("16:9").clicked() {
+                self.set_ratio(Some(16.0 / 9.0));
+            }
+            if ui.button("21:9").clicked() {
+                self.set_ratio(Some(21.0 / 9.0));
+            }
+            if ui.button("800×600").clicked() {
+                self.set_resolution(800, 600);
+            }
+        });
+        ui.horizontal(|ui| {
+            let (potong, muat) = (self.t("Potong"), self.t("Muat penuh"));
+            let prev = self.crop_fit;
+            ui.selectable_value(&mut self.crop_fit, false, potong);
+            ui.selectable_value(&mut self.crop_fit, true, muat);
+            if self.crop_fit != prev {
+                if self.crop_fit {
+                    self.crop_editing = false; // fit needs no crop step
+                }
+                self.dirty = true;
+            }
+        });
+        if self.crop_fit {
+            ui.small(self.t("Muat: simpan seluruh gambar + bar (ukuran tetap)."));
+        }
+        let crop_btn = self.t(if self.crop_editing { "✓ Selesai crop" } else { "✏ Edit crop" });
+        if ui.add_enabled(self.photo.is_some(), egui::Button::new(crop_btn)).clicked() {
+            self.toggle_crop_edit();
+        }
+        if self.crop.is_some() || self.output_override.is_some() || self.cinematic {
+            let (ow, oh) = self.output_dims();
+            ui.small(format!("Output: {}×{}", ow.round() as u32, oh.round() as u32));
+        }
+    }
+
+    fn tool_chatlog(&mut self, ui: &mut egui::Ui) {
+        ui.horizontal_wrapped(|ui| {
+            ui.label("Chatlog:");
+            for i in 0..self.blocks.len() {
+                if ui
+                    .selectable_label(self.selected_block == i, format!("#{}", i + 1))
+                    .clicked()
+                {
+                    self.selected_block = i;
+                }
+            }
+            if ui.button("➕").on_hover_text(self.t("Tambah chatlog")).clicked() {
+                self.blocks.push(ChatBlock::new(self.blocks.len()));
+                self.selected_block = self.blocks.len() - 1;
+                self.dirty = true;
+            }
+            if ui.button("📂").on_hover_text(self.t("Chatlog dari folder")).clicked() {
+                self.chatlog.open();
+            }
+        });
+
+        let bi = self.selected_block.min(self.blocks.len() - 1);
+        self.selected_block = bi;
+        let out = egui::TextEdit::multiline(&mut self.blocks[bi].text)
+            .desired_rows(6)
+            .desired_width(f32::INFINITY)
+            .hint_text("[12:34:56] Budi_Santoso says: contoh chat")
+            .show(ui);
+        if out.response.changed() {
+            self.dirty = true;
+        }
+        // Remember the current selection so a swatch can wrap it, even
+        // after the click moves focus off the textarea.
+        if let Some(range) = out.cursor_range {
+            let a = range.primary.ccursor.index;
+            let b = range.secondary.ccursor.index;
+            let (s, e) = if a <= b { (a, b) } else { (b, a) };
+            if s != e {
+                self.text_selection = Some((bi, s, e));
+            }
+        }
+
+        self.palette_ui(ui);
+        self.combo_anchor(ui, bi);
+        self.combo_bg(ui, bi);
+        let del_lbl = self.t("🗑 Hapus chatlog ini");
+        if self.blocks.len() > 1 && ui.button(del_lbl).clicked() {
+            self.blocks.remove(bi);
+            self.selected_block = 0;
+            self.dirty = true;
+        }
+    }
+
+    fn tool_text(&mut self, ui: &mut egui::Ui) {
+        ui.label(self.t("Teks"));
+        let font_lbl = self.t("Font");
+        ui.horizontal(|ui| {
+            ui.label(font_lbl);
+            if self.font_list.is_empty() {
+                self.font_list = screenies_core::fonts::families();
+            }
+            let mut chosen: Option<String> = None;
+            egui::ComboBox::from_id_salt("font")
+                .selected_text(self.font_family.clone())
+                .width(190.0)
+                .show_ui(ui, |ui| {
+                    for i in 0..self.font_list.len() {
+                        let fam = self.font_list[i].clone();
+                        if ui.selectable_label(self.font_family == fam, &fam).clicked() {
+                            chosen = Some(fam);
+                        }
+                    }
+                });
+            if let Some(f) = chosen {
+                self.font_family = f;
+                self.dirty = true;
+            }
+        });
+        let size_lbl = self.t("Ukuran");
+        if ui
+            .add(egui::Slider::new(&mut self.text_size, 8.0..=60.0).text(size_lbl))
+            .changed()
+        {
+            self.dirty = true;
+        }
+        let gap_lbl = self.t("Jarak baris %");
+        if ui
+            .add(egui::Slider::new(&mut self.line_gap, 80.0..=200.0).text(gap_lbl))
+            .changed()
+        {
+            self.dirty = true;
+        }
+        let auto_lbl = self.t("Outline otomatis");
+        if ui.checkbox(&mut self.stroke_auto, auto_lbl).changed() {
+            self.dirty = true;
+        }
+        let outline_lbl = self.t("Outline px");
+        if !self.stroke_auto
+            && ui
+                .add(egui::Slider::new(&mut self.stroke_width, 0.0..=10.0).text(outline_lbl))
+                .changed()
+        {
+            self.dirty = true;
+        }
+    }
+
+    fn tool_fx(&mut self, ui: &mut egui::Ui) {
+        ui.collapsing(self.t("Filter"), |ui| {
+            self.filter_slider(ui, "Brightness", 0.0..=300.0, |f| &mut f.brightness);
+            self.filter_slider(ui, "Contrast", 0.0..=200.0, |f| &mut f.contrast);
+            self.filter_slider(ui, "Grayscale", 0.0..=100.0, |f| &mut f.grayscale);
+            self.filter_slider(ui, "Sepia", 0.0..=100.0, |f| &mut f.sepia);
+            self.filter_slider(ui, "Saturate", 0.0..=300.0, |f| &mut f.saturate);
+        });
+
+        ui.collapsing(self.t("Sensor area (blur/pixelate lokal)"), |ui| {
+            ui.horizontal(|ui| {
+                if ui.button("+ Blur").clicked() {
+                    self.add_censor(CensorKind::Blur);
+                }
+                if ui.button("+ Pixelate").clicked() {
+                    self.add_censor(CensorKind::Pixelate);
+                }
+            });
+            ui.small(self.t("Klik kotak di preview untuk pilih · seret badan untuk geser · seret pojok untuk resize."));
+
+            if let Some(i) = self.selected_censor {
+                if i < self.censors.len() {
+                    let kind = self.censors[i].kind;
+                    let label = self.t(match kind {
+                        CensorKind::Blur => "Blur radius (px)",
+                        CensorKind::Pixelate => "Blok (px)",
+                    });
+                    let mut strength = self.censors[i].strength;
+                    if ui.add(egui::Slider::new(&mut strength, 1.0..=64.0).text(label)).changed() {
+                        self.censors[i].strength = strength;
+                        self.dirty = true;
+                    }
+                    let del = self.t("🗑 Hapus area");
+                    if ui.button(del).clicked() {
+                        self.censors.remove(i);
+                        self.selected_censor = None;
+                        self.dirty = true;
+                    }
+                }
+            }
+            ui.small(format!("{} area sensor", self.censors.len()));
+        });
+
+        ui.collapsing(self.t("Stiker"), |ui| {
+            if ui.button(self.t("+ Tambah stiker")).clicked() {
+                self.add_sticker();
+            }
+            ui.small(self.t("Klik stiker di preview untuk pilih · seret untuk geser · pojok untuk resize."));
+            if let Some(i) = self.selected_sticker {
+                if i < self.stickers.len() {
+                    let (out_w, _) = self.output_dims();
+                    let wl = self.t("Lebar (px)");
+                    let mut w = self.stickers[i].w;
+                    if ui.add(egui::Slider::new(&mut w, 16.0..=out_w).text(wl)).changed() {
+                        self.stickers[i].w = w;
+                        self.stickers[i].h = w / self.stickers[i].aspect;
+                        self.dirty = true;
+                    }
+                    let del = self.t("🗑 Hapus stiker");
+                    if ui.button(del).clicked() {
+                        self.stickers.remove(i);
+                        self.selected_sticker = None;
+                        self.dirty = true;
+                    }
+                }
+            }
+            ui.small(format!("{} stiker", self.stickers.len()));
+        });
+
+        ui.separator();
+        ui.label(self.t("Mode"));
+        ui.horizontal(|ui| {
+            if ui.selectable_label(!self.cinematic, self.t("Normal")).clicked() {
+                self.cinematic = false;
+                self.dirty = true;
+            }
+            if ui.selectable_label(self.cinematic, self.t("🎬 Sinema")).clicked() {
+                self.cinematic = true;
+                self.dirty = true;
+            }
+        });
+        if self.cinematic {
+            let bar_lbl = self.t("Tinggi bar %");
+            if ui
+                .add(egui::Slider::new(&mut self.cinematic_bar, 0.0..=40.0).text(bar_lbl))
+                .changed()
+            {
+                self.dirty = true;
+            }
+            ui.horizontal(|ui| {
+                ui.label(self.t("Posisi bar"));
+                let (both, atas, bawah) = (self.t("Keduanya"), self.t("Atas"), self.t("Bawah"));
+                let prev = self.cinematic_bar_pos;
+                ui.selectable_value(&mut self.cinematic_bar_pos, BarPos::Both, both);
+                ui.selectable_value(&mut self.cinematic_bar_pos, BarPos::Top, atas);
+                ui.selectable_value(&mut self.cinematic_bar_pos, BarPos::Bottom, bawah);
+                if self.cinematic_bar_pos != prev {
+                    self.dirty = true;
+                }
+            });
+            ui.horizontal(|ui| {
+                ui.label(self.t("Warna bar"));
+                if ui.color_edit_button_srgb(&mut self.cinematic_color).changed() {
+                    self.dirty = true;
+                }
+            });
+            ui.small(self.t("Bar sinema digambar di dalam foto (pilih posisi)."));
+        }
     }
 
     fn combo_anchor(&mut self, ui: &mut egui::Ui, bi: usize) {
