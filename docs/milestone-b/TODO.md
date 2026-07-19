@@ -11,8 +11,8 @@ Milestone B — TODO (tracking)
 - [x] Move Undo/Redo to floating preview toolbar
 - [x] Add keyboard shortcuts (1..5) for tool switching
 - [x] Add unit smoke tests for each tool panel
-- [ ] Complete visual QA, capture screenshots, and publish the PR description (see QA.md and PR-DESCRIPTION.md)
-- [ ] Merge to main and tag v3.0.0-beta when ready
+- [x] Complete visual QA, capture screenshots, and publish the PR description (see QA.md and PR-DESCRIPTION.md)
+- [x] Merge to main and tag v3.0.0-beta when ready
 
 Notes:
 - Keep commits small and focused per task.

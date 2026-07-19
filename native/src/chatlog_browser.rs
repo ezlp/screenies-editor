@@ -4,6 +4,7 @@
 // rendered as real colors, and copy the raw text to paste into an editor block.
 
 use eframe::egui;
+use crate::icons;
 use std::fs;
 use std::path::PathBuf;
 
@@ -100,7 +101,7 @@ impl ChatlogBrowser {
             return;
         }
         let mut open = true;
-        egui::Window::new("📂 Chatlog folder")
+        egui::Window::new(format!("{} Chatlog folder", icons::ICON_FOLDER))
             .open(&mut open)
             .default_width(620.0)
             .default_height(440.0)
@@ -234,7 +235,6 @@ fn colored_log(text: &str) -> egui::text::LayoutJob {
 mod tests {
     use super::*;
     use std::fs;
-    use std::path::PathBuf;
 
     #[test]
     fn load_handles_non_utf8_bytes() {

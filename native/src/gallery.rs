@@ -5,6 +5,7 @@
 
 use eframe::egui;
 use screenies_core::gallery::{self, Item};
+use crate::icons;
 use std::collections::HashMap;
 use std::path::PathBuf;
 
@@ -17,9 +18,9 @@ const THUMB_H: f32 = 112.0;
 #[derive(Default)]
 pub struct GalleryState {
     folder: Option<PathBuf>,
-    items: Vec<Item>,
+    pub items: Vec<Item>,
     /// Cached grid thumbnails (None = decode failed, don't retry).
-    thumbs: HashMap<PathBuf, Option<egui::TextureHandle>>,
+    pub thumbs: HashMap<PathBuf, Option<egui::TextureHandle>>,
     /// Item whose popup preview is open.
     selected: Option<usize>,
     /// Cached popup preview (path it was decoded from + its texture).
@@ -66,7 +67,7 @@ impl GalleryState {
     pub fn ui(&mut self, ui: &mut egui::Ui) {
         ui.add_space(6.0);
         ui.horizontal(|ui| {
-            if ui.button(self.t("📂  Buka folder")).clicked() {
+            if ui.button(format!("{} {}", icons::ICON_FOLDER, self.t("Buka folder"))).clicked() {
                 self.open_folder();
             }
             if let Some(f) = &self.folder {
@@ -157,7 +158,7 @@ impl GalleryState {
     }
 
     /// Decode + cache a small grid thumbnail for `path`.
-    fn load_thumb(&mut self, ctx: &egui::Context, path: &PathBuf) {
+    pub fn load_thumb(&mut self, ctx: &egui::Context, path: &PathBuf) {
         let tex = match image::open(path) {
             Ok(img) => {
                 let rgba = img.thumbnail(256, 256).to_rgba8();
@@ -187,9 +188,9 @@ impl GalleryState {
         }
         let name = self.items[i].name.clone();
         let path = self.items[i].path.clone();
-        let open_lbl = self.t("✏  Buka di editor");
+        let open_lbl = format!("{} {}", icons::ICON_PENCIL, self.t("Buka di editor"));
         let mut open = true;
-        egui::Window::new(format!("🖼 {name}"))
+        egui::Window::new(format!("{} {name}", icons::ICON_IMAGE))
             .open(&mut open)
             .collapsible(false)
             .default_width(760.0)

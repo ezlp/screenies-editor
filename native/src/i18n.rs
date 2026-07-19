@@ -9,14 +9,7 @@ pub enum Lang {
     En,
 }
 
-impl Lang {
-    pub fn toggled(self) -> Lang {
-        match self {
-            Lang::Id => Lang::En,
-            Lang::En => Lang::Id,
-        }
-    }
-}
+
 
 /// Translate `id` (an Indonesian source string) for `lang`.
 pub fn t(lang: Lang, id: &'static str) -> &'static str {
@@ -26,6 +19,8 @@ pub fn t(lang: Lang, id: &'static str) -> &'static str {
     match id {
         // menu / nav
         "Screenshot Roleplay toolkit — komunitas SA-MP" => "Screenshot Roleplay toolkit — SA-MP community",
+        "Menu Utama" => "Main Menu",
+        "Hasil Edit Terbaru" => "Recent Edits",
         "Crop · chatlog · filter · export" => "Crop · chatlog · filters · export",
         "Buka folder chatlog · cari di aplikasi" => "Open a chatlog folder · search in-app",
         "Jelajahi foto SSRP hasil edit" => "Browse your edited SSRP photos",
@@ -138,6 +133,16 @@ pub fn t(lang: Lang, id: &'static str) -> &'static str {
         "Bahasa" => "Language",
         "Tentang" => "About",
         "GitHub" => "GitHub",
+        // Clean translations (emoji-free keys)
+        "Muat Foto" => "Load Photo",
+        "Edit crop" => "Edit crop",
+        "Selesai crop" => "Finish crop",
+        "Sinema" => "Cinematic",
+        "Hapus chatlog ini" => "Delete this chatlog",
+        "Hapus area" => "Delete area",
+        "Hapus stiker" => "Delete sticker",
+        "Buka folder" => "Open folder",
+        "Buka di editor" => "Open in editor",
         _ => id,
     }
 }

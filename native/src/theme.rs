@@ -7,6 +7,7 @@
 use eframe::egui::{self, Color32, Rounding, Stroke, Visuals};
 
 /// A complete, themeable color palette + density.
+#[allow(dead_code)]
 #[derive(Clone)]
 pub struct Theme {
     pub id: &'static str,
@@ -273,7 +274,7 @@ mod tests {
     }
 
     fn relative_luminance(c: Color32) -> f32 {
-        let [r, g, b, _] = c.to_normalized();
+        let [r, g, b, _] = c.to_normalized_gamma_f32();
         let r = if r <= 0.03928 {
             r / 12.92
         } else {

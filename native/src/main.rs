@@ -13,6 +13,7 @@ mod chatlog_browser;
 mod editor;
 mod gallery;
 mod i18n;
+mod icons;
 mod theme;
 
 use eframe::egui;
@@ -238,6 +239,29 @@ fn default_filters() -> FilterValues {
 
 impl App {
     fn new(cc: &eframe::CreationContext<'_>) -> Self {
+        // Load the custom icon font.
+        let mut fonts = egui::FontDefinitions::default();
+        fonts.font_data.insert(
+            "icons".into(),
+            egui::FontData::from_static(include_bytes!("../assets/icons.ttf")),
+        );
+        fonts
+            .families
+            .entry(egui::FontFamily::Name("icons".into()))
+            .or_default()
+            .insert(0, "icons".into());
+        fonts
+            .families
+            .entry(egui::FontFamily::Proportional)
+            .or_default()
+            .push("icons".into());
+        fonts
+            .families
+            .entry(egui::FontFamily::Monospace)
+            .or_default()
+            .push("icons".into());
+        cc.egui_ctx.set_fonts(fonts);
+
         let mut app = App::default();
         if let Some(storage) = cc.storage {
             if let Some(s) = eframe::get_value::<Settings>(storage, "settings") {
@@ -282,22 +306,75 @@ impl eframe::App for App {
         self.editor.lang = self.lang;
         self.gallery.lang = self.lang;
 
-        if self.screen != Screen::Menu {
-            egui::TopBottomPanel::top("nav").show(ctx, |ui| {
-                ui.horizontal(|ui| {
-                    if ui.button("←  Menu").clicked() {
+        // Persistent Nav Rail (left side of window)
+        egui::SidePanel::left("nav")
+            .resizable(false)
+            .exact_width(56.0)
+            .show(ctx, |ui| {
+                ui.vertical_centered(|ui| {
+                    ui.add_space(12.0);
+                    
+                    // Home/Menu
+                    let is_home = self.screen == Screen::Menu;
+                    let resp = ui.add_sized(
+                        [40.0, 40.0],
+                        egui::SelectableLabel::new(is_home, egui::RichText::new(icons::ICON_HOME).size(22.0)),
+                    );
+                    if resp.on_hover_text(t(self.lang, "Menu Utama")).clicked() {
                         self.screen = Screen::Menu;
                     }
-                    ui.separator();
-                    ui.heading(title_of(self.screen));
-                    ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                        if ui.button(lang_label(self.lang)).on_hover_text("ID / EN").clicked() {
-                            self.lang = self.lang.toggled();
+                    ui.add_space(8.0);
+
+                    // Editor
+                    let is_editor = self.screen == Screen::Editor;
+                    let resp = ui.add_sized(
+                        [40.0, 40.0],
+                        egui::SelectableLabel::new(is_editor, egui::RichText::new(icons::ICON_IMAGE).size(22.0)),
+                    );
+                    if resp.on_hover_text(t(self.lang, "SSRP Editor")).clicked() {
+                        self.screen = Screen::Editor;
+                    }
+                    ui.add_space(8.0);
+
+                    // Gallery
+                    let is_gallery = self.screen == Screen::Gallery;
+                    let resp = ui.add_sized(
+                        [40.0, 40.0],
+                        egui::SelectableLabel::new(is_gallery, egui::RichText::new(icons::ICON_FOLDER).size(22.0)),
+                    );
+                    if resp.on_hover_text(t(self.lang, "Gallery")).clicked() {
+                        self.screen = Screen::Gallery;
+                    }
+                    ui.add_space(8.0);
+
+                    // Settings
+                    let is_settings = self.screen == Screen::Settings;
+                    let resp = ui.add_sized(
+                        [40.0, 40.0],
+                        egui::SelectableLabel::new(is_settings, egui::RichText::new(icons::ICON_SETTINGS).size(22.0)),
+                    );
+                    if resp.on_hover_text(t(self.lang, "Pengaturan")).clicked() {
+                        self.screen = Screen::Settings;
+                    }
+
+                    // Bottom items: quick theme cycle
+                    ui.with_layout(egui::Layout::bottom_up(egui::Align::Center), |ui| {
+                        ui.add_space(12.0);
+                        let resp = ui.add_sized(
+                            [40.0, 40.0],
+                            egui::Button::new(egui::RichText::new(icons::ICON_SPARKLES).size(20.0)),
+                        );
+                        if resp.on_hover_text(t(self.lang, "Ganti tema")).clicked() {
+                            let current_idx = theme::builtins()
+                                .iter()
+                                .position(|t| t.id == self.theme_id)
+                                .unwrap_or(0);
+                            let next_idx = (current_idx + 1) % theme::builtins().len();
+                            self.theme_id = theme::builtins()[next_idx].id.to_string();
                         }
                     });
                 });
             });
-        }
 
         // Sync active tool into the editor before drawing, and read it back
         // afterwards so clicks inside the editor update App state.
@@ -363,23 +440,109 @@ impl App {
     fn menu(&mut self, ui: &mut egui::Ui) {
         let lang = self.lang;
         ui.vertical_centered(|ui| {
-            ui.add_space(48.0);
-            ui.heading(egui::RichText::new("ScreeniesEditor").size(34.0).strong());
+            ui.add_space(32.0);
+            
+            // Header / Title
+            ui.heading(egui::RichText::new("ScreeniesEditor").size(36.0).strong());
             ui.label(t(lang, "Screenshot Roleplay toolkit — komunitas SA-MP"));
-            ui.add_space(28.0);
+            ui.add_space(32.0);
 
-            if menu_tile(ui, "🖼  SSRP Editor", t(lang, "Crop · chatlog · filter · export")) {
-                self.screen = Screen::Editor;
-            }
-            if menu_tile(ui, "🗂  Gallery (WIP)", t(lang, "Jelajahi foto SSRP hasil edit")) {
-                self.screen = Screen::Gallery;
-            }
-            if menu_tile(ui, "⚙  Settings", t(lang, "Bahasa · tema · ukuran ruang edit")) {
-                self.screen = Screen::Settings;
+            // Row of Cards
+            ui.horizontal(|ui| {
+                let card_w = 240.0;
+                let card_h = 160.0;
+                let num_cards = 3;
+                let total_w = card_w * num_cards as f32 + ui.spacing().item_spacing.x * (num_cards - 1) as f32;
+                let avail_w = ui.available_width();
+                if avail_w > total_w {
+                    ui.add_space((avail_w - total_w) / 2.0);
+                }
+
+                // Editor Card
+                if entry_card(
+                    ui,
+                    icons::ICON_IMAGE,
+                    t(lang, "SSRP Editor"),
+                    t(lang, "Crop · chatlog · filter · export"),
+                    card_w,
+                    card_h,
+                ).clicked() {
+                    self.screen = Screen::Editor;
+                }
+
+                // Gallery Card
+                if entry_card(
+                    ui,
+                    icons::ICON_FOLDER,
+                    t(lang, "Gallery"),
+                    t(lang, "Jelajahi foto SSRP hasil edit"),
+                    card_w,
+                    card_h,
+                ).clicked() {
+                    self.screen = Screen::Gallery;
+                }
+
+                // Settings Card
+                if entry_card(
+                    ui,
+                    icons::ICON_SETTINGS,
+                    t(lang, "Settings"),
+                    t(lang, "Bahasa · tema · ukuran ruang edit"),
+                    card_w,
+                    card_h,
+                ).clicked() {
+                    self.screen = Screen::Settings;
+                }
+            });
+
+            // Recent shots strip
+            if let Some(_folder) = self.gallery.gallery_folder() {
+                if !self.gallery.items.is_empty() {
+                    ui.add_space(32.0);
+                    ui.label(egui::RichText::new(t(lang, "Hasil Edit Terbaru")).strong().size(18.0));
+                    ui.add_space(12.0);
+                    
+                    ui.horizontal(|ui| {
+                        let limit = self.gallery.items.len().min(5);
+                        let thumb_w = 120.0;
+                        let thumb_h = 80.0;
+                        let total_thumbs_w = thumb_w * limit as f32 + ui.spacing().item_spacing.x * (limit - 1) as f32;
+                        let avail_w = ui.available_width();
+                        if avail_w > total_thumbs_w {
+                            ui.add_space((avail_w - total_thumbs_w) / 2.0);
+                        }
+
+                        for i in 0..limit {
+                            let path = self.gallery.items[i].path.clone();
+                            if !self.gallery.thumbs.contains_key(&path) {
+                                self.gallery.load_thumb(ui.ctx(), &path);
+                            }
+
+                            let clicked = match self.gallery.thumbs.get(&path) {
+                                Some(Some(tex)) => {
+                                    let s = tex.size_vec2();
+                                    let scale = (thumb_w / s.x).min(thumb_h / s.y).min(1.0);
+                                    let img = egui::Image::new(egui::load::SizedTexture::new(tex.id(), s * scale));
+                                    ui.add(egui::ImageButton::new(img))
+                                        .on_hover_text(&self.gallery.items[i].name)
+                                        .clicked()
+                                }
+                                _ => ui.add_sized([thumb_w, thumb_h], egui::Button::new("…")).clicked(),
+                            };
+
+                            if clicked {
+                                self.editor.load_photo_path(&path);
+                                self.screen = Screen::Editor;
+                            }
+                        }
+                    });
+                }
             }
 
-            ui.add_space(16.0);
-            ui.small(format!("v{} · native (egui) · preview", env!("CARGO_PKG_VERSION")));
+            ui.add_space(40.0);
+            
+            // Footer
+            ui.small(format!("v{} · native (egui) · stable", env!("CARGO_PKG_VERSION")));
         });
     }
 
@@ -479,27 +642,40 @@ impl App {
     }
 }
 
-fn lang_label(l: Lang) -> &'static str {
-    match l {
-        Lang::Id => "ID",
-        Lang::En => "EN",
-    }
-}
+fn entry_card(ui: &mut egui::Ui, icon: &str, title: &str, sub: &str, width: f32, height: f32) -> egui::Response {
+    let margin = 12.0;
+    let frame = egui::Frame::none()
+        .fill(ui.visuals().faint_bg_color)
+        .rounding(ui.visuals().widgets.inactive.rounding)
+        .inner_margin(margin);
+        
+    let response = frame.show(ui, |ui| {
+        ui.set_width(width);
+        ui.set_height(height);
+        ui.vertical_centered(|ui| {
+            ui.add_space(6.0);
+            ui.label(egui::RichText::new(icon).size(32.0).color(ui.visuals().selection.stroke.color));
+            ui.add_space(8.0);
+            ui.heading(title);
+            ui.add_space(4.0);
+            ui.small(sub);
+            ui.add_space(6.0);
+        });
+    }).response;
 
-fn menu_tile(ui: &mut egui::Ui, title: &str, subtitle: &str) -> bool {
-    let clicked = ui
-        .add_sized([440.0, 62.0], egui::Button::new(title))
-        .clicked();
-    ui.small(subtitle);
-    ui.add_space(12.0);
-    clicked
-}
-
-fn title_of(s: Screen) -> &'static str {
-    match s {
-        Screen::Menu => "ScreeniesEditor",
-        Screen::Editor => "SSRP Editor",
-        Screen::Gallery => "Gallery",
-        Screen::Settings => "Settings",
+    let response = ui.interact(response.rect, response.id, egui::Sense::click());
+    if response.hovered() {
+        ui.painter().rect_stroke(
+            response.rect,
+            ui.visuals().widgets.inactive.rounding,
+            egui::Stroke::new(1.5_f32, ui.visuals().selection.stroke.color),
+        );
+    } else {
+        ui.painter().rect_stroke(
+            response.rect,
+            ui.visuals().widgets.inactive.rounding,
+            egui::Stroke::new(1.0_f32, ui.visuals().widgets.inactive.bg_stroke.color),
+        );
     }
+    response
 }
