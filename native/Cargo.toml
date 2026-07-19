@@ -54,6 +54,7 @@ image = "0.25"
 base64 = "0.22"
 serde = { version = "1", features = ["derive"] } # persisted settings
 serde_json = "1.0"
+ureq = { version = "2.9", default-features = false, features = ["tls", "json"] }
 
 [target.'cfg(windows)'.build-dependencies]
 winresource = "0.1" # embed the .exe icon on Windows

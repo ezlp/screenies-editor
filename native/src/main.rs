@@ -128,6 +128,10 @@ struct App {
     accent: Option<egui::Color32>,
     /// Density toggle: true = compact, false = cozy.
     dense: bool,
+    source_shots_folder: Option<String>,
+    imgbb_api_key: Option<String>,
+    unified_layout: bool,
+    hotkeys: std::collections::HashMap<String, String>,
 }
 
 impl Default for App {
@@ -142,6 +146,10 @@ impl Default for App {
             theme_id: "midnight".into(),
             accent: None,
             dense: false,
+            source_shots_folder: None,
+            imgbb_api_key: None,
+            unified_layout: false,
+            hotkeys: default_hotkeys(),
         }
     }
 }
@@ -191,11 +199,29 @@ struct Settings {
     last_open_folder: Option<String>,
     #[serde(default)]
     last_save_folder: Option<String>,
+    #[serde(default)]
+    source_shots_folder: Option<String>,
+    #[serde(default)]
+    imgbb_api_key: Option<String>,
+    #[serde(default)]
+    unified_layout: bool,
+    #[serde(default = "default_hotkeys")]
+    hotkeys: std::collections::HashMap<String, String>,
 }
 
 fn default_true() -> bool { true }
 fn default_stroke_width() -> f32 { 3.0 }
 fn default_cinematic_bar() -> f32 { 12.0 }
+fn default_hotkeys() -> std::collections::HashMap<String, String> {
+    let mut map = std::collections::HashMap::new();
+    map.insert("Open".to_string(), "Ctrl+O".to_string());
+    map.insert("Paste".to_string(), "Ctrl+V".to_string());
+    map.insert("Export".to_string(), "Ctrl+E".to_string());
+    map.insert("Undo".to_string(), "Ctrl+Z".to_string());
+    map.insert("Redo".to_string(), "Ctrl+Y".to_string());
+    map.insert("Cinematic".to_string(), "Ctrl+M".to_string());
+    map
+}
 
 impl Default for Settings {
     fn default() -> Self {
@@ -221,6 +247,10 @@ impl Default for Settings {
             active_tool: "photo".into(),
             last_open_folder: None,
             last_save_folder: None,
+            source_shots_folder: None,
+            imgbb_api_key: None,
+            unified_layout: false,
+            hotkeys: default_hotkeys(),
         }
     }
 }
@@ -290,6 +320,12 @@ impl App {
                 app.editor.set_chatlog_folder(s.chatlog_folder);
                 app.editor.set_file_folders(s.last_open_folder, s.last_save_folder);
                 app.gallery.set_gallery_folder(s.gallery_folder);
+                app.source_shots_folder = s.source_shots_folder;
+                app.imgbb_api_key = s.imgbb_api_key;
+                app.unified_layout = s.unified_layout;
+                for (k, v) in s.hotkeys {
+                    app.hotkeys.insert(k, v);
+                }
             }
         }
         app
@@ -431,6 +467,10 @@ impl eframe::App for App {
             active_tool: self.active_tool.id().to_string(),
             last_open_folder: self.editor.last_open_folder(),
             last_save_folder: self.editor.last_save_folder(),
+            source_shots_folder: self.source_shots_folder.clone(),
+            imgbb_api_key: self.imgbb_api_key.clone(),
+            unified_layout: self.unified_layout,
+            hotkeys: self.hotkeys.clone(),
         };
         eframe::set_value(storage, "settings", &s);
     }
