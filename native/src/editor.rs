@@ -21,6 +21,7 @@ use screenies_core::render::{
     BarPos, Canvas, CensorKind, CensorRegion, CropRect, FilterValues, RenderJob, Size, StickerJob,
 };
 
+use crate::icons;
 use crate::Tool;
 
 /// A loaded photo: base64 for the render pipeline + its pixel dimensions.
@@ -345,7 +346,7 @@ impl EditorState {
                     ui.add_space(8.0);
                     // Photo
                     if ui
-                        .add(egui::Button::new("🖼").min_size(egui::Vec2::splat(40.0)))
+                        .add(egui::Button::new(icons::ICON_IMAGE).min_size(egui::Vec2::splat(40.0)))
                         .on_hover_text(self.t("Foto")).clicked()
                     {
                         self.active_tool = Tool::Photo;
@@ -353,7 +354,7 @@ impl EditorState {
                     ui.add_space(6.0);
                     // Crop
                     if ui
-                        .add(egui::Button::new("✂️").min_size(egui::Vec2::splat(40.0)))
+                        .add(egui::Button::new(icons::ICON_CROP).min_size(egui::Vec2::splat(40.0)))
                         .on_hover_text(self.t("Potong")).clicked()
                     {
                         self.active_tool = Tool::Crop;
@@ -361,7 +362,7 @@ impl EditorState {
                     ui.add_space(6.0);
                     // Chatlog
                     if ui
-                        .add(egui::Button::new("💬").min_size(egui::Vec2::splat(40.0)))
+                        .add(egui::Button::new(icons::ICON_MESSAGE).min_size(egui::Vec2::splat(40.0)))
                         .on_hover_text(self.t("Chatlog")).clicked()
                     {
                         self.active_tool = Tool::Chatlog;
@@ -369,7 +370,7 @@ impl EditorState {
                     ui.add_space(6.0);
                     // Text
                     if ui
-                        .add(egui::Button::new("🔤").min_size(egui::Vec2::splat(40.0)))
+                        .add(egui::Button::new(icons::ICON_TEXT).min_size(egui::Vec2::splat(40.0)))
                         .on_hover_text(self.t("Teks")).clicked()
                     {
                         self.active_tool = Tool::Text;
@@ -377,7 +378,7 @@ impl EditorState {
                     ui.add_space(6.0);
                     // Fx
                     if ui
-                        .add(egui::Button::new("✨").min_size(egui::Vec2::splat(40.0)))
+                        .add(egui::Button::new(icons::ICON_SPARKLES).min_size(egui::Vec2::splat(40.0)))
                         .on_hover_text(self.t("Efek")).clicked()
                     {
                         self.active_tool = Tool::Fx;
@@ -455,7 +456,7 @@ impl EditorState {
             }
         });
 
-        if ui.button(self.t("📂  Muat Foto")).clicked() {
+        if ui.button(format!("{}  {}", icons::ICON_FOLDER, self.t("Muat Foto"))).clicked() {
             self.pick_photo();
         }
         if let Some(p) = &self.photo {
@@ -506,7 +507,11 @@ impl EditorState {
         if self.crop_fit {
             ui.small(self.t("Muat: simpan seluruh gambar + bar (ukuran tetap)."));
         }
-        let crop_btn = self.t(if self.crop_editing { "✓ Selesai crop" } else { "✏ Edit crop" });
+        let crop_btn = if self.crop_editing {
+            format!("{} {}", icons::ICON_CHECK, self.t("Selesai crop"))
+        } else {
+            format!("{} {}", icons::ICON_PENCIL, self.t("Edit crop"))
+        };
         if ui.add_enabled(self.photo.is_some(), egui::Button::new(crop_btn)).clicked() {
             self.toggle_crop_edit();
         }
@@ -527,12 +532,12 @@ impl EditorState {
                     self.selected_block = i;
                 }
             }
-            if ui.button("➕").on_hover_text(self.t("Tambah chatlog")).clicked() {
+            if ui.button(icons::ICON_PLUS).on_hover_text(self.t("Tambah chatlog")).clicked() {
                 self.blocks.push(ChatBlock::new(self.blocks.len()));
                 self.selected_block = self.blocks.len() - 1;
                 self.dirty = true;
             }
-            if ui.button("📂").on_hover_text(self.t("Chatlog dari folder")).clicked() {
+            if ui.button(icons::ICON_FOLDER).on_hover_text(self.t("Chatlog dari folder")).clicked() {
                 self.chatlog.open();
             }
         });
@@ -561,7 +566,7 @@ impl EditorState {
         self.palette_ui(ui);
         self.combo_anchor(ui, bi);
         self.combo_bg(ui, bi);
-        let del_lbl = self.t("🗑 Hapus chatlog ini");
+        let del_lbl = format!("{} {}", icons::ICON_TRASH, self.t("Hapus chatlog ini"));
         if self.blocks.len() > 1 && ui.button(del_lbl).clicked() {
             self.blocks.remove(bi);
             self.selected_block = 0;
@@ -654,7 +659,7 @@ impl EditorState {
                         self.censors[i].strength = strength;
                         self.dirty = true;
                     }
-                    let del = self.t("🗑 Hapus area");
+                    let del = format!("{} {}", icons::ICON_TRASH, self.t("Hapus area"));
                     if ui.button(del).clicked() {
                         self.censors.remove(i);
                         self.selected_censor = None;
@@ -666,7 +671,7 @@ impl EditorState {
         });
 
         ui.collapsing(self.t("Stiker"), |ui| {
-            if ui.button(self.t("+ Tambah stiker")).clicked() {
+            if ui.button(format!("{} {}", icons::ICON_PLUS, self.t("Tambah stiker"))).clicked() {
                 self.add_sticker();
             }
             ui.small(self.t("Klik stiker di preview untuk pilih · seret untuk geser · pojok untuk resize."));
@@ -680,7 +685,7 @@ impl EditorState {
                         self.stickers[i].h = w / self.stickers[i].aspect;
                         self.dirty = true;
                     }
-                    let del = self.t("🗑 Hapus stiker");
+                    let del = format!("{} {}", icons::ICON_TRASH, self.t("Hapus stiker"));
                     if ui.button(del).clicked() {
                         self.stickers.remove(i);
                         self.selected_sticker = None;
@@ -698,7 +703,7 @@ impl EditorState {
                 self.cinematic = false;
                 self.dirty = true;
             }
-            if ui.selectable_label(self.cinematic, self.t("🎬 Sinema")).clicked() {
+            if ui.selectable_label(self.cinematic, format!("{} {}", icons::ICON_FILM, self.t("Sinema"))).clicked() {
                 self.cinematic = true;
                 self.dirty = true;
             }

@@ -10,7 +10,7 @@
 # screens are filled in phase by phase (see docs/2.0-MIGRATION.md).
 [package]
 name = "screenies-native"
-version = "2.1.0"
+version = "3.0.0"
 edition = "2021"
 rust-version = "1.77"
 description = "ScreeniesEditor — Screenshot Roleplay editor for the SA-MP community (native egui shell)"
@@ -39,7 +39,7 @@ assets = [
 # pre-release separator ("2.0.0~alpha.0" sorts before "2.0.0", as intended).
 [package.metadata.generate-rpm]
 auto-req = "disabled"
-version = "2.1.0"
+version = "3.0.0"
 assets = [
     { source = "target/release/screenies-native", dest = "/usr/bin/screenies-native", mode = "755" },
     { source = "assets/screenies-native.desktop", dest = "/usr/share/applications/screenies-native.desktop", mode = "644" },
