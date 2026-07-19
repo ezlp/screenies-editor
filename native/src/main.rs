@@ -537,13 +537,13 @@ impl App {
 
             // Recent shots strip
             if let Some(_folder) = self.gallery.gallery_folder() {
-                if !self.gallery.items.is_empty() {
+                if !self.gallery.finished_items.is_empty() {
                     ui.add_space(32.0);
                     ui.label(egui::RichText::new(t(lang, "Hasil Edit Terbaru")).strong().size(18.0));
                     ui.add_space(12.0);
                     
                     ui.horizontal(|ui| {
-                        let limit = self.gallery.items.len().min(5);
+                        let limit = self.gallery.finished_items.len().min(5);
                         let thumb_w = 120.0;
                         let thumb_h = 80.0;
                         let total_thumbs_w = thumb_w * limit as f32 + ui.spacing().item_spacing.x * (limit - 1) as f32;
@@ -553,7 +553,7 @@ impl App {
                         }
 
                         for i in 0..limit {
-                            let path = self.gallery.items[i].path.clone();
+                            let path = self.gallery.finished_items[i].path.clone();
                             if !self.gallery.thumbs.contains_key(&path) {
                                 self.gallery.load_thumb(ui.ctx(), &path);
                             }
@@ -564,7 +564,7 @@ impl App {
                                     let scale = (thumb_w / s.x).min(thumb_h / s.y).min(1.0);
                                     let img = egui::Image::new(egui::load::SizedTexture::new(tex.id(), s * scale));
                                     ui.add(egui::ImageButton::new(img))
-                                        .on_hover_text(&self.gallery.items[i].name)
+                                        .on_hover_text(&self.gallery.finished_items[i].name)
                                         .clicked()
                                 }
                                 _ => ui.add_sized([thumb_w, thumb_h], egui::Button::new("…")).clicked(),

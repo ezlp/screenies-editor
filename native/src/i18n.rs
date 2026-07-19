@@ -149,6 +149,9 @@ pub fn t(lang: Lang, id: &'static str) -> &'static str {
         "Sesuaikan jarak antar elemen UI (Nyaman atau Kompak)." => "Adjust the spacing between UI elements (Cozy or Compact).",
         "Skala perbesaran antarmuka editor dan teks." => "Scale the zoom level of the editor interface and text.",
         "Ganti bahasa pelokalan aplikasi." => "Change the localization language of the application.",
+        "Source Shots" => "Tangkapan Mentah",
+        "Finished Edits" => "Hasil Edit",
+        "Pilih folder berisi screenshot mentah." => "Choose the folder containing raw screenshots.",
         _ => id,
     }
 }

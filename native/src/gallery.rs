@@ -15,10 +15,20 @@ const THUMBS_PER_FRAME: usize = 6;
 const THUMB_W: f32 = 150.0;
 const THUMB_H: f32 = 112.0;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, Default)]
+pub enum GalleryTab {
+    #[default]
+    Sources,
+    Edits,
+}
+
 #[derive(Default)]
 pub struct GalleryState {
-    folder: Option<PathBuf>,
-    pub items: Vec<Item>,
+    pub active_tab: GalleryTab,
+    pub source_folder: Option<PathBuf>,
+    pub source_items: Vec<Item>,
+    pub finished_folder: Option<PathBuf>,
+    pub finished_items: Vec<Item>,
     /// Cached grid thumbnails (None = decode failed, don't retry).
     pub thumbs: HashMap<PathBuf, Option<egui::TextureHandle>>,
     /// Keep track of insertion order to evict old thumbnails (garbage collection).
@@ -40,27 +50,59 @@ impl GalleryState {
 
     /// Get the persisted gallery folder path (for Settings).
     pub fn gallery_folder(&self) -> Option<String> {
-        self.folder.as_ref().map(|p| p.to_string_lossy().into_owned())
+        self.finished_folder.as_ref().map(|p| p.to_string_lossy().into_owned())
     }
 
     /// Set the gallery folder path (for Settings load).
     pub fn set_gallery_folder(&mut self, path: Option<String>) {
-        self.folder = path.filter(|s| !s.is_empty()).map(PathBuf::from);
-        if self.folder.is_some() {
-            self.rescan();
+        self.finished_folder = path.filter(|s| !s.is_empty()).map(PathBuf::from);
+        if self.finished_folder.is_some() {
+            self.rescan_edits();
         }
     }
 
-    fn rescan(&mut self) {
-        self.items.clear();
-        self.thumbs.clear();
-        self.thumb_order.clear();
+    /// Get the persisted source folder path.
+    pub fn source_shots_folder(&self) -> Option<String> {
+        self.source_folder.as_ref().map(|p| p.to_string_lossy().into_owned())
+    }
+
+    /// Set the source folder path.
+    pub fn set_source_shots_folder(&mut self, path: Option<String>) {
+        self.source_folder = path.filter(|s| !s.is_empty()).map(PathBuf::from);
+        if self.source_folder.is_some() {
+            self.rescan_sources();
+        }
+    }
+
+    pub fn rescan(&mut self) {
+        match self.active_tab {
+            GalleryTab::Sources => self.rescan_sources(),
+            GalleryTab::Edits => self.rescan_edits(),
+        }
+    }
+
+    fn rescan_edits(&mut self) {
+        self.finished_items.clear();
         self.selected = None;
         self.preview = None;
-        let Some(dir) = &self.folder else { return };
+        let Some(dir) = &self.finished_folder else { return };
         match gallery::list_folder(dir) {
             Ok(items) => {
-                self.items = items;
+                self.finished_items = items;
+                self.error = None;
+            }
+            Err(e) => self.error = Some(format!("Gagal baca folder: {e}")),
+        }
+    }
+
+    fn rescan_sources(&mut self) {
+        self.source_items.clear();
+        self.selected = None;
+        self.preview = None;
+        let Some(dir) = &self.source_folder else { return };
+        match gallery::list_folder(dir) {
+            Ok(items) => {
+                self.source_items = items;
                 self.error = None;
             }
             Err(e) => self.error = Some(format!("Gagal baca folder: {e}")),
@@ -68,15 +110,39 @@ impl GalleryState {
     }
 
     pub fn ui(&mut self, ui: &mut egui::Ui) {
+        // Draw Tab Selector
+        let label_sources = format!("{} {}", icons::ICON_FOLDER, self.t("Source Shots"));
+        let label_edits = format!("{} {}", icons::ICON_IMAGE, self.t("Finished Edits"));
+        ui.horizontal(|ui| {
+            let resp_sources = ui.selectable_value(&mut self.active_tab, GalleryTab::Sources, label_sources);
+            let resp_edits = ui.selectable_value(&mut self.active_tab, GalleryTab::Edits, label_edits);
+            if resp_sources.changed() || resp_edits.changed() {
+                self.selected = None;
+                self.preview = None;
+            }
+        });
         ui.add_space(6.0);
+
         ui.horizontal(|ui| {
             if ui.button(format!("{} {}", icons::ICON_FOLDER, self.t("Buka folder"))).clicked() {
                 self.open_folder();
             }
-            if let Some(f) = &self.folder {
-                ui.small(format!("{} · {} gambar", f.display(), self.items.len()));
+            let active_folder = match self.active_tab {
+                GalleryTab::Sources => &self.source_folder,
+                GalleryTab::Edits => &self.finished_folder,
+            };
+            let items_len = match self.active_tab {
+                GalleryTab::Sources => self.source_items.len(),
+                GalleryTab::Edits => self.finished_items.len(),
+            };
+            if let Some(f) = active_folder {
+                ui.small(format!("{} · {} gambar", f.display(), items_len));
             } else {
-                ui.small(self.t("Pilih folder berisi foto hasil edit."));
+                let msg = match self.active_tab {
+                    GalleryTab::Sources => self.t("Pilih folder berisi screenshot mentah."),
+                    GalleryTab::Edits => self.t("Pilih folder berisi foto hasil edit."),
+                };
+                ui.small(msg);
             }
         });
         if let Some(err) = &self.error {
@@ -84,8 +150,16 @@ impl GalleryState {
         }
         ui.separator();
 
-        if self.items.is_empty() {
-            let msg = self.t("Pilih folder berisi foto hasil edit.");
+        let items_len = match self.active_tab {
+            GalleryTab::Sources => self.source_items.len(),
+            GalleryTab::Edits => self.finished_items.len(),
+        };
+
+        if items_len == 0 {
+            let msg = match self.active_tab {
+                GalleryTab::Sources => self.t("Pilih folder berisi screenshot mentah."),
+                GalleryTab::Edits => self.t("Pilih folder berisi foto hasil edit."),
+            };
             ui.centered_and_justified(|ui| {
                 ui.label(msg);
             });
@@ -101,12 +175,19 @@ impl GalleryState {
     fn grid(&mut self, ui: &mut egui::Ui) {
         let mut decoded = 0usize;
         let mut clicked: Option<usize> = None;
+        let items_len = match self.active_tab {
+            GalleryTab::Sources => self.source_items.len(),
+            GalleryTab::Edits => self.finished_items.len(),
+        };
         egui::ScrollArea::vertical()
             .auto_shrink([false, false])
             .show(ui, |ui| {
                 ui.horizontal_wrapped(|ui| {
-                    for i in 0..self.items.len() {
-                        let path = self.items[i].path.clone();
+                    for i in 0..items_len {
+                        let path = match self.active_tab {
+                            GalleryTab::Sources => self.source_items[i].path.clone(),
+                            GalleryTab::Edits => self.finished_items[i].path.clone(),
+                        };
                         // Decode a few uncached thumbnails per frame.
                         if !self.thumbs.contains_key(&path) && decoded < THUMBS_PER_FRAME {
                             self.load_thumb(ui.ctx(), &path);
@@ -130,7 +211,10 @@ impl GalleryState {
     /// One grid cell: a clickable thumbnail (or a placeholder while it decodes),
     /// with the filename as a tooltip. Returns true when clicked.
     fn thumb_cell(&self, ui: &mut egui::Ui, i: usize, path: &PathBuf) -> bool {
-        let name = self.items[i].name.clone();
+        let name = match self.active_tab {
+            GalleryTab::Sources => self.source_items[i].name.clone(),
+            GalleryTab::Edits => self.finished_items[i].name.clone(),
+        };
         let resp = match self.thumbs.get(path) {
             Some(Some(tex)) => {
                 let s = tex.size_vec2();
@@ -149,10 +233,16 @@ impl GalleryState {
         };
         match gallery::list_folder(&dir) {
             Ok(items) => {
-                self.items = items;
-                self.folder = Some(dir);
-                self.thumbs.clear();
-                self.thumb_order.clear();
+                match self.active_tab {
+                    GalleryTab::Sources => {
+                        self.source_items = items;
+                        self.source_folder = Some(dir);
+                    }
+                    GalleryTab::Edits => {
+                        self.finished_items = items;
+                        self.finished_folder = Some(dir);
+                    }
+                }
                 self.selected = None;
                 self.preview = None;
                 self.error = None;
@@ -196,12 +286,18 @@ impl GalleryState {
         let Some(i) = self.selected else {
             return;
         };
-        if i >= self.items.len() {
+        let items_len = match self.active_tab {
+            GalleryTab::Sources => self.source_items.len(),
+            GalleryTab::Edits => self.finished_items.len(),
+        };
+        if i >= items_len {
             self.selected = None;
             return;
         }
-        let name = self.items[i].name.clone();
-        let path = self.items[i].path.clone();
+        let (name, path) = match self.active_tab {
+            GalleryTab::Sources => (self.source_items[i].name.clone(), self.source_items[i].path.clone()),
+            GalleryTab::Edits => (self.finished_items[i].name.clone(), self.finished_items[i].path.clone()),
+        };
         let open_lbl = format!("{} {}", icons::ICON_PENCIL, self.t("Buka di editor"));
         let mut open = true;
         egui::Window::new(format!("{} {name}", icons::ICON_IMAGE))
