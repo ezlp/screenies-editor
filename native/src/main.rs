@@ -558,6 +558,8 @@ impl App {
 
         // Theme grid (7 swatches)
         ui.label(t(lang, "Tema"));
+        ui.small(t(lang, "Pilih skema warna dasar untuk seluruh antarmuka aplikasi."));
+        ui.add_space(4.0);
         ui.horizontal_wrapped(|ui| {
             for builtin in theme::builtins() {
                 let is_active = self.theme_id == builtin.id;
@@ -583,6 +585,8 @@ impl App {
 
         // Accent color picker
         ui.label(t(lang, "Accent color"));
+        ui.small(t(lang, "Sesuaikan warna penekanan untuk tombol, seleksi, dan tautan."));
+        ui.add_space(4.0);
         let mut accent_rgb = self.accent
             .map(|c| {
                 let rgba = c.to_array();
@@ -599,6 +603,8 @@ impl App {
 
         // Density toggle
         ui.label(t(lang, "Kepadatan UI"));
+        ui.small(t(lang, "Sesuaikan jarak antar elemen UI (Nyaman atau Kompak)."));
+        ui.add_space(4.0);
         ui.horizontal(|ui| {
             ui.selectable_value(&mut self.dense, false, t(lang, "Nyaman"));
             ui.selectable_value(&mut self.dense, true, t(lang, "Kompak"));
@@ -617,11 +623,15 @@ impl App {
 
         // UI scale
         ui.label(t(lang, "Ukuran ruang edit"));
+        ui.small(t(lang, "Skala perbesaran antarmuka editor dan teks."));
+        ui.add_space(4.0);
         ui.add(egui::Slider::new(&mut self.ui_scale, 0.7..=1.6).text("×"));
         ui.add_space(12.0);
 
         // Language section
         ui.label(t(lang, "Bahasa"));
+        ui.small(t(lang, "Ganti bahasa pelokalan aplikasi."));
+        ui.add_space(4.0);
         ui.separator();
         ui.horizontal(|ui| {
             ui.selectable_value(&mut self.lang, Lang::Id, "Bahasa Indonesia");

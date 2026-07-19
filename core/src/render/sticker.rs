@@ -122,7 +122,7 @@ mod tests {
     #[test]
     fn overlays_and_repeats_identically_from_cache() {
         // Opaque red sticker over a black canvas, same size → no resize.
-        let st = StickerJob { data_base64: png_b64([255, 0, 0, 255], 2), x: 1, y: 1, w: 2, h: 2 };
+        let st = StickerJob { data_base64: png_b64([255, 0, 0, 255], 2), x: 1, y: 1, w: 2, h: 2, opacity: 1.0 };
 
         let mut canvas = RgbaImage::from_pixel(4, 4, image::Rgba([0, 0, 0, 255]));
         overlay_all(&mut canvas, std::slice::from_ref(&st)).unwrap();
@@ -139,8 +139,8 @@ mod tests {
     fn resize_reuses_the_decoded_source() {
         // Draw the same source at two different sizes; both must composite.
         let b64 = png_b64([0, 200, 0, 255], 8);
-        let big = StickerJob { data_base64: b64.clone(), x: 0, y: 0, w: 6, h: 6 };
-        let small = StickerJob { data_base64: b64, x: 0, y: 0, w: 3, h: 3 };
+        let big = StickerJob { data_base64: b64.clone(), x: 0, y: 0, w: 6, h: 6, opacity: 1.0 };
+        let small = StickerJob { data_base64: b64, x: 0, y: 0, w: 3, h: 3, opacity: 1.0 };
 
         let mut canvas = RgbaImage::from_pixel(6, 6, image::Rgba([0, 0, 0, 255]));
         overlay_all(&mut canvas, std::slice::from_ref(&big)).unwrap();
@@ -154,7 +154,7 @@ mod tests {
 
     #[test]
     fn invalid_base64_still_errors() {
-        let st = StickerJob { data_base64: "not valid base64!!!".into(), x: 0, y: 0, w: 2, h: 2 };
+        let st = StickerJob { data_base64: "not valid base64!!!".into(), x: 0, y: 0, w: 2, h: 2, opacity: 1.0 };
         let mut canvas = RgbaImage::from_pixel(4, 4, image::Rgba([0, 0, 0, 255]));
         assert!(overlay_all(&mut canvas, std::slice::from_ref(&st)).is_err());
     }
