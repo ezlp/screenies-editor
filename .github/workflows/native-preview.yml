@@ -18,7 +18,8 @@ on:
   push:
     tags:
       - "native-preview-*" # rolling preview builds
-      - "v2.*" # versioned 2.x releases (e.g. v2.0.0-alpha.1)
+      - "v2.*" # versioned 2.x releases
+      - "v3.*" # versioned 3.x releases (e.g. v3.0.0)
 
 permissions:
   contents: write # create/update the pre-release
@@ -138,12 +139,9 @@ jobs:
           # pre-releases; clean tags (v2.0.0) publish as a stable release.
           prerelease: ${{ contains(github.ref_name, '-') }}
           body: |
-            ## ScreeniesEditor 2.0 — TL;DR
+            ## ScreeniesEditor 3.0 — TL;DR
 
-            **A complete rewrite from a webview app (Tauri) to a native Rust app
-            (egui).** No more WebView2/Edge dependency — it runs on old laptops as
-            a small native binary. Same fast Rust engine under the hood, brand-new
-            native UI.
+            **A complete native Rust app (egui) with a brand-new persistent left navigation rail, premium custom theme support, lightweight icon font, and memory garbage collection.**
 
             ### What's inside
             - **SSRP Editor** — load **multiple photos** (tabs) · crop presets
