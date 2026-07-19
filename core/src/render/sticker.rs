@@ -59,20 +59,29 @@ pub fn overlay_all(canvas: &mut RgbaImage, stickers: &[StickerJob]) -> Result<()
                 .get(&key)
                 .and_then(|(cw, ch, img)| (*cw == w && *ch == h).then(|| img.clone()))
         };
-        if let Some(img) = cached {
-            imageops::overlay(canvas, img.as_ref(), st.x, st.y);
-            continue;
-        }
-
-        // Decode the source once (memoized), then resize from it as needed.
-        let source = decode_source(key, &st.data_base64)?;
-        let sized = if source.width() == w && source.height() == h {
-            source
+        let sized = if let Some(img) = cached {
+            img
         } else {
-            Arc::new(imageops::resize(source.as_ref(), w, h, FilterType::Lanczos3))
+            // Decode the source once (memoized), then resize from it as needed.
+            let source = decode_source(key, &st.data_base64)?;
+            let sized = if source.width() == w && source.height() == h {
+                source
+            } else {
+                Arc::new(imageops::resize(source.as_ref(), w, h, FilterType::Lanczos3))
+            };
+            resized_cache().lock().unwrap().insert(key, (w, h, sized.clone()));
+            sized
         };
-        resized_cache().lock().unwrap().insert(key, (w, h, sized.clone()));
-        imageops::overlay(canvas, sized.as_ref(), st.x, st.y);
+
+        if st.opacity < 1.0 {
+            let mut sized_img = sized.as_ref().clone();
+            for pixel in sized_img.pixels_mut() {
+                pixel.0[3] = (pixel.0[3] as f32 * st.opacity).round() as u8;
+            }
+            imageops::overlay(canvas, &sized_img, st.x, st.y);
+        } else {
+            imageops::overlay(canvas, sized.as_ref(), st.x, st.y);
+        }
     }
     Ok(())
 }

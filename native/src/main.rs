@@ -300,7 +300,7 @@ impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         // Apply the current theme.
         let theme_obj = theme::by_id(&self.theme_id).clone();
-        theme_obj.apply(ctx, self.accent, self.ui_scale);
+        theme_obj.apply(ctx, self.accent, self.ui_scale, self.dense);
 
         // Propagate the current language to each screen before it draws.
         self.editor.lang = self.lang;

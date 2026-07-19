@@ -164,6 +164,12 @@ pub struct StickerJob {
     pub y: i64,
     pub w: u32,
     pub h: u32,
+    #[serde(default = "default_opacity")]
+    pub opacity: f32,
+}
+
+fn default_opacity() -> f32 {
+    1.0
 }
 
 #[derive(Debug, Clone, Deserialize)]

@@ -74,6 +74,7 @@ struct Sticker {
     w: f32,
     h: f32,
     aspect: f32,
+    opacity: f32,
 }
 
 /// One chatlog block: its raw text + placement. Multiple blocks let you put
@@ -90,9 +91,14 @@ struct ChatBlock {
 impl ChatBlock {
     /// A fresh block, staggered by index so new ones don't stack exactly.
     fn new(index: usize) -> Self {
+        let anchor = match index {
+            0 => Anchor::KiriAtas,
+            1 => Anchor::KiriBawah,
+            _ => Anchor::Free,
+        };
         Self {
             text: String::new(),
-            anchor: Anchor::Free,
+            anchor,
             bg_mode: BgMode::None,
             x: 40.0,
             y: 40.0 + 70.0 * index as f32,
@@ -683,6 +689,12 @@ impl EditorState {
                     if ui.add(egui::Slider::new(&mut w, 16.0..=out_w).text(wl)).changed() {
                         self.stickers[i].w = w;
                         self.stickers[i].h = w / self.stickers[i].aspect;
+                        self.dirty = true;
+                    }
+                    let mut opacity = self.stickers[i].opacity;
+                    let ol = self.t("Transparansi");
+                    if ui.add(egui::Slider::new(&mut opacity, 0.0..=1.0).text(ol)).changed() {
+                        self.stickers[i].opacity = opacity;
                         self.dirty = true;
                     }
                     let del = format!("{} {}", icons::ICON_TRASH, self.t("Hapus stiker"));
@@ -1386,6 +1398,7 @@ impl EditorState {
             w,
             h,
             aspect,
+            opacity: 1.0,
         });
         self.selected_sticker = Some(self.stickers.len() - 1);
         self.error = None;
@@ -1661,6 +1674,7 @@ impl EditorState {
                 y: s.y.round() as i64,
                 w: (s.w.round() as u32).max(1),
                 h: (s.h.round() as u32).max(1),
+                opacity: s.opacity,
             })
             .collect();
 

@@ -31,7 +31,7 @@ pub struct Theme {
 
 impl Theme {
     /// Apply this theme to egui's Visuals + Style, with optional accent override.
-    pub fn apply(&self, ctx: &egui::Context, accent: Option<Color32>, scale: f32) {
+    pub fn apply(&self, ctx: &egui::Context, accent: Option<Color32>, scale: f32, dense: bool) {
         let accent = accent.unwrap_or(self.accent);
 
         let mut v = if self.dark {
@@ -72,13 +72,13 @@ impl Theme {
 
         let mut style = (*ctx.style()).clone();
         let sp = &mut style.spacing;
-        let (gap, pad, h) = if self.dense {
+        let (gap, pad, h) = if dense {
             (4.0, 3.0, 22.0)
         } else {
             (8.0, 6.0, 26.0)
         };
-        sp.item_spacing = egui::vec2(if self.dense { 6.0 } else { 8.0 }, gap);
-        sp.button_padding = egui::vec2(if self.dense { 6.0 } else { 10.0 }, pad);
+        sp.item_spacing = egui::vec2(if dense { 6.0 } else { 8.0 }, gap);
+        sp.button_padding = egui::vec2(if dense { 6.0 } else { 10.0 }, pad);
         sp.interact_size.y = h;
         ctx.set_style(style);
 

@@ -143,6 +143,7 @@ pub fn t(lang: Lang, id: &'static str) -> &'static str {
         "Hapus stiker" => "Delete sticker",
         "Buka folder" => "Open folder",
         "Buka di editor" => "Open in editor",
+        "Transparansi" => "Transparency",
         _ => id,
     }
 }
