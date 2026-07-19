@@ -207,6 +207,10 @@ struct Settings {
     unified_layout: bool,
     #[serde(default = "default_hotkeys")]
     hotkeys: std::collections::HashMap<String, String>,
+    #[serde(default)]
+    albums: Vec<crate::gallery::Album>,
+    #[serde(default)]
+    selected_album_id: Option<String>,
 }
 
 fn default_true() -> bool { true }
@@ -251,6 +255,8 @@ impl Default for Settings {
             imgbb_api_key: None,
             unified_layout: false,
             hotkeys: default_hotkeys(),
+            albums: Vec::new(),
+            selected_album_id: None,
         }
     }
 }
@@ -320,6 +326,8 @@ impl App {
                 app.editor.set_chatlog_folder(s.chatlog_folder);
                 app.editor.set_file_folders(s.last_open_folder, s.last_save_folder);
                 app.gallery.set_gallery_folder(s.gallery_folder);
+                app.gallery.albums = s.albums;
+                app.gallery.selected_album_id = s.selected_album_id;
                 app.source_shots_folder = s.source_shots_folder;
                 app.imgbb_api_key = s.imgbb_api_key;
                 app.unified_layout = s.unified_layout;
@@ -471,6 +479,8 @@ impl eframe::App for App {
             imgbb_api_key: self.imgbb_api_key.clone(),
             unified_layout: self.unified_layout,
             hotkeys: self.hotkeys.clone(),
+            albums: self.gallery.albums.clone(),
+            selected_album_id: self.gallery.selected_album_id.clone(),
         };
         eframe::set_value(storage, "settings", &s);
     }

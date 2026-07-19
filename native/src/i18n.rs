@@ -152,6 +152,14 @@ pub fn t(lang: Lang, id: &'static str) -> &'static str {
         "Source Shots" => "Tangkapan Mentah",
         "Finished Edits" => "Hasil Edit",
         "Pilih folder berisi screenshot mentah." => "Choose the folder containing raw screenshots.",
+        "Buat Album Baru" => "Create New Album",
+        "Album Baru" => "New Album",
+        "Hapus Album" => "Delete Album",
+        "Judul Album" => "Album Title",
+        "Deskripsi Cerita" => "Storyline Description",
+        "Pilih atau buat album untuk mulai menyusun cerita." => "Select or create an album to start writing your story.",
+        "Filter berdasarkan album ini" => "Filter by this album",
+        "Di dalam album" => "In Album",
         _ => id,
     }
 }

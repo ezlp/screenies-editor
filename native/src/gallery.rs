@@ -22,6 +22,14 @@ pub enum GalleryTab {
     Edits,
 }
 
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, PartialEq, Eq)]
+pub struct Album {
+    pub id: String,
+    pub title: String,
+    pub description: String,
+    pub image_paths: Vec<String>,
+}
+
 #[derive(Default)]
 pub struct GalleryState {
     pub active_tab: GalleryTab,
@@ -29,6 +37,9 @@ pub struct GalleryState {
     pub source_items: Vec<Item>,
     pub finished_folder: Option<PathBuf>,
     pub finished_items: Vec<Item>,
+    pub albums: Vec<Album>,
+    pub selected_album_id: Option<String>,
+    pub filter_by_album: bool,
     /// Cached grid thumbnails (None = decode failed, don't retry).
     pub thumbs: HashMap<PathBuf, Option<egui::TextureHandle>>,
     /// Keep track of insertion order to evict old thumbnails (garbage collection).
@@ -109,6 +120,26 @@ impl GalleryState {
         }
     }
 
+    fn get_filtered_indices(&self) -> Vec<usize> {
+        let items = match self.active_tab {
+            GalleryTab::Sources => &self.source_items,
+            GalleryTab::Edits => &self.finished_items,
+        };
+        if self.active_tab == GalleryTab::Edits && self.filter_by_album {
+            if let Some(album_id) = &self.selected_album_id {
+                if let Some(album) = self.albums.iter().find(|a| &a.id == album_id) {
+                    return (0..items.len())
+                        .filter(|&idx| {
+                            let path_str = items[idx].path.to_string_lossy().into_owned();
+                            album.image_paths.contains(&path_str)
+                        })
+                        .collect();
+                }
+            }
+        }
+        (0..items.len()).collect()
+    }
+
     pub fn ui(&mut self, ui: &mut egui::Ui) {
         // Draw Tab Selector
         let label_sources = format!("{} {}", icons::ICON_FOLDER, self.t("Source Shots"));
@@ -123,6 +154,119 @@ impl GalleryState {
         });
         ui.add_space(6.0);
 
+        if self.active_tab == GalleryTab::Edits {
+            ui.horizontal(|ui| {
+                // Left Column: Album Side Panel
+                ui.allocate_ui_with_layout(
+                    egui::vec2(240.0, ui.available_height()),
+                    egui::Layout::top_down(egui::Align::Min),
+                    |ui| {
+                        self.albums_panel(ui);
+                    },
+                );
+
+                ui.separator();
+
+                // Right Column: Grid Area
+                ui.vertical(|ui| {
+                    self.grid_panel(ui);
+                });
+            });
+        } else {
+            self.grid_panel(ui);
+        }
+
+        // Popup preview overlay (open while an item is selected).
+        self.preview_window(ui.ctx());
+    }
+
+    fn albums_panel(&mut self, ui: &mut egui::Ui) {
+        let title_smart_albums = self.t("Smart Albums").to_string();
+        let btn_create_album = format!("➕ {}", self.t("Buat Album Baru"));
+        let default_album_title = self.t("Album Baru").to_string();
+        let tooltip_delete = self.t("Hapus Album").to_string();
+
+        ui.label(egui::RichText::new(title_smart_albums).strong().size(16.0));
+        ui.add_space(4.0);
+
+        if ui.button(btn_create_album).clicked() {
+            let id = format!("album_{}", std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs());
+            self.albums.push(Album {
+                id: id.clone(),
+                title: default_album_title,
+                description: String::new(),
+                image_paths: Vec::new(),
+            });
+            self.selected_album_id = Some(id);
+        }
+        ui.add_space(8.0);
+
+        // Pre-clone list of albums to avoid borrow checker overlap
+        let album_summaries: Vec<(usize, String, String)> = self.albums
+            .iter()
+            .enumerate()
+            .map(|(idx, a)| (idx, a.id.clone(), a.title.clone()))
+            .collect();
+
+        // Scrollable list of albums
+        egui::ScrollArea::vertical()
+            .id_salt("albums_scroll")
+            .max_height(160.0)
+            .show(ui, |ui| {
+                let mut to_delete = None;
+                for (idx, id, title) in album_summaries {
+                    let is_selected = Some(&id) == self.selected_album_id.as_ref();
+                    ui.horizontal(|ui| {
+                        if ui.selectable_label(is_selected, &title).clicked() {
+                            self.selected_album_id = Some(id.clone());
+                        }
+                        if is_selected {
+                            if ui.small_button("🗑").on_hover_text(&tooltip_delete).clicked() {
+                                to_delete = Some(idx);
+                            }
+                        }
+                    });
+                }
+                if let Some(idx) = to_delete {
+                    self.albums.remove(idx);
+                    self.selected_album_id = None;
+                }
+            });
+
+        ui.add_space(8.0);
+        ui.separator();
+        ui.add_space(8.0);
+
+        // Pre-evaluate translation strings for selected album details
+        let label_judul = self.t("Judul Album").to_string();
+        let label_deskripsi = self.t("Deskripsi Cerita").to_string();
+        let label_filter = self.t("Filter berdasarkan album ini").to_string();
+        let placeholder_select = self.t("Pilih atau buat album untuk mulai menyusun cerita.").to_string();
+
+        // Details of selected album
+        if let Some(album_id) = &self.selected_album_id {
+            if let Some(album) = self.albums.iter_mut().find(|a| &a.id == album_id) {
+                ui.label(label_judul);
+                ui.text_edit_singleline(&mut album.title);
+                ui.add_space(6.0);
+
+                ui.label(label_deskripsi);
+                ui.text_edit_multiline(&mut album.description);
+                ui.add_space(6.0);
+
+                ui.checkbox(&mut self.filter_by_album, label_filter);
+                ui.add_space(4.0);
+                ui.small(format!("{} gambar", album.image_paths.len()));
+            }
+        } else {
+            ui.weak(placeholder_select);
+        }
+    }
+
+    fn grid_panel(&mut self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
             if ui.button(format!("{} {}", icons::ICON_FOLDER, self.t("Buka folder"))).clicked() {
                 self.open_folder();
@@ -131,12 +275,9 @@ impl GalleryState {
                 GalleryTab::Sources => &self.source_folder,
                 GalleryTab::Edits => &self.finished_folder,
             };
-            let items_len = match self.active_tab {
-                GalleryTab::Sources => self.source_items.len(),
-                GalleryTab::Edits => self.finished_items.len(),
-            };
+            let indices = self.get_filtered_indices();
             if let Some(f) = active_folder {
-                ui.small(format!("{} · {} gambar", f.display(), items_len));
+                ui.small(format!("{} · {} gambar", f.display(), indices.len()));
             } else {
                 let msg = match self.active_tab {
                     GalleryTab::Sources => self.t("Pilih folder berisi screenshot mentah."),
@@ -150,12 +291,9 @@ impl GalleryState {
         }
         ui.separator();
 
-        let items_len = match self.active_tab {
-            GalleryTab::Sources => self.source_items.len(),
-            GalleryTab::Edits => self.finished_items.len(),
-        };
+        let indices = self.get_filtered_indices();
 
-        if items_len == 0 {
+        if indices.is_empty() {
             let msg = match self.active_tab {
                 GalleryTab::Sources => self.t("Pilih folder berisi screenshot mentah."),
                 GalleryTab::Edits => self.t("Pilih folder berisi foto hasil edit."),
@@ -166,24 +304,19 @@ impl GalleryState {
         } else {
             self.grid(ui);
         }
-
-        // Popup preview overlay (open while an item is selected).
-        self.preview_window(ui.ctx());
     }
 
     /// The thumbnail grid: vertical scroll, wraps to fill the width.
     fn grid(&mut self, ui: &mut egui::Ui) {
         let mut decoded = 0usize;
         let mut clicked: Option<usize> = None;
-        let items_len = match self.active_tab {
-            GalleryTab::Sources => self.source_items.len(),
-            GalleryTab::Edits => self.finished_items.len(),
-        };
+        let indices = self.get_filtered_indices();
+
         egui::ScrollArea::vertical()
             .auto_shrink([false, false])
             .show(ui, |ui| {
                 ui.horizontal_wrapped(|ui| {
-                    for i in 0..items_len {
+                    for &i in &indices {
                         let path = match self.active_tab {
                             GalleryTab::Sources => self.source_items[i].path.clone(),
                             GalleryTab::Edits => self.finished_items[i].path.clone(),
@@ -193,9 +326,35 @@ impl GalleryState {
                             self.load_thumb(ui.ctx(), &path);
                             decoded += 1;
                         }
-                        if self.thumb_cell(ui, i, &path) {
-                            clicked = Some(i);
-                        }
+
+                        ui.vertical(|ui| {
+                            if self.thumb_cell(ui, i, &path) {
+                                clicked = Some(i);
+                            }
+
+                            if self.active_tab == GalleryTab::Edits {
+                                if let Some(album_id) = &self.selected_album_id {
+                                    let path_str = path.to_string_lossy().into_owned();
+                                    let mut in_album = false;
+                                    if let Some(album) = self.albums.iter().find(|a| &a.id == album_id) {
+                                        in_album = album.image_paths.contains(&path_str);
+                                    }
+
+                                    let mut check_val = in_album;
+                                    if ui.checkbox(&mut check_val, self.t("Di dalam album")).changed() {
+                                        if let Some(album) = self.albums.iter_mut().find(|a| &a.id == album_id) {
+                                            if check_val {
+                                                if !album.image_paths.contains(&path_str) {
+                                                    album.image_paths.push(path_str);
+                                                }
+                                            } else {
+                                                album.image_paths.retain(|p| p != &path_str);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        });
                     }
                 });
             });
