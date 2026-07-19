@@ -235,7 +235,6 @@ fn colored_log(text: &str) -> egui::text::LayoutJob {
 mod tests {
     use super::*;
     use std::fs;
-    use std::path::PathBuf;
 
     #[test]
     fn load_handles_non_utf8_bytes() {

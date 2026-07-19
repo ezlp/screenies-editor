@@ -9,14 +9,7 @@ pub enum Lang {
     En,
 }
 
-impl Lang {
-    pub fn toggled(self) -> Lang {
-        match self {
-            Lang::Id => Lang::En,
-            Lang::En => Lang::Id,
-        }
-    }
-}
+
 
 /// Translate `id` (an Indonesian source string) for `lang`.
 pub fn t(lang: Lang, id: &'static str) -> &'static str {

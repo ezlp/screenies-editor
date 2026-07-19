@@ -7,6 +7,7 @@
 use eframe::egui::{self, Color32, Rounding, Stroke, Visuals};
 
 /// A complete, themeable color palette + density.
+#[allow(dead_code)]
 #[derive(Clone)]
 pub struct Theme {
     pub id: &'static str,

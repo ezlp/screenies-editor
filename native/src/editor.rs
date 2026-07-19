@@ -875,7 +875,6 @@ impl EditorState {
         // Floating preview toolbar (top-right) with Undo/Redo and other quick actions.
         // Position it relative to the preview area so it overlays the image.
         let toolbar_w = 160.0;
-        let toolbar_h = 40.0;
         let toolbar_x = area.max.x - toolbar_w - 12.0;
         let toolbar_y = area.min.y + 12.0;
         let toolbar_pos = egui::pos2(toolbar_x, toolbar_y);
@@ -884,14 +883,14 @@ impl EditorState {
             .show(ui.ctx(), |ui| {
                 ui.horizontal(|ui| {
                     if ui
-                        .add_enabled(self.history.len() > 1, egui::Button::new("↩  Undo"))
+                        .add_enabled(self.history.len() > 1, egui::Button::new(format!("{} Undo", icons::ICON_UNDO)))
                         .on_hover_text("Ctrl+Z")
                         .clicked()
                     {
                         self.undo();
                     }
                     if ui
-                        .add_enabled(!self.future.is_empty(), egui::Button::new("↪  Redo"))
+                        .add_enabled(!self.future.is_empty(), egui::Button::new(format!("{} Redo", icons::ICON_REDO)))
                         .on_hover_text("Ctrl+Y")
                         .clicked()
                     {
@@ -937,7 +936,7 @@ impl EditorState {
             }
             if self.selected_block == i {
                 painter.rect_stroke(
-                    rect, 2.0, egui::Stroke::new(1.5, ui.visuals().selection.stroke.color),
+                    rect, 2.0_f32, egui::Stroke::new(1.5_f32, ui.visuals().selection.stroke.color),
                 );
             }
         }
@@ -1804,7 +1803,7 @@ mod tests {
                 ..Default::default()
             };
 
-            ctx.run(egui::RawInput::default(), |ctx| {
+            let _ = ctx.run(egui::RawInput::default(), |ctx| {
                 egui::CentralPanel::default().show(ctx, |ui| editor.controls(ui));
             });
         }

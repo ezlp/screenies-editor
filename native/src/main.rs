@@ -642,13 +642,6 @@ impl App {
     }
 }
 
-fn lang_label(l: Lang) -> &'static str {
-    match l {
-        Lang::Id => "ID",
-        Lang::En => "EN",
-    }
-}
-
 fn entry_card(ui: &mut egui::Ui, icon: &str, title: &str, sub: &str, width: f32, height: f32) -> egui::Response {
     let margin = 12.0;
     let frame = egui::Frame::none()
@@ -675,23 +668,14 @@ fn entry_card(ui: &mut egui::Ui, icon: &str, title: &str, sub: &str, width: f32,
         ui.painter().rect_stroke(
             response.rect,
             ui.visuals().widgets.inactive.rounding,
-            egui::Stroke::new(1.5, ui.visuals().selection.stroke.color),
+            egui::Stroke::new(1.5_f32, ui.visuals().selection.stroke.color),
         );
     } else {
         ui.painter().rect_stroke(
             response.rect,
             ui.visuals().widgets.inactive.rounding,
-            egui::Stroke::new(1.0, ui.visuals().widgets.inactive.bg_stroke.color),
+            egui::Stroke::new(1.0_f32, ui.visuals().widgets.inactive.bg_stroke.color),
         );
     }
     response
-}
-
-fn title_of(s: Screen) -> &'static str {
-    match s {
-        Screen::Menu => "ScreeniesEditor",
-        Screen::Editor => "SSRP Editor",
-        Screen::Gallery => "Gallery",
-        Screen::Settings => "Settings",
-    }
 }

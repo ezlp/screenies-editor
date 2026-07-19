@@ -10,6 +10,7 @@ pub const ICON_REDO: &str = "\u{e143}";
 pub const ICON_UNDO: &str = "\u{e19b}";
 pub const ICON_TRASH: &str = "\u{e18d}";
 pub const ICON_TEXT: &str = "\u{e185}";
+#[allow(dead_code)]
 pub const ICON_SLIDERS: &str = "\u{e162}";
 pub const ICON_SPARKLES: &str = "\u{e412}";
 pub const ICON_MESSAGE: &str = "\u{e117}";
