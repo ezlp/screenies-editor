@@ -59,20 +59,29 @@ pub fn overlay_all(canvas: &mut RgbaImage, stickers: &[StickerJob]) -> Result<()
                 .get(&key)
                 .and_then(|(cw, ch, img)| (*cw == w && *ch == h).then(|| img.clone()))
         };
-        if let Some(img) = cached {
-            imageops::overlay(canvas, img.as_ref(), st.x, st.y);
-            continue;
-        }
-
-        // Decode the source once (memoized), then resize from it as needed.
-        let source = decode_source(key, &st.data_base64)?;
-        let sized = if source.width() == w && source.height() == h {
-            source
+        let sized = if let Some(img) = cached {
+            img
         } else {
-            Arc::new(imageops::resize(source.as_ref(), w, h, FilterType::Lanczos3))
+            // Decode the source once (memoized), then resize from it as needed.
+            let source = decode_source(key, &st.data_base64)?;
+            let sized = if source.width() == w && source.height() == h {
+                source
+            } else {
+                Arc::new(imageops::resize(source.as_ref(), w, h, FilterType::Lanczos3))
+            };
+            resized_cache().lock().unwrap().insert(key, (w, h, sized.clone()));
+            sized
         };
-        resized_cache().lock().unwrap().insert(key, (w, h, sized.clone()));
-        imageops::overlay(canvas, sized.as_ref(), st.x, st.y);
+
+        if st.opacity < 1.0 {
+            let mut sized_img = sized.as_ref().clone();
+            for pixel in sized_img.pixels_mut() {
+                pixel.0[3] = (pixel.0[3] as f32 * st.opacity).round() as u8;
+            }
+            imageops::overlay(canvas, &sized_img, st.x, st.y);
+        } else {
+            imageops::overlay(canvas, sized.as_ref(), st.x, st.y);
+        }
     }
     Ok(())
 }
@@ -93,6 +102,7 @@ fn decode_source(key: u64, data_base64: &str) -> Result<Arc<RgbaImage>, AppError
     let mut cache = decoded_cache().lock().unwrap();
     if cache.len() >= MAX_DECODED {
         cache.clear(); // rare backstop; keeps memory bounded
+        resized_cache().lock().unwrap().clear(); // also clear resized cache (garbage collection)
     }
     cache.insert(key, img.clone());
     Ok(img)
@@ -112,7 +122,7 @@ mod tests {
     #[test]
     fn overlays_and_repeats_identically_from_cache() {
         // Opaque red sticker over a black canvas, same size → no resize.
-        let st = StickerJob { data_base64: png_b64([255, 0, 0, 255], 2), x: 1, y: 1, w: 2, h: 2 };
+        let st = StickerJob { data_base64: png_b64([255, 0, 0, 255], 2), x: 1, y: 1, w: 2, h: 2, opacity: 1.0 };
 
         let mut canvas = RgbaImage::from_pixel(4, 4, image::Rgba([0, 0, 0, 255]));
         overlay_all(&mut canvas, std::slice::from_ref(&st)).unwrap();
@@ -129,8 +139,8 @@ mod tests {
     fn resize_reuses_the_decoded_source() {
         // Draw the same source at two different sizes; both must composite.
         let b64 = png_b64([0, 200, 0, 255], 8);
-        let big = StickerJob { data_base64: b64.clone(), x: 0, y: 0, w: 6, h: 6 };
-        let small = StickerJob { data_base64: b64, x: 0, y: 0, w: 3, h: 3 };
+        let big = StickerJob { data_base64: b64.clone(), x: 0, y: 0, w: 6, h: 6, opacity: 1.0 };
+        let small = StickerJob { data_base64: b64, x: 0, y: 0, w: 3, h: 3, opacity: 1.0 };
 
         let mut canvas = RgbaImage::from_pixel(6, 6, image::Rgba([0, 0, 0, 255]));
         overlay_all(&mut canvas, std::slice::from_ref(&big)).unwrap();
@@ -144,7 +154,7 @@ mod tests {
 
     #[test]
     fn invalid_base64_still_errors() {
-        let st = StickerJob { data_base64: "not valid base64!!!".into(), x: 0, y: 0, w: 2, h: 2 };
+        let st = StickerJob { data_base64: "not valid base64!!!".into(), x: 0, y: 0, w: 2, h: 2, opacity: 1.0 };
         let mut canvas = RgbaImage::from_pixel(4, 4, image::Rgba([0, 0, 0, 255]));
         assert!(overlay_all(&mut canvas, std::slice::from_ref(&st)).is_err());
     }

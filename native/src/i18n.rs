@@ -143,6 +143,12 @@ pub fn t(lang: Lang, id: &'static str) -> &'static str {
         "Hapus stiker" => "Delete sticker",
         "Buka folder" => "Open folder",
         "Buka di editor" => "Open in editor",
+        "Transparansi" => "Transparency",
+        "Pilih skema warna dasar untuk seluruh antarmuka aplikasi." => "Choose the base color scheme for the entire application interface.",
+        "Sesuaikan warna penekanan untuk tombol, seleksi, dan tautan." => "Customize the highlight color for buttons, selections, and links.",
+        "Sesuaikan jarak antar elemen UI (Nyaman atau Kompak)." => "Adjust the spacing between UI elements (Cozy or Compact).",
+        "Skala perbesaran antarmuka editor dan teks." => "Scale the zoom level of the editor interface and text.",
+        "Ganti bahasa pelokalan aplikasi." => "Change the localization language of the application.",
         _ => id,
     }
 }
