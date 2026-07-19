@@ -21,6 +21,8 @@ pub struct GalleryState {
     pub items: Vec<Item>,
     /// Cached grid thumbnails (None = decode failed, don't retry).
     pub thumbs: HashMap<PathBuf, Option<egui::TextureHandle>>,
+    /// Keep track of insertion order to evict old thumbnails (garbage collection).
+    thumb_order: Vec<PathBuf>,
     /// Item whose popup preview is open.
     selected: Option<usize>,
     /// Cached popup preview (path it was decoded from + its texture).
@@ -52,6 +54,7 @@ impl GalleryState {
     fn rescan(&mut self) {
         self.items.clear();
         self.thumbs.clear();
+        self.thumb_order.clear();
         self.selected = None;
         self.preview = None;
         let Some(dir) = &self.folder else { return };
@@ -149,6 +152,7 @@ impl GalleryState {
                 self.items = items;
                 self.folder = Some(dir);
                 self.thumbs.clear();
+                self.thumb_order.clear();
                 self.selected = None;
                 self.preview = None;
                 self.error = None;
@@ -159,6 +163,16 @@ impl GalleryState {
 
     /// Decode + cache a small grid thumbnail for `path`.
     pub fn load_thumb(&mut self, ctx: &egui::Context, path: &PathBuf) {
+        // Enforce garbage collection: cap thumbnail cache to 128 items
+        const MAX_THUMBS: usize = 128;
+        if !self.thumbs.contains_key(path) {
+            self.thumb_order.push(path.clone());
+            if self.thumb_order.len() > MAX_THUMBS {
+                let oldest = self.thumb_order.remove(0);
+                self.thumbs.remove(&oldest);
+            }
+        }
+
         let tex = match image::open(path) {
             Ok(img) => {
                 let rgba = img.thumbnail(256, 256).to_rgba8();

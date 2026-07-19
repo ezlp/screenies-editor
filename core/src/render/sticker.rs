@@ -93,6 +93,7 @@ fn decode_source(key: u64, data_base64: &str) -> Result<Arc<RgbaImage>, AppError
     let mut cache = decoded_cache().lock().unwrap();
     if cache.len() >= MAX_DECODED {
         cache.clear(); // rare backstop; keeps memory bounded
+        resized_cache().lock().unwrap().clear(); // also clear resized cache (garbage collection)
     }
     cache.insert(key, img.clone());
     Ok(img)

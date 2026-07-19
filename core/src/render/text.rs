@@ -34,7 +34,11 @@ fn faces_for(family: &str) -> Result<Arc<Faces>, AppError> {
         return Ok(faces.clone());
     }
     let faces = Arc::new(load_faces(family)?);
-    cache.lock().unwrap().insert(family.to_string(), faces.clone());
+    let mut map = cache.lock().unwrap();
+    if map.len() >= 8 {
+        map.clear(); // Evict all cached fonts to release memory when threshold is reached
+    }
+    map.insert(family.to_string(), faces.clone());
     Ok(faces)
 }
 
