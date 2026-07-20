@@ -424,9 +424,10 @@ impl eframe::App for App {
                 });
             });
 
-        // Sync active tool into the editor before drawing, and read it back
+        // Sync active tool and layout mode into the editor before drawing, and read them back
         // afterwards so clicks inside the editor update App state.
         self.editor.active_tool = self.active_tool;
+        self.editor.unified_layout = self.unified_layout;
         egui::CentralPanel::default().show(ctx, |ui| match self.screen {
             Screen::Menu => self.menu(ui),
             Screen::Editor => self.editor.ui(ui),
@@ -436,8 +437,9 @@ impl eframe::App for App {
             }
             Screen::Settings => self.settings_screen(ui, &theme_obj),
         });
-        // read back the active tool (user may have clicked the rail)
+        // read back the active tool and layout (user may have clicked the toggle or rail)
         self.active_tool = self.editor.active_tool;
+        self.unified_layout = self.editor.unified_layout;
 
         // Gallery → "Buka di editor": load the photo and jump to the editor.
         if let Some(path) = self.gallery.open_request.take() {
@@ -667,6 +669,44 @@ impl App {
             ui.selectable_value(&mut self.dense, false, t(lang, "Nyaman"));
             ui.selectable_value(&mut self.dense, true, t(lang, "Kompak"));
         });
+        ui.add_space(8.0);
+
+        // Layout Mode toggle
+        ui.label(t(lang, "Tata Letak Antarmuka"));
+        ui.small(t(lang, "Pilih tata letak antarmuka editor: Unified UI (semua alat dalam satu panel) atau Classic UI (navigasi tab terpisah)."));
+        ui.add_space(4.0);
+        ui.horizontal(|ui| {
+            ui.selectable_value(&mut self.unified_layout, false, "Classic UI");
+            ui.selectable_value(&mut self.unified_layout, true, "Unified UI");
+        });
+        ui.add_space(12.0);
+
+        // ImgBB Cloud API Key section
+        ui.label("ImgBB Cloud API Key");
+        ui.small(t(lang, "Kunci API untuk mengunggah gambar secara langsung ke ImgBB."));
+        ui.add_space(4.0);
+        let mut key_str = self.imgbb_api_key.clone().unwrap_or_default();
+        if ui.add(egui::TextEdit::singleline(&mut key_str).password(true).desired_width(280.0)).changed() {
+            self.imgbb_api_key = if key_str.trim().is_empty() { None } else { Some(key_str.trim().to_string()) };
+        }
+        ui.add_space(12.0);
+
+        // Hotkeys section
+        ui.label(t(lang, "Pintasan Kibor (Shortcuts)"));
+        ui.separator();
+        ui.small(t(lang, "Sesuaikan tombol pintasan untuk tindakan cepat."));
+        ui.add_space(6.0);
+
+        let mut hotkey_keys: Vec<String> = self.hotkeys.keys().cloned().collect();
+        hotkey_keys.sort();
+        for action in hotkey_keys {
+            if let Some(binding) = self.hotkeys.get_mut(&action) {
+                ui.horizontal(|ui| {
+                    ui.label(format!("{action}:"));
+                    ui.text_edit_singleline(binding);
+                });
+            }
+        }
         ui.add_space(12.0);
 
         // Editing defaults section

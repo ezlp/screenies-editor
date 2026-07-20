@@ -162,6 +162,12 @@ pub fn t(lang: Lang, id: &'static str) -> &'static str {
         "Di dalam album" => "In Album",
         "Salin tautan" => "Copy link",
         "Konfigurasi API Key ImgBB di Pengaturan untuk mengunggah" => "Configure ImgBB API Key in Settings to upload",
+        "Tata Letak Antarmuka" => "Interface Layout",
+        "Pintasan Kibor (Shortcuts)" => "Keyboard Shortcuts",
+        "Kunci API untuk mengunggah gambar secara langsung ke ImgBB." => "API Key for uploading images directly to ImgBB.",
+        "Sesuaikan tombol pintasan untuk tindakan cepat." => "Customize shortcut keys for fast actions.",
+        "Ganti tata letak antarmuka editor" => "Toggle editor interface layout",
+        "Foto & Dokumen" => "Photos & Documents",
         _ => id,
     }
 }

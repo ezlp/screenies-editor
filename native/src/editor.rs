@@ -192,6 +192,7 @@ pub struct EditorState {
 
     /// UI language, set by the App each frame.
     pub lang: crate::i18n::Lang,
+    pub unified_layout: bool,
 
     /// Chatlog-folder browser popup (grab chatlog text to paste).
     chatlog: crate::chatlog_browser::ChatlogBrowser,
@@ -268,6 +269,7 @@ impl Default for EditorState {
             text_selection: None,
             custom_color: [255, 255, 255],
             lang: crate::i18n::Lang::default(),
+            unified_layout: false,
             chatlog: crate::chatlog_browser::ChatlogBrowser::default(),
             font_family: "Verdana".into(),
             font_list: Vec::new(),
@@ -420,21 +422,74 @@ impl EditorState {
     }
 
     fn controls(&mut self, ui: &mut egui::Ui) {
-        // Main scrollable content
-        egui::ScrollArea::vertical().show(ui, |ui| {
-            ui.add_space(6.0);
-
-            // Dispatch to the active tool panel.
-            match self.active_tool {
-                Tool::Photo => self.tool_photo(ui),
-                Tool::Crop => self.tool_crop(ui),
-                Tool::Chatlog => self.tool_chatlog(ui),
-                Tool::Text => self.tool_text(ui),
-                Tool::Fx => self.tool_fx(ui),
+        ui.horizontal(|ui| {
+            let label = if self.unified_layout {
+                format!("🗂 {}", self.t("Unified UI"))
+            } else {
+                format!("🔲 {}", self.t("Classic UI"))
+            };
+            if ui.button(label).on_hover_text(self.t("Ganti tata letak antarmuka editor")).clicked() {
+                self.unified_layout = !self.unified_layout;
             }
         });
+        ui.separator();
 
-        // Fixed action bar at bottom of the controls panel.
+        if self.unified_layout {
+            self.controls_unified(ui);
+        } else {
+            // Main scrollable content
+            egui::ScrollArea::vertical().show(ui, |ui| {
+                ui.add_space(6.0);
+
+                // Dispatch to the active tool panel.
+                match self.active_tool {
+                    Tool::Photo => self.tool_photo(ui),
+                    Tool::Crop => self.tool_crop(ui),
+                    Tool::Chatlog => self.tool_chatlog(ui),
+                    Tool::Text => self.tool_text(ui),
+                    Tool::Fx => self.tool_fx(ui),
+                }
+            });
+
+            // Fixed action bar at bottom of the controls panel.
+            ui.separator();
+            ui.horizontal(|ui| {
+                if ui.button(self.t("💾  Export PNG")).clicked() {
+                    self.export();
+                }
+            });
+        }
+    }
+
+    fn controls_unified(&mut self, ui: &mut egui::Ui) {
+        egui::ScrollArea::vertical().show(ui, |ui| {
+            ui.add_space(4.0);
+
+            ui.collapsing(format!("🖼 {}", self.t("Foto & Dokumen")), |ui| {
+                self.tool_photo(ui);
+            });
+            ui.add_space(4.0);
+
+            ui.collapsing(format!("💬 {}", self.t("Chatlog")), |ui| {
+                self.tool_chatlog(ui);
+            });
+            ui.add_space(4.0);
+
+            ui.collapsing(format!("✏ {}", self.t("Teks")), |ui| {
+                self.tool_text(ui);
+            });
+            ui.add_space(4.0);
+
+            ui.collapsing(format!("✂ {}", self.t("Potong")), |ui| {
+                self.tool_crop(ui);
+            });
+            ui.add_space(4.0);
+
+            ui.collapsing(format!("✨ {}", self.t("Efek")), |ui| {
+                self.tool_fx(ui);
+            });
+        });
+
         ui.separator();
         ui.horizontal(|ui| {
             if ui.button(self.t("💾  Export PNG")).clicked() {
