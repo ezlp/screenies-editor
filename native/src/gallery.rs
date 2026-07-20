@@ -8,6 +8,14 @@ use screenies_core::gallery::{self, Item};
 use crate::icons;
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum UploadStatus {
+    Uploading,
+    Success(String),
+    Error(String),
+}
 
 /// Thumbnails decoded per frame — keeps a big folder responsive while it fills.
 const THUMBS_PER_FRAME: usize = 6;
@@ -40,6 +48,9 @@ pub struct GalleryState {
     pub albums: Vec<Album>,
     pub selected_album_id: Option<String>,
     pub filter_by_album: bool,
+    pub uploaded_links: HashMap<String, String>,
+    pub imgbb_api_key: Option<String>,
+    pub upload_status: Arc<Mutex<HashMap<PathBuf, UploadStatus>>>,
     /// Cached grid thumbnails (None = decode failed, don't retry).
     pub thumbs: HashMap<PathBuf, Option<egui::TextureHandle>>,
     /// Keep track of insertion order to evict old thumbnails (garbage collection).
@@ -333,8 +344,10 @@ impl GalleryState {
                             }
 
                             if self.active_tab == GalleryTab::Edits {
+                                let path_str = path.to_string_lossy().into_owned();
+
+                                // Check if an album is selected for assignment
                                 if let Some(album_id) = &self.selected_album_id {
-                                    let path_str = path.to_string_lossy().into_owned();
                                     let mut in_album = false;
                                     if let Some(album) = self.albums.iter().find(|a| &a.id == album_id) {
                                         in_album = album.image_paths.contains(&path_str);
@@ -345,10 +358,60 @@ impl GalleryState {
                                         if let Some(album) = self.albums.iter_mut().find(|a| &a.id == album_id) {
                                             if check_val {
                                                 if !album.image_paths.contains(&path_str) {
-                                                    album.image_paths.push(path_str);
+                                                    album.image_paths.push(path_str.clone());
                                                 }
                                             } else {
                                                 album.image_paths.retain(|p| p != &path_str);
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // Check background upload status updates
+                                let status = {
+                                    let map = self.upload_status.lock().unwrap();
+                                    map.get(&path).cloned()
+                                };
+                                if let Some(UploadStatus::Success(ref new_url)) = status {
+                                    self.uploaded_links.insert(path_str.clone(), new_url.clone());
+                                }
+
+                                // Render URL / Upload Controls directly underneath
+                                if let Some(url) = self.uploaded_links.get(&path_str).cloned() {
+                                    ui.horizontal(|ui| {
+                                        let mut temp_url = url.clone();
+                                        ui.add(egui::TextEdit::singleline(&mut temp_url).desired_width(100.0));
+                                        if ui.small_button("📋").on_hover_text(self.t("Salin tautan")).clicked() {
+                                            ui.ctx().copy_text(url);
+                                        }
+                                    });
+                                } else {
+                                    match status {
+                                        Some(UploadStatus::Uploading) => {
+                                            ui.horizontal(|ui| {
+                                                ui.spinner();
+                                                ui.small("Uploading...");
+                                            });
+                                        }
+                                        Some(UploadStatus::Error(ref err_msg)) => {
+                                            let has_key = self.imgbb_api_key.as_ref().map_or(false, |k| !k.is_empty());
+                                            if ui.add_enabled(has_key, egui::Button::new("📤 Retry")).on_hover_text(err_msg).clicked() {
+                                                if let Some(key) = &self.imgbb_api_key {
+                                                    perform_upload(key.clone(), path.clone(), self.upload_status.clone());
+                                                }
+                                            }
+                                        }
+                                        _ => {
+                                            let has_key = self.imgbb_api_key.as_ref().map_or(false, |k| !k.is_empty());
+                                            let tooltip = if has_key {
+                                                "Upload to ImgBB"
+                                            } else {
+                                                self.t("Konfigurasi API Key ImgBB di Pengaturan untuk mengunggah")
+                                            };
+                                            if ui.add_enabled(has_key, egui::Button::new("📤 Upload")).on_hover_text(tooltip).clicked() {
+                                                if let Some(key) = &self.imgbb_api_key {
+                                                    perform_upload(key.clone(), path.clone(), self.upload_status.clone());
+                                                }
                                             }
                                         }
                                     }
@@ -509,4 +572,65 @@ impl GalleryState {
             }
         }
     }
+}
+
+fn perform_upload(api_key: String, path: PathBuf, status_map: Arc<Mutex<HashMap<PathBuf, UploadStatus>>>) {
+    std::thread::spawn(move || {
+        {
+            let mut map = status_map.lock().unwrap();
+            map.insert(path.clone(), UploadStatus::Uploading);
+        }
+
+        let file_bytes = match std::fs::read(&path) {
+            Ok(bytes) => bytes,
+            Err(e) => {
+                let mut map = status_map.lock().unwrap();
+                map.insert(path, UploadStatus::Error(format!("Read error: {e}")));
+                return;
+            }
+        };
+
+        use base64::Engine;
+        let b64_image = base64::engine::general_purpose::STANDARD.encode(&file_bytes);
+
+        #[derive(serde::Deserialize)]
+        struct ImgbbResponse {
+            data: ImgbbData,
+            success: bool,
+        }
+
+        #[derive(serde::Deserialize)]
+        struct ImgbbData {
+            url: String,
+        }
+
+        let url = "https://api.imgbb.com/1/upload";
+        let res = ureq::post(url)
+            .query("key", &api_key)
+            .send_form(&[("image", &b64_image)]);
+
+        match res {
+            Ok(resp) => {
+                match resp.into_json::<ImgbbResponse>() {
+                    Ok(parsed) => {
+                        if parsed.success {
+                            let mut map = status_map.lock().unwrap();
+                            map.insert(path, UploadStatus::Success(parsed.data.url));
+                        } else {
+                            let mut map = status_map.lock().unwrap();
+                            map.insert(path, UploadStatus::Error("Upload failed".to_string()));
+                        }
+                    }
+                    Err(e) => {
+                        let mut map = status_map.lock().unwrap();
+                        map.insert(path, UploadStatus::Error(format!("JSON parse error: {e}")));
+                    }
+                }
+            }
+            Err(e) => {
+                let mut map = status_map.lock().unwrap();
+                map.insert(path, UploadStatus::Error(format!("HTTP request error: {e}")));
+            }
+        }
+    });
 }

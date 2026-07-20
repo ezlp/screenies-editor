@@ -211,6 +211,8 @@ struct Settings {
     albums: Vec<crate::gallery::Album>,
     #[serde(default)]
     selected_album_id: Option<String>,
+    #[serde(default)]
+    uploaded_links: std::collections::HashMap<String, String>,
 }
 
 fn default_true() -> bool { true }
@@ -257,6 +259,7 @@ impl Default for Settings {
             hotkeys: default_hotkeys(),
             albums: Vec::new(),
             selected_album_id: None,
+            uploaded_links: std::collections::HashMap::new(),
         }
     }
 }
@@ -328,6 +331,7 @@ impl App {
                 app.gallery.set_gallery_folder(s.gallery_folder);
                 app.gallery.albums = s.albums;
                 app.gallery.selected_album_id = s.selected_album_id;
+                app.gallery.uploaded_links = s.uploaded_links;
                 app.source_shots_folder = s.source_shots_folder;
                 app.imgbb_api_key = s.imgbb_api_key;
                 app.unified_layout = s.unified_layout;
@@ -426,7 +430,10 @@ impl eframe::App for App {
         egui::CentralPanel::default().show(ctx, |ui| match self.screen {
             Screen::Menu => self.menu(ui),
             Screen::Editor => self.editor.ui(ui),
-            Screen::Gallery => self.gallery.ui(ui),
+            Screen::Gallery => {
+                self.gallery.imgbb_api_key = self.imgbb_api_key.clone();
+                self.gallery.ui(ui);
+            }
             Screen::Settings => self.settings_screen(ui, &theme_obj),
         });
         // read back the active tool (user may have clicked the rail)
@@ -481,6 +488,7 @@ impl eframe::App for App {
             hotkeys: self.hotkeys.clone(),
             albums: self.gallery.albums.clone(),
             selected_album_id: self.gallery.selected_album_id.clone(),
+            uploaded_links: self.gallery.uploaded_links.clone(),
         };
         eframe::set_value(storage, "settings", &s);
     }

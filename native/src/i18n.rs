@@ -160,6 +160,8 @@ pub fn t(lang: Lang, id: &'static str) -> &'static str {
         "Pilih atau buat album untuk mulai menyusun cerita." => "Select or create an album to start writing your story.",
         "Filter berdasarkan album ini" => "Filter by this album",
         "Di dalam album" => "In Album",
+        "Salin tautan" => "Copy link",
+        "Konfigurasi API Key ImgBB di Pengaturan untuk mengunggah" => "Configure ImgBB API Key in Settings to upload",
         _ => id,
     }
 }
