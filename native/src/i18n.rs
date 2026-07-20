@@ -168,6 +168,8 @@ pub fn t(lang: Lang, id: &'static str) -> &'static str {
         "Sesuaikan tombol pintasan untuk tindakan cepat." => "Customize shortcut keys for fast actions.",
         "Ganti tata letak antarmuka editor" => "Toggle editor interface layout",
         "Foto & Dokumen" => "Photos & Documents",
+        "Lokasi Foto" => "Photo Location",
+        "Beralih ke Finished Edits untuk mengelola Smart Albums cerita." => "Switch to Finished Edits to manage Smart Storyline Albums.",
         _ => id,
     }
 }

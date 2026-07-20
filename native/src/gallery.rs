@@ -152,43 +152,54 @@ impl GalleryState {
     }
 
     pub fn ui(&mut self, ui: &mut egui::Ui) {
-        // Draw Tab Selector
-        let label_sources = format!("{} {}", icons::ICON_FOLDER, self.t("Source Shots"));
-        let label_edits = format!("{} {}", icons::ICON_IMAGE, self.t("Finished Edits"));
         ui.horizontal(|ui| {
-            let resp_sources = ui.selectable_value(&mut self.active_tab, GalleryTab::Sources, label_sources);
-            let resp_edits = ui.selectable_value(&mut self.active_tab, GalleryTab::Edits, label_edits);
-            if resp_sources.changed() || resp_edits.changed() {
-                self.selected = None;
-                self.preview = None;
-            }
-        });
-        ui.add_space(6.0);
+            // Left Column: Navigation Sidebar & Storyline Albums (260.0 px)
+            ui.allocate_ui_with_layout(
+                egui::vec2(260.0, ui.available_height()),
+                egui::Layout::top_down(egui::Align::Min),
+                |ui| {
+                    self.sidebar_panel(ui);
+                },
+            );
 
-        if self.active_tab == GalleryTab::Edits {
-            ui.horizontal(|ui| {
-                // Left Column: Album Side Panel
-                ui.allocate_ui_with_layout(
-                    egui::vec2(240.0, ui.available_height()),
-                    egui::Layout::top_down(egui::Align::Min),
-                    |ui| {
-                        self.albums_panel(ui);
-                    },
-                );
+            ui.separator();
 
-                ui.separator();
-
-                // Right Column: Grid Area
-                ui.vertical(|ui| {
-                    self.grid_panel(ui);
-                });
+            // Right Column: Photo Grid Area
+            ui.vertical(|ui| {
+                self.grid_panel(ui);
             });
-        } else {
-            self.grid_panel(ui);
-        }
+        });
 
         // Popup preview overlay (open while an item is selected).
         self.preview_window(ui.ctx());
+    }
+
+    fn sidebar_panel(&mut self, ui: &mut egui::Ui) {
+        // Section 1: Folder Selector
+        ui.label(egui::RichText::new(self.t("Lokasi Foto")).strong().size(14.0));
+        ui.add_space(4.0);
+
+        let label_sources = format!("{} {}", icons::ICON_FOLDER, self.t("Source Shots"));
+        let label_edits = format!("{} {}", icons::ICON_IMAGE, self.t("Finished Edits"));
+
+        let resp_sources = ui.selectable_value(&mut self.active_tab, GalleryTab::Sources, label_sources);
+        let resp_edits = ui.selectable_value(&mut self.active_tab, GalleryTab::Edits, label_edits);
+
+        if resp_sources.changed() || resp_edits.changed() {
+            self.selected = None;
+            self.preview = None;
+        }
+
+        ui.add_space(12.0);
+        ui.separator();
+        ui.add_space(8.0);
+
+        // Section 2: Smart Albums (for Finished Edits)
+        if self.active_tab == GalleryTab::Edits {
+            self.albums_panel(ui);
+        } else {
+            ui.weak(self.t("Beralih ke Finished Edits untuk mengelola Smart Albums cerita."));
+        }
     }
 
     fn albums_panel(&mut self, ui: &mut egui::Ui) {
