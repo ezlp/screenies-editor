@@ -509,9 +509,9 @@ impl App {
 
             // Row of Cards
             ui.horizontal(|ui| {
-                let card_w = 240.0;
+                let card_w = 260.0;
                 let card_h = 160.0;
-                let num_cards = 3;
+                let num_cards = 2;
                 let total_w = card_w * num_cards as f32 + ui.spacing().item_spacing.x * (num_cards - 1) as f32;
                 let avail_w = ui.available_width();
                 if avail_w > total_w {
@@ -528,18 +528,6 @@ impl App {
                     card_h,
                 ).clicked() {
                     self.screen = Screen::Editor;
-                }
-
-                // Gallery Card
-                if entry_card(
-                    ui,
-                    icons::ICON_FOLDER,
-                    t(lang, "Gallery"),
-                    t(lang, "Jelajahi foto SSRP hasil edit"),
-                    card_w,
-                    card_h,
-                ).clicked() {
-                    self.screen = Screen::Gallery;
                 }
 
                 // Settings Card

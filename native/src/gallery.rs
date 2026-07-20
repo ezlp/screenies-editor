@@ -338,86 +338,9 @@ impl GalleryState {
                             decoded += 1;
                         }
 
-                        ui.vertical(|ui| {
-                            if self.thumb_cell(ui, i, &path) {
-                                clicked = Some(i);
-                            }
-
-                            if self.active_tab == GalleryTab::Edits {
-                                let path_str = path.to_string_lossy().into_owned();
-
-                                // Check if an album is selected for assignment
-                                if let Some(album_id) = &self.selected_album_id {
-                                    let mut in_album = false;
-                                    if let Some(album) = self.albums.iter().find(|a| &a.id == album_id) {
-                                        in_album = album.image_paths.contains(&path_str);
-                                    }
-
-                                    let mut check_val = in_album;
-                                    if ui.checkbox(&mut check_val, self.t("Di dalam album")).changed() {
-                                        if let Some(album) = self.albums.iter_mut().find(|a| &a.id == album_id) {
-                                            if check_val {
-                                                if !album.image_paths.contains(&path_str) {
-                                                    album.image_paths.push(path_str.clone());
-                                                }
-                                            } else {
-                                                album.image_paths.retain(|p| p != &path_str);
-                                            }
-                                        }
-                                    }
-                                }
-
-                                // Check background upload status updates
-                                let status = {
-                                    let map = self.upload_status.lock().unwrap();
-                                    map.get(&path).cloned()
-                                };
-                                if let Some(UploadStatus::Success(ref new_url)) = status {
-                                    self.uploaded_links.insert(path_str.clone(), new_url.clone());
-                                }
-
-                                // Render URL / Upload Controls directly underneath
-                                if let Some(url) = self.uploaded_links.get(&path_str).cloned() {
-                                    ui.horizontal(|ui| {
-                                        let mut temp_url = url.clone();
-                                        ui.add(egui::TextEdit::singleline(&mut temp_url).desired_width(100.0));
-                                        if ui.small_button("📋").on_hover_text(self.t("Salin tautan")).clicked() {
-                                            ui.ctx().copy_text(url);
-                                        }
-                                    });
-                                } else {
-                                    match status {
-                                        Some(UploadStatus::Uploading) => {
-                                            ui.horizontal(|ui| {
-                                                ui.spinner();
-                                                ui.small("Uploading...");
-                                            });
-                                        }
-                                        Some(UploadStatus::Error(ref err_msg)) => {
-                                            let has_key = self.imgbb_api_key.as_ref().map_or(false, |k| !k.is_empty());
-                                            if ui.add_enabled(has_key, egui::Button::new("📤 Retry")).on_hover_text(err_msg).clicked() {
-                                                if let Some(key) = &self.imgbb_api_key {
-                                                    perform_upload(key.clone(), path.clone(), self.upload_status.clone());
-                                                }
-                                            }
-                                        }
-                                        _ => {
-                                            let has_key = self.imgbb_api_key.as_ref().map_or(false, |k| !k.is_empty());
-                                            let tooltip = if has_key {
-                                                "Upload to ImgBB"
-                                            } else {
-                                                self.t("Konfigurasi API Key ImgBB di Pengaturan untuk mengunggah")
-                                            };
-                                            if ui.add_enabled(has_key, egui::Button::new("📤 Upload")).on_hover_text(tooltip).clicked() {
-                                                if let Some(key) = &self.imgbb_api_key {
-                                                    perform_upload(key.clone(), path.clone(), self.upload_status.clone());
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        });
+                        if self.thumb_cell(ui, i, &path) {
+                            clicked = Some(i);
+                        }
                     }
                 });
             });
@@ -430,23 +353,50 @@ impl GalleryState {
         }
     }
 
-    /// One grid cell: a clickable thumbnail (or a placeholder while it decodes),
-    /// with the filename as a tooltip. Returns true when clicked.
+    /// One grid cell: a clean clickable thumbnail with small status indicators.
     fn thumb_cell(&self, ui: &mut egui::Ui, i: usize, path: &PathBuf) -> bool {
         let name = match self.active_tab {
             GalleryTab::Sources => self.source_items[i].name.clone(),
             GalleryTab::Edits => self.finished_items[i].name.clone(),
         };
-        let resp = match self.thumbs.get(path) {
-            Some(Some(tex)) => {
-                let s = tex.size_vec2();
-                let scale = (THUMB_W / s.x).min(THUMB_H / s.y).min(1.0);
-                let img = egui::Image::new(egui::load::SizedTexture::new(tex.id(), s * scale));
-                ui.add(egui::ImageButton::new(img))
-            }
-            _ => ui.add_sized([THUMB_W, THUMB_H], egui::Button::new("…")),
+
+        let path_str = path.to_string_lossy().into_owned();
+        let is_uploaded = self.uploaded_links.contains_key(&path_str);
+        let in_selected_album = if let Some(album_id) = &self.selected_album_id {
+            self.albums.iter().find(|a| &a.id == album_id).map_or(false, |a| a.image_paths.contains(&path_str))
+        } else {
+            false
         };
-        resp.on_hover_text(name).clicked()
+
+        let mut clicked = false;
+        ui.vertical_centered(|ui| {
+            let resp = match self.thumbs.get(path) {
+                Some(Some(tex)) => {
+                    let s = tex.size_vec2();
+                    let scale = (THUMB_W / s.x).min(THUMB_H / s.y).min(1.0);
+                    let img = egui::Image::new(egui::load::SizedTexture::new(tex.id(), s * scale));
+                    ui.add(egui::ImageButton::new(img))
+                }
+                _ => ui.add_sized([THUMB_W, THUMB_H], egui::Button::new("…")),
+            };
+
+            let mut badge = String::new();
+            if is_uploaded {
+                badge.push_str("☁ ");
+            }
+            if in_selected_album {
+                badge.push_str("🏷 ");
+            }
+            let label_text = format!("{badge}{name}");
+
+            ui.add_sized([THUMB_W, 20.0], egui::Label::new(egui::RichText::new(label_text).weak().size(11.0)).truncate());
+
+            if resp.on_hover_text(&name).clicked() {
+                clicked = true;
+            }
+        });
+
+        clicked
     }
 
     fn open_folder(&mut self) {
@@ -503,7 +453,7 @@ impl GalleryState {
         self.thumbs.insert(path.clone(), tex);
     }
 
-    /// Popup preview window for the selected item (no-op when none selected).
+    /// Spacious Inspector window for the selected item (no-op when none selected).
     fn preview_window(&mut self, ctx: &egui::Context) {
         let Some(i) = self.selected else {
             return;
@@ -520,30 +470,126 @@ impl GalleryState {
             GalleryTab::Sources => (self.source_items[i].name.clone(), self.source_items[i].path.clone()),
             GalleryTab::Edits => (self.finished_items[i].name.clone(), self.finished_items[i].path.clone()),
         };
+        let path_str = path.to_string_lossy().into_owned();
+
+        // Sync background upload status updates
+        let status = {
+            let map = self.upload_status.lock().unwrap();
+            map.get(&path).cloned()
+        };
+        if let Some(UploadStatus::Success(ref new_url)) = status {
+            self.uploaded_links.insert(path_str.clone(), new_url.clone());
+        }
+
         let open_lbl = format!("{} {}", icons::ICON_PENCIL, self.t("Buka di editor"));
         let mut open = true;
-        egui::Window::new(format!("{} {name}", icons::ICON_IMAGE))
+
+        egui::Window::new(format!("🖼 {name}"))
             .open(&mut open)
             .collapsible(false)
-            .default_width(760.0)
-            .default_height(560.0)
+            .default_width(840.0)
+            .default_height(580.0)
             .show(ctx, |ui| {
-                if ui.button(open_lbl).clicked() {
-                    self.open_request = Some(path.clone());
-                }
-                ui.separator();
-                self.ensure_preview(ctx, &path);
-                if let Some((_, tex)) = &self.preview {
-                    let avail = ui.available_size();
-                    let s = tex.size_vec2();
-                    let scale = (avail.x / s.x).min(avail.y / s.y).min(1.0);
-                    ui.centered_and_justified(|ui| {
-                        ui.image(egui::load::SizedTexture::new(tex.id(), s * scale));
+                ui.horizontal(|ui| {
+                    // Left Column: Image Preview
+                    ui.allocate_ui_with_layout(
+                        egui::vec2(540.0, ui.available_height()),
+                        egui::Layout::top_down(egui::Align::Center),
+                        |ui| {
+                            self.ensure_preview(ctx, &path);
+                            if let Some((_, tex)) = &self.preview {
+                                let avail = ui.available_size();
+                                let s = tex.size_vec2();
+                                let scale = (avail.x / s.x).min(avail.y / s.y).min(1.0);
+                                ui.centered_and_justified(|ui| {
+                                    ui.image(egui::load::SizedTexture::new(tex.id(), s * scale));
+                                });
+                            } else if let Some(err) = &self.error {
+                                ui.colored_label(ui.visuals().error_fg_color, err);
+                            }
+                        },
+                    );
+
+                    ui.separator();
+
+                    // Right Column: Inspector Controls
+                    ui.vertical(|ui| {
+                        ui.label(egui::RichText::new(&name).strong().size(14.0));
+                        ui.small(path.display().to_string());
+                        ui.add_space(8.0);
+
+                        if ui.button(open_lbl).clicked() {
+                            self.open_request = Some(path.clone());
+                        }
+                        ui.add_space(8.0);
+
+                        // ImgBB Cloud Uploader Section
+                        ui.label(egui::RichText::new("ImgBB Cloud").strong());
+                        if let Some(url) = self.uploaded_links.get(&path_str).cloned() {
+                            ui.small("Raw Direct URL:");
+                            ui.horizontal(|ui| {
+                                let mut temp_url = url.clone();
+                                ui.add(egui::TextEdit::singleline(&mut temp_url).desired_width(180.0));
+                                if ui.small_button("📋").on_hover_text(self.t("Salin tautan")).clicked() {
+                                    ui.ctx().copy_text(url);
+                                }
+                            });
+                        } else {
+                            match status {
+                                Some(UploadStatus::Uploading) => {
+                                    ui.horizontal(|ui| {
+                                        ui.spinner();
+                                        ui.small("Uploading...");
+                                    });
+                                }
+                                Some(UploadStatus::Error(ref err_msg)) => {
+                                    let has_key = self.imgbb_api_key.as_ref().map_or(false, |k| !k.is_empty());
+                                    if ui.add_enabled(has_key, egui::Button::new("📤 Retry Upload")).on_hover_text(err_msg).clicked() {
+                                        if let Some(key) = &self.imgbb_api_key {
+                                            perform_upload(key.clone(), path.clone(), self.upload_status.clone());
+                                        }
+                                    }
+                                }
+                                _ => {
+                                    let has_key = self.imgbb_api_key.as_ref().map_or(false, |k| !k.is_empty());
+                                    let tooltip = if has_key {
+                                        "Upload screenshot to ImgBB"
+                                    } else {
+                                        self.t("Konfigurasi API Key ImgBB di Pengaturan untuk mengunggah")
+                                    };
+                                    if ui.add_enabled(has_key, egui::Button::new("📤 Unggah ke ImgBB")).on_hover_text(tooltip).clicked() {
+                                        if let Some(key) = &self.imgbb_api_key {
+                                            perform_upload(key.clone(), path.clone(), self.upload_status.clone());
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        ui.add_space(12.0);
+                        ui.separator();
+                        ui.add_space(8.0);
+
+                        // Storyline Albums Section
+                        if self.active_tab == GalleryTab::Edits && !self.albums.is_empty() {
+                            ui.label(egui::RichText::new("Smart Albums").strong());
+                            for album in self.albums.iter_mut() {
+                                let mut in_album = album.image_paths.contains(&path_str);
+                                if ui.checkbox(&mut in_album, &album.title).changed() {
+                                    if in_album {
+                                        if !album.image_paths.contains(&path_str) {
+                                            album.image_paths.push(path_str.clone());
+                                        }
+                                    } else {
+                                        album.image_paths.retain(|p| p != &path_str);
+                                    }
+                                }
+                            }
+                        }
                     });
-                } else if let Some(err) = &self.error {
-                    ui.colored_label(ui.visuals().error_fg_color, err);
-                }
+                });
             });
+
         // Close on the window ✕, or after jumping to the editor.
         if !open || self.open_request.is_some() {
             self.selected = None;
