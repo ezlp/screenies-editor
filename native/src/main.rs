@@ -507,41 +507,47 @@ impl App {
             ui.label(t(lang, "Screenshot Roleplay toolkit — komunitas SA-MP"));
             ui.add_space(32.0);
 
-            // Row of Cards
-            ui.horizontal(|ui| {
-                let card_w = 260.0;
-                let card_h = 160.0;
-                let num_cards = 2;
-                let total_w = card_w * num_cards as f32 + ui.spacing().item_spacing.x * (num_cards - 1) as f32;
-                let avail_w = ui.available_width();
-                if avail_w > total_w {
-                    ui.add_space((avail_w - total_w) / 2.0);
-                }
+            // Vertical Stack of Cards
+            let card_w = 440.0;
+            let card_h = 64.0;
 
-                // Editor Card
-                if entry_card(
-                    ui,
-                    icons::ICON_IMAGE,
-                    t(lang, "SSRP Editor"),
-                    t(lang, "Crop · chatlog · filter · export"),
-                    card_w,
-                    card_h,
-                ).clicked() {
-                    self.screen = Screen::Editor;
-                }
+            // Editor Card
+            if entry_card(
+                ui,
+                icons::ICON_IMAGE,
+                t(lang, "SSRP Editor"),
+                t(lang, "Crop · chatlog · filter · export"),
+                card_w,
+                card_h,
+            ).clicked() {
+                self.screen = Screen::Editor;
+            }
+            ui.add_space(12.0);
 
-                // Settings Card
-                if entry_card(
-                    ui,
-                    icons::ICON_SETTINGS,
-                    t(lang, "Settings"),
-                    t(lang, "Bahasa · tema · ukuran ruang edit"),
-                    card_w,
-                    card_h,
-                ).clicked() {
-                    self.screen = Screen::Settings;
-                }
-            });
+            // Gallery Card
+            if entry_card(
+                ui,
+                icons::ICON_FOLDER,
+                t(lang, "Gallery"),
+                t(lang, "Jelajahi foto SSRP hasil edit"),
+                card_w,
+                card_h,
+            ).clicked() {
+                self.screen = Screen::Gallery;
+            }
+            ui.add_space(12.0);
+
+            // Settings Card
+            if entry_card(
+                ui,
+                icons::ICON_SETTINGS,
+                t(lang, "Settings"),
+                t(lang, "Bahasa · tema · ukuran ruang edit"),
+                card_w,
+                card_h,
+            ).clicked() {
+                self.screen = Screen::Settings;
+            }
 
             // Recent shots strip
             if let Some(_folder) = self.gallery.gallery_folder() {
@@ -561,27 +567,23 @@ impl App {
                         }
 
                         for i in 0..limit {
-                            let path = self.gallery.finished_items[i].path.clone();
-                            if !self.gallery.thumbs.contains_key(&path) {
-                                self.gallery.load_thumb(ui.ctx(), &path);
-                            }
-
-                            let clicked = match self.gallery.thumbs.get(&path) {
-                                Some(Some(tex)) => {
+                            let item = &self.gallery.finished_items[i];
+                            ui.vertical(|ui| {
+                                if let Some(Some(tex)) = self.gallery.thumbs.get(&item.path) {
                                     let s = tex.size_vec2();
                                     let scale = (thumb_w / s.x).min(thumb_h / s.y).min(1.0);
                                     let img = egui::Image::new(egui::load::SizedTexture::new(tex.id(), s * scale));
-                                    ui.add(egui::ImageButton::new(img))
-                                        .on_hover_text(&self.gallery.finished_items[i].name)
-                                        .clicked()
+                                    if ui.add(egui::ImageButton::new(img)).on_hover_text(&item.name).clicked() {
+                                        self.gallery.open_request = Some(item.path.clone());
+                                        self.screen = Screen::Editor;
+                                    }
+                                } else {
+                                    if ui.add_sized([thumb_w, thumb_h], egui::Button::new("…")).on_hover_text(&item.name).clicked() {
+                                        self.gallery.open_request = Some(item.path.clone());
+                                        self.screen = Screen::Editor;
+                                    }
                                 }
-                                _ => ui.add_sized([thumb_w, thumb_h], egui::Button::new("…")).clicked(),
-                            };
-
-                            if clicked {
-                                self.editor.load_photo_path(&path);
-                                self.screen = Screen::Editor;
-                            }
+                            });
                         }
                     });
                 }

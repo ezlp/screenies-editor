@@ -19,10 +19,9 @@ pub enum UploadStatus {
 
 /// Thumbnails decoded per frame — keeps a big folder responsive while it fills.
 const THUMBS_PER_FRAME: usize = 6;
-/// Vertical Thumbnail Card dimensions (px).
-const CARD_W: f32 = 130.0;
-const CARD_H: f32 = 160.0;
-const IMG_H: f32 = 110.0;
+/// Thumbnail grid cell box (px).
+const THUMB_W: f32 = 160.0;
+const THUMB_H: f32 = 120.0;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize, Default)]
 pub enum GalleryTab {
@@ -365,7 +364,7 @@ impl GalleryState {
         }
     }
 
-    /// One grid cell: a structured vertical card with thumbnail frame and badges.
+    /// One grid cell: a clean clickable thumbnail with small status indicators.
     fn thumb_cell(&self, ui: &mut egui::Ui, i: usize, path: &PathBuf) -> bool {
         let name = match self.active_tab {
             GalleryTab::Sources => self.source_items[i].name.clone(),
@@ -381,45 +380,31 @@ impl GalleryState {
         };
 
         let mut clicked = false;
-
-        let frame = egui::Frame::none()
-            .fill(ui.visuals().faint_bg_color)
-            .stroke(ui.visuals().widgets.noninteractive.bg_stroke)
-            .rounding(egui::Rounding::same(8.0))
-            .inner_margin(egui::Margin::same(6.0));
-
-        frame.show(ui, |ui| {
-            ui.set_width(CARD_W);
-            ui.set_height(CARD_H);
-
-            ui.vertical_centered(|ui| {
-                let resp = match self.thumbs.get(path) {
-                    Some(Some(tex)) => {
-                        let s = tex.size_vec2();
-                        let scale = (CARD_W / s.x).min(IMG_H / s.y).min(1.0);
-                        let img = egui::Image::new(egui::load::SizedTexture::new(tex.id(), s * scale));
-                        ui.add_sized([CARD_W, IMG_H], egui::ImageButton::new(img))
-                    }
-                    _ => ui.add_sized([CARD_W, IMG_H], egui::Button::new("…")),
-                };
-
-                ui.add_space(4.0);
-
-                let mut badge = String::new();
-                if is_uploaded {
-                    badge.push_str("☁ ");
+        ui.vertical_centered(|ui| {
+            let resp = match self.thumbs.get(path) {
+                Some(Some(tex)) => {
+                    let s = tex.size_vec2();
+                    let scale = (THUMB_W / s.x).min(THUMB_H / s.y).min(1.0);
+                    let img = egui::Image::new(egui::load::SizedTexture::new(tex.id(), s * scale));
+                    ui.add(egui::ImageButton::new(img))
                 }
-                if in_selected_album {
-                    badge.push_str("🏷 ");
-                }
-                let label_text = format!("{badge}{name}");
+                _ => ui.add_sized([THUMB_W, THUMB_H], egui::Button::new("…")),
+            };
 
-                ui.add_sized([CARD_W, 24.0], egui::Label::new(egui::RichText::new(label_text).size(11.0).strong()).truncate());
+            let mut badge = String::new();
+            if is_uploaded {
+                badge.push_str("☁ ");
+            }
+            if in_selected_album {
+                badge.push_str("🏷 ");
+            }
+            let label_text = format!("{badge}{name}");
 
-                if resp.on_hover_text(&name).clicked() {
-                    clicked = true;
-                }
-            });
+            ui.add_sized([THUMB_W, 20.0], egui::Label::new(egui::RichText::new(label_text).weak().size(11.0)).truncate());
+
+            if resp.on_hover_text(&name).clicked() {
+                clicked = true;
+            }
         });
 
         clicked
