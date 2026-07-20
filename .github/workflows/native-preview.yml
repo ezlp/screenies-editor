@@ -79,14 +79,30 @@ jobs:
             --icon-filename screenies-native \
             --output appimage
 
-      - name: Stage artifacts (copy direct files without zip)
+      - name: Stage artifacts (copy separate direct files without zip)
         shell: bash
         run: |
           mkdir -p out
-          cp native/target/release/screenies-native out/screenies-native-linux-x86_64
-          cp native/target/debian/*.deb out/
-          cp native/target/generate-rpm/*.rpm out/
-          cp native/*.AppImage out/ 2>/dev/null || echo "no AppImage (best-effort step may have failed)"
+          TAG_NAME="${{ github.ref_name }}"
+          VERSION="${TAG_NAME#v}"
+          
+          # Raw binary
+          cp native/target/release/screenies-native "out/screenies-editor-${TAG_NAME}-linux-x86_64"
+          
+          # .deb package
+          for f in native/target/debian/*.deb; do
+            [ -e "$f" ] && cp "$f" "out/screenies-editor_${VERSION}_amd64.deb"
+          done
+          
+          # .rpm package
+          for f in native/target/generate-rpm/*.rpm; do
+            [ -e "$f" ] && cp "$f" "out/screenies-editor-${VERSION}-1.x86_64.rpm"
+          done
+          
+          # AppImage
+          for f in native/*.AppImage; do
+            [ -e "$f" ] && cp "$f" "out/screenies-editor-${TAG_NAME}-x86_64.AppImage"
+          done
 
       - uses: actions/upload-artifact@v7
         with:
