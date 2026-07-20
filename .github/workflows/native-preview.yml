@@ -51,7 +51,7 @@ jobs:
       # Compile the packagers from source to match system glibc exactly.
       - name: Install packagers
         run: |
-          cargo install cargo-deb --version 3.1.0 || cargo install cargo-deb --git https://github.com/kornelski/cargo-deb.git
+          cargo install cargo-deb --locked
           cargo install cargo-generate-rpm --locked
 
       - name: Package .deb
