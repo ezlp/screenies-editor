@@ -1,5 +1,21 @@
 # Changelog (ringkas per rilis)
 
+- **v4.0.0 — Dual-Tab Gallery, Smart Albums, ImgBB Cloud Uploader, Unified Fast-Editor & Custom Shortcuts (2026-07-20)**
+  - **Segmented Dual-Tab Gallery**: Gallery divided into **Source Shots** (raw unedited screenshots) and **Finished Edits** (exported SSRP artwork).
+  - **Smart Albums & Storyline Narrative Logs**: Create custom storyline albums (e.g. *Faction Heist*, *Daily Patrol*), write storyline narrative descriptions, assign screenshots to albums, and filter grid images by album.
+  - **ImgBB Cloud Uploader**: Non-blocking background thread HTTP uploader (`ureq` + `base64`), direct raw URL display inline right below thumbnails, and one-click clipboard copy button (`📋`).
+  - **Unified Fast-Editor UI**: Consolidated single scrollable page mode (`controls_unified`) containing all tool sections (Photo, Chatlog, Text, Crop, Fx).
+  - **On-The-Fly Layout Switcher**: Header toggle button `🗂 Unified UI` / `🔲 Classic UI` to switch editor layouts dynamically.
+  - **Settings Customization**: Custom keyboard shortcuts table mapping, ImgBB API key password field, and layout preference selector.
+  - **Pure-Rust TLS**: HTTP stack built with `ureq` and `rustls` (zero system OpenSSL dependencies).
+
+- **v3.0.0 — Theme Engine, Navigation Rail, Default Anchors & Transparency (2026-07-19)**
+  - **Theme Engine**: 7 built-in themes (Midnight, Paper, Dark, Light, Cyberpunk, Forest, Slate) with custom Accent Color picker.
+  - **UI Density Switcher**: Cozy vs Compact mode for tight screens.
+  - **Default Editing Anchors**: Default anchor configuration (`Free`, `Top Left`, `Bottom Left`).
+  - **Sticker Transparency Slider**: Per-sticker opacity slider (0.0 to 1.0) with alpha-blended composition export.
+  - **Raw Binary Packaging**: Fixed CI workflow to release unzipped raw Linux binaries (`.deb`, `.rpm`, `.AppImage`, raw executable).
+
 - **2.0 (preview, `2.0-migration` branch) — native egui, no webview.** The
   shell moved from Tauri (WebView2/WebKitGTK + TypeScript) to a pure-Rust
   **egui/eframe** app; the Rust engine (`screenies-core`) is unchanged. The
