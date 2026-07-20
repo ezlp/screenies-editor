@@ -83,11 +83,12 @@ jobs:
         shell: bash
         run: |
           mkdir -p out
-          TAG_NAME="${{ github.ref_name }}"
-          VERSION="${TAG_NAME#v}"
+          RAW_REF="${{ github.ref_name }}"
+          SAFE_NAME="${RAW_REF//\//-}"
+          VERSION="${SAFE_NAME#v}"
           
           # Raw binary
-          cp native/target/release/screenies-native "out/screenies-editor-${TAG_NAME}-linux-x86_64"
+          cp native/target/release/screenies-native "out/screenies-editor-${SAFE_NAME}-linux-x86_64"
           
           # .deb package
           for f in native/target/debian/*.deb; do
@@ -101,7 +102,7 @@ jobs:
           
           # AppImage
           for f in native/*.AppImage; do
-            [ -e "$f" ] && cp "$f" "out/screenies-editor-${TAG_NAME}-x86_64.AppImage"
+            [ -e "$f" ] && cp "$f" "out/screenies-editor-${SAFE_NAME}-x86_64.AppImage"
           done
 
       - uses: actions/upload-artifact@v7
@@ -127,7 +128,9 @@ jobs:
         shell: bash
         run: |
           mkdir -p out
-          cp native/target/release/screenies-native.exe out/screenies-native-windows-x86_64.exe
+          RAW_REF="${{ github.ref_name }}"
+          SAFE_NAME="${RAW_REF//\//-}"
+          cp native/target/release/screenies-native.exe "out/screenies-editor-${SAFE_NAME}-windows-x86_64.exe"
 
       - uses: actions/upload-artifact@v7
         with:
