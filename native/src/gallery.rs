@@ -96,6 +96,7 @@ impl GalleryState {
         }
     }
 
+    #[allow(dead_code)]
     pub fn rescan(&mut self) {
         match self.active_tab {
             GalleryTab::Sources => self.rescan_sources(),

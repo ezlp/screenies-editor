@@ -332,7 +332,8 @@ impl App {
                 app.gallery.albums = s.albums;
                 app.gallery.selected_album_id = s.selected_album_id;
                 app.gallery.uploaded_links = s.uploaded_links;
-                app.source_shots_folder = s.source_shots_folder;
+                app.source_shots_folder = s.source_shots_folder.clone();
+                app.gallery.set_source_shots_folder(s.source_shots_folder);
                 app.imgbb_api_key = s.imgbb_api_key;
                 app.unified_layout = s.unified_layout;
                 for (k, v) in s.hotkeys {
@@ -484,7 +485,7 @@ impl eframe::App for App {
             active_tool: self.active_tool.id().to_string(),
             last_open_folder: self.editor.last_open_folder(),
             last_save_folder: self.editor.last_save_folder(),
-            source_shots_folder: self.source_shots_folder.clone(),
+            source_shots_folder: self.gallery.source_shots_folder(),
             imgbb_api_key: self.imgbb_api_key.clone(),
             unified_layout: self.unified_layout,
             hotkeys: self.hotkeys.clone(),
