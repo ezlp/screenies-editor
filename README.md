@@ -1,58 +1,73 @@
 <div align="center">
 
-# 🖼️ ScreeniesEditor 2.0
+# 🖼️ ScreeniesEditor v4.0.0
 
-**Editor Screenshot Roleplay (SSRP) untuk komunitas SA-MP Indonesia**
+**Editor Screenshot Roleplay (SSRP) Native untuk Komunitas SA-MP & GTA Roleplay**
 
-Tempel chatlog → warna otomatis → filter → export PNG tajam.
-Semua offline, tanpa upload ke mana-mana.
+Tempel chatlog → Warna Otomatis → Edit & Crop → Unggah ImgBB / Album Cerita → Export PNG Tajam.  
+Murni berbasis **Native Rust (egui)** — super cepat, tanpa WebView2/Edge, hemat RAM & berjalan mulus di laptop spek rendah.
 
-*oleh Isut Indraputra & Claude (Anthropic)* · **English:** [README.en.md](README.en.md)
+*Oleh Isut Indraputra & DeepMind (Google Antigravity)* · **English Version:** [README.en.md](README.en.md)
 
 </div>
 
 ---
 
-## 🚧 Status: 2.0 preview (native, tanpa webview)
+## 🌟 Fitur Utama v4.0.0
 
-Versi 2.0 adalah aplikasi **native Rust (egui)** — **tanpa WebView2/Edge**,
-biar jalan di laptop lama, binary kecil. Backend Rust (`core`) sama seperti
-sebelumnya. Saat ini **tahap preview/alpha**.
+### 🗂️ 1. Galeri Dua Tab (Tangkapan Mentah vs Hasil Edit)
+* **Tab Tangkapan Mentah (Source Shots)**: Jelajahi screenshot game yang belum diedit.
+* **Tab Hasil Edit (Finished Edits)**: Tempat menyimpan dan mengelola karya SSRP yang sudah diekspor.
 
-- **Coba preview:** ambil dari **[Releases](../../releases)** (`native-preview-*`)
-  — Windows `.exe`, Linux `.deb` / `.rpm` / binary.
-- Versi **1.x** (berbasis Tauri/WebView2) yang lama ada di branch `main`
-  dan tag `v1.*`.
+### 📚 2. Smart Albums & Log Deskripsi Narasi
+* Buat album khusus cerita roleplay (misal: *Faction Heist*, *Daily Patrol*, *Business Meeting*).
+* Tambahkan **judul album & deskripsi narasi cerita** secara interaktif.
+* Tandai gambar untuk dimasukkan ke dalam album dan gunakan fitur **Filter Album** untuk menyaring tampilan galeri.
 
-## ✨ Fitur (preview)
+### ☁️ 3. Cloud Uploader ImgBB & Salin Tautan Langsung
+* Unggah hasil foto langsung ke layanan cloud ImgBB di latar belakang (*async non-blocking*).
+* Menampilkan URL langsung (*raw image URL*) tepat di bawah thumbnail gambar tanpa pop-up mengganggu.
+* Tombol **Salin Tautan (📋)** satu-klik ke clipboard.
+* Integrasi API Key ImgBB di menu Pengaturan.
 
-| | |
+### ⚡ 4. Unified Fast-Editor UI & Pengaturan Shortcuts
+* **Unified UI Mode**: Menggabungkan seluruh panel alat (Foto, Chatlog, Teks, Potong, Efek) ke dalam satu halaman lipat serbaguna untuk pengeditan super cepat.
+* **Layout Switcher**: Tombol cepat `🗂 Unified UI` / `🔲 Classic UI` di bagian header editor untuk berpindah tata letak secara instant.
+* **Pintasan Kibor (Shortcuts)**: Tabel pengaturan hotkey kustom untuk tindakan cepat (`Open`, `Paste`, `Export`, `Undo`, `Redo`, `Cinematic`).
+
+### 🎨 5. Theme Engine & Kepadatan Antarmuka
+* 7 Pilihan Tema bawaan (Midnight, Paper, Dark, Light, Cyberpunk, Forest, Slate).
+* Kustomisasi warna penekanan (*Accent Color Picker*).
+* Pilihan Kepadatan UI (Nyaman vs Kompak).
+* Bahasa Indonesia & English full localization support.
+
+---
+
+## 🔧 Teknologi & Performa
+
+| Komponen | Teknologi |
 |---|---|
-| 📋 **Parser chatlog** | Timestamp `[HH:MM:SS]` dibuang, `*` /me ungu, `(( ))` OOC abu, `/do`, tag `SERVER:` bold, kode `{RRGGBB}` — preset per server (JGRP/Umum/Polos) |
-| 🖼️ **Foto** | Muat gambar (PNG/JPG/WebP/BMP), preview langsung |
-| 🎛️ **Filter** | Brightness / Contrast / Grayscale / Sepia / Saturate |
-| ✨ **Efek 2.0** | **Blur** & **Pixelate** (sensor nama/plat) |
-| ✍️ **Teks** | Font, ukuran 8–60px, outline (auto), jarak baris |
-| 🏷️ **Background teks** | Blok (per baris) / Mask (selebar) · posisi Bebas / Kiri Atas / Kiri Bawah |
-| 💾 **Export** | Render penuh via `core` — **preview = PNG** (parity by identity) |
+| **Core Engine** | Pure Rust (`screenies-core`) — parser chatlog, pipeline composition, filter, crop, sticker, font rasterization |
+| **Desktop Shell** | `egui` / `eframe` — GUI native tanpa WebView2 / Edge |
+| **Network & HTTP** | `ureq` + `rustls` — Pure-Rust TLS HTTP client tanpa dependensi OpenSSL sistem |
+| **Render Engine** | `image` + `ab_glyph` + `fontdb` — Lanczos resampling, blur/pixelate filter, text stroke generation |
 
-Belum masuk preview (fase berikutnya): crop editor, stiker, palet warna,
-undo/redo, multi-chatlog, i18n, simpan setelan, **Chatlog Parser** (cari di
-folder log), **Gallery** hasil edit.
+---
 
-## 🔧 Teknologi
+## ⬇️ Unduh Aplikasi
 
-| | |
-|---|---|
-| **Rust** | Seluruh logika di crate `core` — parser + pipeline render/export, teruji (`cargo test`) |
-| **egui / eframe** | Shell desktop native, pure-Rust, tanpa C++/webview |
-| **image + ab_glyph** | Decode/crop/resize Lanczos, filter (incl. blur/pixelate), rasterisasi teks + outline |
-| **fontdb** · **arboard** | Font sistem · copy PNG ke clipboard |
+Dapatkan rilis binary terbaru dari halaman **[Releases](../../releases/tag/v4.0.0)**:
+* 🪟 **Windows**: `screenies-editor-v4.0.0-windows-x86_64.exe` (Portable Binary)
+* 🐧 **Linux**: `screenies-editor-v4.0.0-linux-x86_64` (Raw Executable), `.deb` (Debian/Ubuntu), `.rpm` (Fedora/RHEL), `.AppImage`
 
-Arsitektur: **[docs/DEVELOPMENT.md](docs/DEVELOPMENT.md)** ·
-Rencana 2.0: **[docs/2.0-MIGRATION.md](docs/2.0-MIGRATION.md)** ·
-Preset: **[docs/PRESETS.md](docs/PRESETS.md)** ·
-Riwayat: **[docs/CHANGELOG.md](docs/CHANGELOG.md)**
+---
+
+## 📖 Panduan Pengembangan
+
+Lihat dokumentasi teknis di folder `docs/`:
+* **[DEVELOPMENT.md](docs/DEVELOPMENT.md)** — Struktur direktori & panduan kontribusi.
+* **[PRESETS.md](docs/PRESETS.md)** — Skema preset warna parser chatlog.
+* **[CHANGELOG.md](docs/CHANGELOG.md)** — Catatan perubahan antar versi rilis.
 
 ---
 
