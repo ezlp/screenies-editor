@@ -60,6 +60,26 @@ Download the pre-compiled binaries from **[Releases](../../releases/tag/v4.0.0)*
 * 🪟 **Windows**: `screenies-editor-v4.0.0-windows-x86_64.exe` (Portable Executable)
 * 🐧 **Linux**: `screenies-editor-v4.0.0-linux-x86_64` (Raw Binary), `.deb` (Debian/Ubuntu), `.rpm` (Fedora/RHEL), `.AppImage`
 
+## 🗺️ Project Map
+
+```
+core/   screenies-core — standalone pure Rust engine (all core logic):
+        chatlog/     parser: timestamp → autocolor → systag → preset
+        render/      compose → crop → filters (blur/pixelate) → sticker → layout → text
+        chatlog_library.rs   folder index & search
+        gallery.rs           photo lister & file filter
+        fonts.rs             shared fontdb (one-time system font scan)
+native/ screenies-native — native egui/eframe desktop shell (pure Rust):
+        main.rs             app entry, screen navigation & persistent Settings
+        editor.rs           editor state, Classic UI & Unified Fast-Editor UI modes
+        gallery.rs          Dual-Tab Gallery, Smart Albums & ImgBB Cloud Uploader
+        theme.rs            Theme Engine (7 themes + accent picker + UI density)
+        i18n.rs             bilingual localization dictionary (ID / EN)
+        chatlog_browser.rs  chatlog search & instant text grabber
+examples/presets/   community color presets (.toml) for chatlog parser
+docs/               technical guides, schema docs, changelog & migration notes
+```
+
 ---
 
 ## 📖 Developer Documentation

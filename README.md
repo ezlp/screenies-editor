@@ -60,6 +60,26 @@ Dapatkan rilis binary terbaru dari halaman **[Releases](../../releases/tag/v4.0.
 * 🪟 **Windows**: `screenies-editor-v4.0.0-windows-x86_64.exe` (Portable Binary)
 * 🐧 **Linux**: `screenies-editor-v4.0.0-linux-x86_64` (Raw Executable), `.deb` (Debian/Ubuntu), `.rpm` (Fedora/RHEL), `.AppImage`
 
+## 🗺️ Peta Proyek (Project Map)
+
+```
+core/   screenies-core — engine utama murni Rust (seluruh logika inti):
+        chatlog/     parser: timestamp → autocolor → systag → preset
+        render/      compose → crop → filters (blur/pixelate) → sticker → layout → text
+        chatlog_library.rs   indeks & pencarian log folder
+        gallery.rs           pencacah file & filter galeri
+        fonts.rs             shared fontdb (pemindaian font sistem sekali)
+native/ screenies-native — antarmuka desktop native egui/eframe (Pure Rust):
+        main.rs             entri aplikasi, navigasi layar & penyimpanan Settings
+        editor.rs           status editor, mode Classic UI & Unified Fast-Editor UI
+        gallery.rs          Galeri Dua Tab, Smart Albums & ImgBB Cloud Uploader
+        theme.rs            Theme Engine (7 tema + accent picker + kepadatan UI)
+        i18n.rs             kamus pelokalan dua bahasa (ID / EN)
+        chatlog_browser.rs  pencari chatlog & pengambil teks instan
+examples/presets/   preset warna komunal (.toml) untuk parser chatlog
+docs/               panduan teknis, dokumentasi skema, changelog & migrasi
+```
+
 ---
 
 ## 📖 Panduan Pengembangan

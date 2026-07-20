@@ -10,16 +10,21 @@ How the codebase works, for anyone (including future-us) touching the code.
 
 ```
 core/   screenies-core — the shell-independent engine (all the real logic):
-        chatlog/   parser: timestamp → autocolor → systag
-        render/    compose → crop → filters (incl. blur/pixelate) →
-                   sticker → layout (wrap+positioning) → text
-        chatlog_library.rs   folder index + search   (2.0 feature)
-        gallery.rs           exported-photo listing   (2.0 feature)
-        fonts.rs   shared fontdb (scanned once)   clipboard.rs   error.rs
-native/ screenies-native — the egui/eframe shell (pure Rust). Consumes core.
-        Excluded from the default workspace (needs GUI system-deps):
-        `cd native && cargo run`.
-examples/presets/   community parsing presets (.toml) the parser accepts.
+        chatlog/     parser: timestamp → autocolor → systag → preset
+        render/      compose → crop → filters (incl. blur/pixelate) →
+                     sticker (with opacity) → layout (wrap+positioning) → text
+        chatlog_library.rs   folder index + search
+        gallery.rs           exported-photo listing & file filter
+        fonts.rs             shared fontdb (scanned once)
+native/ screenies-native — the egui/eframe desktop shell (pure Rust):
+        main.rs             app entry, screen router, persistent Settings
+        editor.rs           editor state, Classic UI & Unified Fast-Editor UI modes
+        gallery.rs          Dual-Tab Gallery (Sources vs Edits), Smart Albums & ImgBB Cloud Uploader
+        theme.rs            Theme Engine (7 themes + accent picker + density)
+        i18n.rs             bilingual localization dictionary (ID / EN)
+        chatlog_browser.rs  chatlog search & instant text grabber
+examples/presets/   community parsing presets (.toml)
+docs/               technical guides, presets schema, changelog & migration docs
 ```
 
 `cargo test --workspace` builds/tests `core` (fast; no GUI/JS needed). CI runs
