@@ -2,93 +2,93 @@
 
 # 🖼️ ScreeniesEditor v4.0.0
 
-**Editor Screenshot Roleplay (SSRP) Native untuk Komunitas SA-MP & GTA Roleplay**
+**Native Screenshot Roleplay (SSRP) Editor for SA-MP & GTA Roleplay Communities**
 
-Tempel chatlog → Warna Otomatis → Edit & Crop → Unggah ImgBB / Album Cerita → Export PNG Tajam.  
-Murni berbasis **Native Rust (egui)** — super cepat, tanpa WebView2/Edge, hemat RAM & berjalan mulus di laptop spek rendah.
+Paste Chatlog → Auto Color → Edit & Crop → ImgBB Upload / Storyline Albums → Export Sharp PNG.  
+Built 100% in **Native Rust (egui)** — ultra-fast, zero WebView2/Edge, low RAM footprint, smooth on low-spec laptops.
 
-*Oleh Isut Indraputra & DeepMind (Google Antigravity)* · **English Version:** [README.en.md](README.en.md)
+*by Isut Indraputra & DeepMind (Google Antigravity)* · **Bahasa Indonesia:** [README.id.md](README.id.md)
 
 </div>
 
 ---
 
-## 🌟 Fitur Utama v4.0.0
+## 🌟 Key Features in v4.0.0
 
-### 🗂️ 1. Galeri Dua Tab (Tangkapan Mentah vs Hasil Edit)
-* **Tab Tangkapan Mentah (Source Shots)**: Jelajahi screenshot game yang belum diedit.
-* **Tab Hasil Edit (Finished Edits)**: Tempat menyimpan dan mengelola karya SSRP yang sudah diekspor.
+### 🗂️ 1. Segmented Dual-Tab Gallery (Sources vs Edits)
+* **Source Shots Tab**: Browse raw, unedited in-game screenshots.
+* **Finished Edits Tab**: Manage and organize exported SSRP artwork.
 
-### 📚 2. Smart Albums & Log Deskripsi Narasi
-* Buat album khusus cerita roleplay (misal: *Faction Heist*, *Daily Patrol*, *Business Meeting*).
-* Tambahkan **judul album & deskripsi narasi cerita** secara interaktif.
-* Tandai gambar untuk dimasukkan ke dalam album dan gunakan fitur **Filter Album** untuk menyaring tampilan galeri.
+### 📚 2. Smart Albums & Storyline Narrative Logs
+* Create storyline albums (e.g., *Faction Heist*, *Daily Patrol*, *Business Meeting*).
+* Edit custom **album titles & narrative storyline logs**.
+* Assign screenshots to albums and toggle **Album Filtering** to focus your gallery view.
 
-### ☁️ 3. Cloud Uploader ImgBB & Salin Tautan Langsung
-* Unggah hasil foto langsung ke layanan cloud ImgBB di latar belakang (*async non-blocking*).
-* Menampilkan URL langsung (*raw image URL*) tepat di bawah thumbnail gambar tanpa pop-up mengganggu.
-* Tombol **Salin Tautan (📋)** satu-klik ke clipboard.
-* Integrasi API Key ImgBB di menu Pengaturan.
+### ☁️ 3. ImgBB Cloud Direct Uploader & Inline Link Copy
+* Upload finished screenshots to ImgBB cloud storage in the background (non-blocking async).
+* Displays raw direct image URLs inline right beneath thumbnails with zero intrusive popups.
+* One-click **Copy Link (📋)** button to clipboard.
+* User API key configuration in Settings.
 
-### ⚡ 4. Unified Fast-Editor UI & Pengaturan Shortcuts
-* **Unified UI Mode**: Menggabungkan seluruh panel alat (Foto, Chatlog, Teks, Potong, Efek) ke dalam satu halaman lipat serbaguna untuk pengeditan super cepat.
-* **Layout Switcher**: Tombol cepat `🗂 Unified UI` / `🔲 Classic UI` di bagian header editor untuk berpindah tata letak secara instant.
-* **Pintasan Kibor (Shortcuts)**: Tabel pengaturan hotkey kustom untuk tindakan cepat (`Open`, `Paste`, `Export`, `Undo`, `Redo`, `Cinematic`).
+### ⚡ 4. Unified Fast-Editor UI & Custom Shortcuts
+* **Unified UI Mode**: Consolidates all tool panels (Photo, Chatlog, Text, Crop, Fx) into a single collapsible sidebar for lightning-fast editing.
+* **Layout Switcher**: Header toggle button `🗂 Unified UI` / `🔲 Classic UI` to switch layouts instantly.
+* **Shortcuts & Keybindings**: Customizable hotkeys mapping table for fast actions (`Open`, `Paste`, `Export`, `Undo`, `Redo`, `Cinematic`).
 
-### 🎨 5. Theme Engine & Kepadatan Antarmuka
-* 7 Pilihan Tema bawaan (Midnight, Paper, Dark, Light, Cyberpunk, Forest, Slate).
-* Kustomisasi warna penekanan (*Accent Color Picker*).
-* Pilihan Kepadatan UI (Nyaman vs Kompak).
-* Bahasa Indonesia & English full localization support.
+### 🎨 5. Theme Engine & UI Density Customization
+* 7 Built-in Themes (Midnight, Paper, Dark, Light, Cyberpunk, Forest, Slate).
+* Custom Accent Color picker.
+* UI Density toggle (Cozy vs Compact).
+* Full localization support for English & Bahasa Indonesia.
 
 ---
 
-## 🔧 Teknologi & Performa
+## 🔧 Tech Stack & Performance
 
-| Komponen | Teknologi |
+| Component | Technology |
 |---|---|
-| **Core Engine** | Pure Rust (`screenies-core`) — parser chatlog, pipeline composition, filter, crop, sticker, font rasterization |
-| **Desktop Shell** | `egui` / `eframe` — GUI native tanpa WebView2 / Edge |
-| **Network & HTTP** | `ureq` + `rustls` — Pure-Rust TLS HTTP client tanpa dependensi OpenSSL sistem |
-| **Render Engine** | `image` + `ab_glyph` + `fontdb` — Lanczos resampling, blur/pixelate filter, text stroke generation |
+| **Core Engine** | Pure Rust (`screenies-core`) — chatlog parser, composition pipeline, filters, crop, stickers, font rasterization |
+| **Desktop Shell** | `egui` / `eframe` — Native GUI without WebView2 or Edge dependencies |
+| **Networking & HTTP** | `ureq` + `rustls` — Pure-Rust TLS HTTP stack without system OpenSSL dependencies |
+| **Render Engine** | `image` + `ab_glyph` + `fontdb` — Lanczos resampling, blur/pixelate filters, text stroke rendering |
 
 ---
 
-## ⬇️ Unduh Aplikasi
+## ⬇️ Download
 
-Dapatkan rilis binary terbaru dari halaman **[Releases](../../releases/tag/v4.0.0)**:
-* 🪟 **Windows**: `screenies-editor-v4.0.0-windows-x86_64.exe` (Portable Binary)
-* 🐧 **Linux**: `screenies-editor-v4.0.0-linux-x86_64` (Raw Executable), `.deb` (Debian/Ubuntu), `.rpm` (Fedora/RHEL), `.AppImage`
+Download the pre-compiled binaries from **[Releases](../../releases/tag/v4.0.0)**:
+* 🪟 **Windows**: `screenies-editor-v4.0.0-windows-x86_64.exe` (Portable Executable)
+* 🐧 **Linux**: `screenies-editor-v4.0.0-linux-x86_64` (Raw Binary), `.deb` (Debian/Ubuntu), `.rpm` (Fedora/RHEL), `.AppImage`
 
-## 🗺️ Peta Proyek (Project Map)
+## 🗺️ Project Map
 
 ```
-core/   screenies-core — engine utama murni Rust (seluruh logika inti):
+core/   screenies-core — standalone pure Rust engine (all core logic):
         chatlog/     parser: timestamp → autocolor → systag → preset
         render/      compose → crop → filters (blur/pixelate) → sticker → layout → text
-        chatlog_library.rs   indeks & pencarian log folder
-        gallery.rs           pencacah file & filter galeri
-        fonts.rs             shared fontdb (pemindaian font sistem sekali)
-native/ screenies-native — antarmuka desktop native egui/eframe (Pure Rust):
-        main.rs             entri aplikasi, navigasi layar & penyimpanan Settings
-        editor.rs           status editor, mode Classic UI & Unified Fast-Editor UI
-        gallery.rs          Galeri Dua Tab, Smart Albums & ImgBB Cloud Uploader
-        theme.rs            Theme Engine (7 tema + accent picker + kepadatan UI)
-        i18n.rs             kamus pelokalan dua bahasa (ID / EN)
-        chatlog_browser.rs  pencari chatlog & pengambil teks instan
-examples/presets/   preset warna komunal (.toml) untuk parser chatlog
-docs/               panduan teknis, dokumentasi skema, changelog & migrasi
+        chatlog_library.rs   folder index & search
+        gallery.rs           photo lister & file filter
+        fonts.rs             shared fontdb (one-time system font scan)
+native/ screenies-native — native egui/eframe desktop shell (pure Rust):
+        main.rs             app entry, screen navigation & persistent Settings
+        editor.rs           editor state, Classic UI & Unified Fast-Editor UI modes
+        gallery.rs          Dual-Tab Gallery, Smart Albums & ImgBB Cloud Uploader
+        theme.rs            Theme Engine (7 themes + accent picker + UI density)
+        i18n.rs             bilingual localization dictionary (ID / EN)
+        chatlog_browser.rs  chatlog search & instant text grabber
+examples/presets/   community color presets (.toml) for chatlog parser
+docs/               technical guides, schema docs, changelog & migration notes
 ```
 
 ---
 
-## 📖 Panduan Pengembangan
+## 📖 Developer Documentation
 
-Lihat dokumentasi teknis di folder `docs/`:
-* **[DEVELOPMENT.md](docs/DEVELOPMENT.md)** — Struktur direktori & panduan kontribusi.
-* **[PRESETS.md](docs/PRESETS.md)** — Skema preset warna parser chatlog.
-* **[CHANGELOG.md](docs/CHANGELOG.md)** — Catatan perubahan antar versi rilis.
+Refer to technical guides in `docs/`:
+* **[DEVELOPMENT.md](docs/DEVELOPMENT.md)** — Directory layout & contribution guidelines.
+* **[PRESETS.md](docs/PRESETS.md)** — Chatlog parser auto-color preset specification.
+* **[CHANGELOG.md](docs/CHANGELOG.md)** — Release history & version notes.
 
 ---
 
-<div align="center">Dibuat dengan ❤️ untuk komunitas roleplay SA-MP Indonesia</div>
+<div align="center">Made with ❤️ for the SA-MP roleplay community</div>

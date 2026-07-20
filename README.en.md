@@ -7,7 +7,7 @@
 Paste Chatlog → Auto Color → Edit & Crop → ImgBB Upload / Storyline Albums → Export Sharp PNG.  
 Built 100% in **Native Rust (egui)** — ultra-fast, zero WebView2/Edge, low RAM footprint, smooth on low-spec laptops.
 
-*by Isut Indraputra & DeepMind (Google Antigravity)* · **Bahasa Indonesia:** [README.md](README.md)
+*by Isut Indraputra & DeepMind (Google Antigravity)* · **Bahasa Indonesia:** [README.id.md](README.id.md)
 
 </div>
 
