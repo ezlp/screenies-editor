@@ -18,8 +18,7 @@ on:
   push:
     tags:
       - "native-preview-*" # rolling preview builds
-      - "v2.*" # versioned 2.x releases
-      - "v3.*" # versioned 3.x releases (e.g. v3.0.0)
+      - "v*" # all versioned releases (v2.*, v3.*, v4.*, etc.)
 
 permissions:
   contents: write # create/update the pre-release
@@ -27,7 +26,7 @@ permissions:
 jobs:
   linux:
     name: Build Linux (.deb / .rpm)
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
 
@@ -49,10 +48,11 @@ jobs:
         working-directory: native
         run: cargo build --release
 
-      # Compile the packagers from source (the prebuilt binaries need a newer
-      # glibc than ubuntu-22.04 has; 22.04 is intentional for wide .deb compat).
+      # Compile the packagers from source to match system glibc exactly.
       - name: Install packagers
-        run: cargo install cargo-deb cargo-generate-rpm --locked
+        run: |
+          cargo install cargo-deb --version 3.1.0 || cargo install cargo-deb --git https://github.com/kornelski/cargo-deb.git
+          cargo install cargo-generate-rpm --locked
 
       - name: Package .deb
         working-directory: native
@@ -121,7 +121,7 @@ jobs:
   release:
     name: Publish pre-release
     needs: [linux, windows]
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     steps:
       - name: Download built artifacts
         uses: actions/download-artifact@v8
@@ -138,31 +138,23 @@ jobs:
           # pre-releases; clean tags (v2.0.0) publish as a stable release.
           prerelease: ${{ contains(github.ref_name, '-') }}
           body: |
-            ## ScreeniesEditor 3.0 — TL;DR
+            ## ScreeniesEditor 4.0 — Release Notes
 
-            **A complete native Rust app (egui) with a brand-new persistent left navigation rail, premium custom theme support, lightweight icon font, and memory garbage collection.**
+            **A major native Rust (egui) release featuring Dual-Tab Gallery, Smart Storyline Albums, ImgBB Cloud Uploader, Unified Fast-Editor, and Customizable Shortcuts.**
 
-            ### What's inside
-            - **SSRP Editor** — load **multiple photos** (tabs) · crop presets
-              (Free / 1:1 / 4:3 / 16:9 / 21:9 / **800×600**) · multi-block chatlog
-              with SA-MP auto-colors + `{RRGGBB}` + server presets · font / size /
-              spacing / outline · filters (brightness · contrast · grayscale ·
-              sepia · saturate) · **local blur / pixelate censor boxes** · stickers
-              · color palette · **undo / redo** · sharp PNG export.
-            - **Chatlog folder** — remembers a folder of `.log` files; open one to
-              preview the raw text (with `{RRGGBB}` codes) and copy it to paste.
-            - **Gallery** *(WIP)* — browse exported photos, open one back in the editor.
-            - **Settings** — dark / light theme · **Indonesian / English** · UI
-              scale (resize the editing space). Everything is remembered across launches.
+            ### 🌟 Key Features
+            - **Segmented Dual-Tab Gallery**: Separate browsing for **Source Shots** (raw screenshots) vs **Finished Edits** (SSRP artwork).
+            - **Smart Albums & Storyline Logs**: Create custom narrative albums, write storyline descriptions, assign images, and filter gallery items by album.
+            - **ImgBB Cloud Uploader**: Non-blocking background thread HTTP uploader (`ureq` + `rustls`), direct raw image URL display, and one-click clipboard copy (`📋`).
+            - **Unified Fast-Editor UI & Shortcuts**: Single collapsible scrollable page mode (`Unified UI`), on-the-fly layout switcher (`🗂 Unified UI` / `🔲 Classic UI`), and custom hotkey mapping.
+            - **Theme Engine**: 7 built-in themes, accent picker, and UI density mode (Cozy vs Compact).
 
-            ### Download
-            - **Windows:** `screenies-native-windows-x86_64.exe` — just run it.
+            ### ⬇️ Download
+            - **Windows:** `screenies-native-windows-x86_64.exe` — portable binary, just run it.
+            - **Linux Binary:** `screenies-native-linux-x86_64` — raw executable (`chmod +x`).
             - **Debian / Ubuntu:** `*.deb` → `sudo apt install ./screenies-native_*.deb`
             - **Fedora / RHEL:** `*.rpm` → `sudo dnf install ./screenies-native-*.rpm`
-            - **Any Linux:** `*.AppImage` (`chmod +x` then run) or the raw binary
-              (needs GTK3 + OpenGL installed).
-
-            The old 1.x (Tauri / WebView2) build stays available under the `v1.*` tags.
+            - **Any Linux:** `*.AppImage` (`chmod +x` then run).
 
             Hit a bug? Please open an issue.
           files: dist/**/*
